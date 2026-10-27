@@ -1,0 +1,178 @@
+{
+  "app": {
+    "name": "Trainer",
+    "loading": "Loading…",
+    "comingSoon": "This section is ready for implementation."
+  },
+  "announcement": {
+    "message": "The Free Guide to Running a More Organized Personal Training Business",
+    "cta": "Download Here",
+    "dismiss": "Dismiss announcement"
+  },
+  "nav": {
+    "home": "Home",
+    "about": "About",
+    "pages": "Pages",
+    "services": "Services",
+    "contact": "Contact",
+    "login": "Log in",
+    "register": "Register",
+    "getStarted": "Get started",
+    "main": "Main navigation",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "overview": "Overview",
+    "subscribers": "Subscribers",
+    "registrationRequests": "Registration requests",
+    "packages": "Packages",
+    "subscriptions": "Subscriptions",
+    "workouts": "Workouts",
+    "nutrition": "Nutrition",
+    "content": "Content library",
+    "progress": "Progress",
+    "staff": "Staff & permissions",
+    "reports": "Reports",
+    "workout": "Workout plan",
+    "library": "Videos & documents",
+    "workoutLog": "Workout log",
+    "nutritionLog": "Nutrition log",
+    "history": "History",
+    "subscription": "My subscription",
+    "profile": "Profile",
+    "logout": "Log out",
+    "language": "Language"
+  },
+  "auth": {
+    "loginTitle": "Log in",
+    "registerTitle": "Request a subscription",
+    "unauthorized": "You do not have access to this area.",
+    "subscriptionExpired": "Your subscription is inactive or expired."
+  },
+  "pages": {
+    "home": "Home",
+    "about": "Coach profile",
+    "services": "Services & packages",
+    "contact": "Contact",
+    "adminOverview": "Admin overview",
+    "subscriberOverview": "My dashboard"
+  },
+  "hero": {
+    "greeting": "Hi, I'm Mike",
+    "titleBefore": "Your",
+    "titleAccent": "fitness",
+    "titleAfter": "trainer",
+    "description": "Transform your body and mind with personalized workout plans tailored to your goals. Reach new heights in your fitness journey with tailored training programs.",
+    "cta": "Book a class",
+    "watermark": "Get Stronger"
+  },
+  "trust": {
+    "trustedBy": "Trusted by over <strong>380,000</strong> coaches",
+    "logosLabel": "Trusted by leading fitness brands"
+  },
+  "secondHero": {
+    "title": "Your coaching app, all in one place",
+    "caption": "Shave hours off program admin work and upgrade your coaching experience with our personal trainer app",
+    "imageAlt": "Personal trainer app shown on laptop and phone"
+  },
+  "mission": {
+    "headline": "Helping you achieve your fitness potential is my mission.",
+    "author": "Mike Vasquez",
+    "follow": "Follow me:",
+    "play": "Play video",
+    "pause": "Pause video",
+    "videoLabel": "Training session video",
+    "marquee": "BALANCE STRENGTH RENEWAL"
+  },
+  "whoIAm": {
+    "eyebrow": "Who I Am",
+    "titleLine1": "Experienced personal",
+    "titleLine2": "trainer",
+    "body": "My approach combines science-backed training techniques with personalized workout plans designed specifically for your goals—building muscle, losing weight, or improving overall health.",
+    "cta": "Get to know me",
+    "yearsValue": "14+",
+    "yearsLabel": "Years of Experience",
+    "certsTitle": "Certifications",
+    "imageAlt": "Personal trainer coaching a client with dumbbells",
+    "certs": {
+      "trainer": "Certified personal trainer",
+      "nutrition": "Nutrition specialist",
+      "strength": "Strength and conditioning coach",
+      "trusted": "Trusted by hundreds"
+    }
+  },
+  "testimonials": {
+    "title": "What my clients say",
+    "avatarsLabel": "Client testimonials",
+    "items": {
+      "sarah": {
+        "title": "I achieved my fitness goals",
+        "body": "Sarah's training has completely transformed my approach to fitness. I've lost 20 pounds and gained a new sense of vitality and self-assurance. His customized plans and ongoing support were instrumental in my success. I highly recommend him to anyone eager to change their fitness lifestyle.",
+        "author": "— Sarah L."
+      },
+      "emily": {
+        "title": "Transformed my health journey",
+        "body": "Emily guidance has been a game-changer for my fitness journey. I've shed 20 pounds and gained newfound confidence. His tailored plans and unwavering support were key to my success. I wholeheartedly recommend him to anyone committed to improving their fitness.",
+        "author": "— Emily R."
+      },
+      "samantha": {
+        "title": "Reached my personal best",
+        "body": "Samantha's expertise has been a pivotal part of my fitness journey. I've not only lost 20 pounds but also gained a new level of strength and confidence. Her personalized plans and encouragement were exactly what I needed to succeed. I can't recommend her enough for anyone looking to make a real change.",
+        "author": "— Samantha L."
+      },
+      "john": {
+        "title": "Exceeded my fitness expectations",
+        "body": "John training program has been a revelation for me. I've not only lost weight but also gained a new sense of vitality. His dedication and tailored workouts have been instrumental in my progress. I highly recommend him to anyone looking to improve their fitness.",
+        "author": "— John M."
+      },
+      "lisa": {
+        "title": "Surpassed my fitness milestones",
+        "body": "Lisa's guidance has been a turning point in my fitness journey. I've not only lost weight but also gained a new level of energy and confidence. Her customized plans and unwavering support were crucial to my success. I highly recommend her to anyone committed to improving their fitness.",
+        "author": "— Lisa M."
+      },
+      "jessica": {
+        "title": "Met my fitness objectives",
+        "body": "Jessica's expertise has been life-changing for me. I've not only lost 20 pounds but also gained a newfound strength and confidence. Her personalized guidance and unwavering support were crucial to my success. I highly recommend her to anyone serious about achieving their fitness goals.",
+        "author": "— Jessica L."
+      }
+    }
+  },
+  "dreams": {
+    "titleLine1": "What's your fitness",
+    "titleLine2": "dream?",
+    "prev": "Previous dreams",
+    "next": "Next dreams",
+    "openItem": "Explore {{title}}",
+    "items": {
+      "nutrition": {
+        "title": "Nutritional guidance",
+        "body": "Build sustainable eating habits with meal plans tailored to your goals and lifestyle.",
+        "alt": "Healthy meal prep on a wooden table"
+      },
+      "online": {
+        "title": "Online coaching",
+        "body": "Achieve your fitness goals from the comfort of your home with virtual training sessions.",
+        "alt": "Coach and client reviewing a workout on a laptop"
+      },
+      "group": {
+        "title": "Group training",
+        "body": "Join small group sessions that combine motivation from fellow trainees with personalized guidance.",
+        "alt": "Athletes training together in a gym"
+      },
+      "stress": {
+        "title": "Stress management",
+        "body": "Incorporating fitness and mindfulness techniques to help you recover, reset, and stay balanced.",
+        "alt": "Athlete pausing to breathe during a workout"
+      },
+      "strength": {
+        "title": "Personal training",
+        "body": "Progressive programs designed to build muscle, power, and confidence at your own pace.",
+        "alt": "Trainer coaching a client with a barbell"
+      },
+      "mobility": {
+        "title": "Mobility & recovery",
+        "body": "Move better every day with guided mobility flows and recovery routines that keep you injury-free.",
+        "alt": "Person stretching in a bright studio"
+      }
+    }
+  }
+}
