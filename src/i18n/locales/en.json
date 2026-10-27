@@ -44,7 +44,39 @@
   },
   "auth": {
     "loginTitle": "Log in",
+    "loginSubtitle": "Welcome back. Let’s continue your training.",
+    "loginSubmit": "Log in",
     "registerTitle": "Request a subscription",
+    "registerSubtitle": "Tell us a bit about you and we’ll get you started.",
+    "registerSubmit": "Submit request",
+    "forgotTitle": "Forgot password",
+    "forgotSubtitle": "Enter your email and we’ll send reset instructions.",
+    "forgotSubmit": "Send reset link",
+    "forgotPassword": "Forgot password?",
+    "backToLogin": "Back to log in",
+    "remember": "Keep me logged in",
+    "noAccount": "Don’t have an account?",
+    "haveAccount": "Already have an account?",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "submitting": "Please wait…",
+    "terms": "Terms of Use",
+    "privacy": "Privacy Policy",
+    "fields": {
+      "fullName": "Full name",
+      "email": "Email",
+      "phone": "Phone",
+      "password": "Password"
+    },
+    "placeholders": {
+      "fullName": "Enter your full name",
+      "email": "Enter your email",
+      "phone": "+20",
+      "password": "Enter your password"
+    },
+    "toast": {
+      "invalid": "Please fill in all fields correctly"
+    },
     "unauthorized": "You do not have access to this area.",
     "subscriptionExpired": "Your subscription is inactive or expired."
   },
@@ -133,6 +165,204 @@
         "title": "Met my fitness objectives",
         "body": "Jessica's expertise has been life-changing for me. I've not only lost 20 pounds but also gained a newfound strength and confidence. Her personalized guidance and unwavering support were crucial to my success. I highly recommend her to anyone serious about achieving their fitness goals.",
         "author": "— Jessica L."
+      }
+    }
+  },
+  "contact": {
+    "badge": "Contact",
+    "title": "Have questions or want to join?",
+    "imageAlt": "Athlete training outdoors at sunset",
+    "emergencyLabel": "Emergency Contact",
+    "emergencyPhone": "+1 (800) 123-456",
+    "emergencyPhoneRaw": "+1800123456",
+    "supportLabel": "Support Mail",
+    "supportEmail": "info@trainer.io",
+    "submit": "Reserve Your Spot",
+    "slideHint": "Slide the handle all the way to submit your request",
+    "slideLabel": "Slide to reserve your spot",
+    "slideDone": "Reserved",
+    "slideError": "Please complete the form",
+    "success": "Thank you! Your submission has been received.",
+    "successHint": "We’ll review your details and get back to you shortly.",
+    "newForm": "Submit another request",
+    "toast": {
+      "success": "Request sent successfully",
+      "invalid": "Please fill in all fields correctly",
+      "failed": "Something went wrong. Please try again."
+    },
+    "fields": {
+      "firstName": "First Name *",
+      "lastName": "Last Name *",
+      "email": "Email Address *",
+      "phone": "Phone *",
+      "plan": "Select Plan *",
+      "message": "Message *"
+    },
+    "placeholders": {
+      "firstName": "Enter your first name",
+      "lastName": "Enter your last name",
+      "email": "Enter your email",
+      "phone": "+20",
+      "plan": "Select one...",
+      "message": "Tell us about your goals or ask a question..."
+    }
+  },
+  "goalsBanner": {
+    "title": "Everything you need to train smarter and stay consistent",
+    "tabsLabel": "Platform features",
+    "cta": "Get started",
+    "tabs": {
+      "logging": "Workout Logging",
+      "videos": "Exercise Videos",
+      "messaging": "Messaging",
+      "metrics": "Metrics And Goals"
+    },
+    "items": {
+      "logging": {
+        "title": "Easy client workout logging",
+        "desc": "Clients can log sessions fast, review past results, leave comments, and ask questions — so you always know how their training is going.",
+        "imageAlt": "Workout logging dashboard with weekly program planner"
+      },
+      "videos": {
+        "title": "Clear exercise video demos",
+        "desc": "Attach form videos to every movement so clients know exactly how to train. Update demos from your library anytime without rewriting the plan.",
+        "imageAlt": "Program builder with exercise video preview"
+      },
+      "messaging": {
+        "title": "Stay close with every client",
+        "desc": "Chat one-on-one or in group channels, share updates, and keep accountability high without leaving the coaching workspace.",
+        "imageAlt": "Coach messaging and client chat interface"
+      },
+      "metrics": {
+        "title": "Track metrics and goals",
+        "desc": "Follow strength progress, body metrics, and wearable data in one place — then adjust the plan based on real results.",
+        "imageAlt": "Metrics dashboard with progress charts and wearables"
+      }
+    }
+  },
+  "transformations": {
+    "title": "Latest body transformations",
+    "viewAll": "View all case study",
+    "imageAlt": "Client body transformation {{n}}",
+    "openImage": "Open transformation {{n}}",
+    "lightboxTitle": "Body transformations gallery",
+    "close": "Close gallery",
+    "prev": "Previous image",
+    "next": "Next image",
+    "counter": "{{current}} / {{total}}"
+  },
+  "footer": {
+    "callLabel": "Feel free to call me",
+    "phone1": "+(91) 125 879 786",
+    "phone1Raw": "+91125879786",
+    "phone2": "+(84) 578 666 333",
+    "phone2Raw": "+84578666333",
+    "emailLabel": "Email me on",
+    "email": "example@gmail.com",
+    "creditBefore": "Designed by",
+    "creditBrand": "Nodex5",
+    "pagesTitle": "Pages link",
+    "utilityTitle": "Account",
+    "formTitle": "Send me a message",
+    "pages": {
+      "home": "Home",
+      "about": "About",
+      "services": "Services",
+      "packages": "Packages",
+      "testimonials": "Testimonials",
+      "transformations": "Transformations",
+      "faq": "FAQ",
+      "contact": "Contact"
+    },
+    "utility": {
+      "login": "Log in",
+      "register": "Register",
+      "dashboard": "Dashboard",
+      "workout": "Workout plan",
+      "nutrition": "Nutrition plan",
+      "progress": "Progress",
+      "profile": "Profile"
+    },
+    "form": {
+      "name": "Name",
+      "email": "Email",
+      "message": "Message",
+      "submit": "Send message",
+      "sending": "Sending…",
+      "success": "Message sent successfully",
+      "invalid": "Please fill in all fields"
+    }
+  },
+  "faq": {
+    "title": "Frequently asked questions",
+    "items": {
+      "plan": {
+        "q": "How do I choose the right plan for me?",
+        "a": "We recommend starting with a consultation to discuss your fitness goals and preferences. This way, we can tailor a plan that suits your individual needs."
+      },
+      "missed": {
+        "q": "What if I miss a scheduled training session?",
+        "a": "If you miss a scheduled training session, please contact your trainer as soon as possible to discuss rescheduling options. We understand that life can be unpredictable, and we are here to help you stay on track with your fitness goals."
+      },
+      "switch": {
+        "q": "Can I switch my plan later?",
+        "a": "Yes, you can switch your plan at any time. We understand that your needs may change, and we are flexible in accommodating those changes to ensure you have the best experience."
+      },
+      "support": {
+        "q": "How do I contact my trainer for support?",
+        "a": "You can contact your trainer for support by sending them an email or a message through the training app. They are available to assist you with any questions or concerns you may have."
+      },
+      "commit": {
+        "q": "Are there any long-term commitments?",
+        "a": "No, there are no long-term commitments required. You have the flexibility to choose a plan that fits your current needs and can adjust or cancel at any time."
+      }
+    }
+  },
+  "packages": {
+    "title": "Choose a package",
+    "bestValue": "Best value",
+    "included": "Included features:",
+    "items": {
+      "quick": {
+        "name": "Quick start consultation",
+        "price": "EGP 12",
+        "period": "/per hours",
+        "cta": "Book a call",
+        "features": {
+          "0": "1-hour personalized consultation",
+          "1": "Tailored nutrition and fitness advice",
+          "2": "Fitness and wellness recommendations",
+          "3": "Personalized fitness roadmap for your goals",
+          "4": "Access to exclusive fitness resources"
+        }
+      },
+      "transform": {
+        "name": "Complete transformation package",
+        "price": "EGP 189",
+        "period": "/month",
+        "cta": "Get started",
+        "features": {
+          "0": "Customized food & fitness plan",
+          "1": "Full fitness assessment and goal-setting",
+          "2": "Daily WhatsApp support & video calls",
+          "3": "Biometrics interpretation and feedback",
+          "4": "Weekly video calls for progress review",
+          "5": "Monthly progress reports"
+        }
+      },
+      "elite": {
+        "name": "Elite fitness coaching",
+        "price": "EGP 299",
+        "period": "/month",
+        "cta": "Book a call",
+        "features": {
+          "0": "1-on-1 Personal training sessions",
+          "1": "Customized workout & nutrition plan",
+          "2": "Weekly fitness assessments and adjustments",
+          "3": "Video feedback on form and technique",
+          "4": "VIP access to fitness workshops and webinars",
+          "5": "Bi-weekly progress reports with detailed analytics"
+        }
       }
     }
   },

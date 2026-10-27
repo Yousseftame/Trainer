@@ -53,7 +53,10 @@ export function TestimonialsSection() {
   }
 
   return (
-    <section className="w-full bg-white px-6 pb-14 pt-10 md:px-10 md:pb-16 md:pt-12 lg:px-14 lg:pb-[72px] lg:pt-12 xl:pb-[96px] xl:pt-14">
+    <section
+      id="testimonials"
+      className="w-full scroll-mt-24 bg-white px-6 pb-14 pt-10 md:px-10 md:pb-16 md:pt-12 lg:px-14 lg:pb-[72px] lg:pt-12 xl:pb-[96px] xl:pt-14"
+    >
       <div className="mx-auto w-full max-w-[1300px]">
         {/* Title sits above; desktop tabs pull up under it (GymTrainer -140/-180) */}
         <div className="relative z-10 mb-8 md:mb-10 lg:mb-11">

@@ -160,6 +160,14 @@
   --gym-muted: #4e5151;
   --gym-dropdown: #f2f4ed;
   font-family: var(--font-public);
+  overflow-x: clip;
+  max-width: 100%;
+}
+
+html:has(.public-site),
+body:has(.public-site) {
+  overflow-x: clip;
+  max-width: 100%;
 }
 
 .public-site h1,
@@ -309,6 +317,121 @@
   }
 }
 
+/* Body transformations gallery — GymTrainer .gallery-image sizes + dual marquees */
+@keyframes gallery-marquee-left {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes gallery-marquee-right {
+  from {
+    transform: translate3d(-50%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.public-site .gallery-marquee {
+  overflow: hidden;
+  /* Same isolation trick as trust-marquee — keeps LTR/RTL pages animating */
+  isolation: isolate;
+  transform: translateZ(0);
+}
+
+.public-site .gallery-marquee__track {
+  /* Force LTR layout so -50% loop math is identical in EN and AR */
+  direction: ltr !important;
+  flex-direction: row !important;
+  display: flex;
+  width: max-content;
+  gap: 0;
+  animation: gallery-marquee-left 80s linear infinite;
+  animation-play-state: running;
+  backface-visibility: hidden;
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+.public-site .gallery-marquee--reverse .gallery-marquee__track {
+  animation: gallery-marquee-right 90s linear infinite;
+  animation-play-state: running;
+}
+
+.public-site .gallery-marquee__set {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 30px;
+  /* Physical padding (not inline) so set widths stay equal under any page dir */
+  padding-right: 30px;
+}
+
+.public-site .gallery-marquee-spacer {
+  height: 30px;
+}
+
+/* Default (tablet+): 450×337.5 — GymTrainer base .gallery-image */
+.public-site .gallery-card {
+  width: 450px;
+  aspect-ratio: 800 / 600;
+}
+
+.public-site .gallery-card__image {
+  width: 100%;
+  height: 100%;
+}
+
+@media (min-width: 1280px) {
+  .public-site .gallery-card {
+    width: 570px;
+  }
+
+  .public-site .gallery-marquee__set {
+    gap: 40px;
+    padding-right: 40px;
+  }
+
+  .public-site .gallery-marquee-spacer {
+    height: 40px;
+  }
+}
+
+@media (max-width: 991px) {
+  .public-site .gallery-card {
+    width: 350px;
+  }
+}
+
+@media (max-width: 767px) {
+  .public-site .gallery-card {
+    width: 250px;
+  }
+}
+
+@media (max-width: 479px) {
+  .public-site .gallery-card {
+    width: 230px;
+  }
+}
+
+/* Touch: keep cards tappable; don't rely on hover-only affordance */
+@media (hover: none) {
+  .public-site .gallery-card {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Pause only while the lightbox is open — never on hover (hover was freezing EN) */
+body.gallery-lightbox-open .public-site .gallery-marquee__track {
+  animation-play-state: paused !important;
+}
+
 /* Mission banner — ghost watermark marquee (LTR: left → right) */
 @keyframes mission-marquee-ltr {
   from {
@@ -354,6 +477,40 @@
   -webkit-text-fill-color: transparent;
 }
 
+/* Contact — nudge so users understand they must slide to submit */
+@keyframes contact-slide-hint {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 0.75;
+  }
+  50% {
+    transform: translateX(5px);
+    opacity: 1;
+  }
+}
+
+.public-site .contact-slide-hint__chevron {
+  display: inline-block;
+  animation: contact-slide-hint 1.6s ease-in-out infinite;
+}
+
+html[dir="rtl"] .public-site .contact-slide-hint__chevron {
+  display: none;
+}
+
+.public-site .contact-slide.slide-commit {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.public-site .contact-slide .slide-commit__label {
+  font-family: var(--font-heading);
+  font-weight: 600;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .public-site .hero-wrap,
   .public-site .hero-fade {
@@ -363,8 +520,13 @@
   }
 
   .public-site .trust-marquee__track,
-  .public-site .mission-marquee__track {
+  .public-site .mission-marquee__track,
+  .public-site .gallery-marquee__track {
     animation: none;
     transform: none;
+  }
+
+  .public-site .contact-slide-hint__chevron {
+    animation: none;
   }
 }

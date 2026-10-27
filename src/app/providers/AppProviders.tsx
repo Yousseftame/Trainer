@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
-import { Toaster } from "react-hot-toast"
 import { AuthProvider } from "@/app/providers/AuthProvider"
 import { QueryProvider } from "@/app/providers/QueryProvider"
+import { AppToaster } from "@/components/ui/AppToaster"
 import "@/i18n"
 
 type AppProvidersProps = {
@@ -13,7 +13,7 @@ export function AppProviders({ children }: AppProvidersProps) {
     <QueryProvider>
       <AuthProvider>
         {children}
-        <Toaster position="top-center" />
+        <AppToaster />
       </AuthProvider>
     </QueryProvider>
   )

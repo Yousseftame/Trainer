@@ -1,56 +1,86 @@
-'use client';
+// @ts-nocheck — interaction-heavy port of React Bits SlideCommit
+import { useEffect, useRef, useState, type ReactNode } from "react"
+import {
+  animate,
+  motion,
+  useMotionValue,
+  useMotionValueEvent,
+  useReducedMotion,
+  useTransform,
+} from "motion/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { ArrowRight02Icon, Tick02Icon } from "@hugeicons/core-free-icons"
 
-import { useEffect, useRef, useState } from 'react';
-import { animate, motion, useMotionValue, useMotionValueEvent, useReducedMotion, useTransform } from 'motion/react';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { ArrowRight02Icon, Tick02Icon } from '@hugeicons/core-free-icons';
+import "./SlideCommit.css"
 
-import './SlideCommit.css';
+const PAD = 4
+const SQUASH_MAX = 0.08
+const SQUASH_DIV = 110
+const SWELL = 1.03
+const MIN_PENDING = 300
+const EASE_OUT = [0.23, 1, 0.32, 1] as const
+const SHAKE = [0, -2, 2, -1, 1, 0]
 
-const PAD = 4;
-const SQUASH_MAX = 0.08;
-const SQUASH_DIV = 110;
-const SWELL = 1.03;
-const MIN_PENDING = 300;
-const EASE_OUT = [0.23, 1, 0.32, 1];
-const SHAKE = [0, -5, 5, -3, 3, -1, 0];
+export type SlideCommitProps = {
+  label?: string
+  doneLabel?: string
+  errorLabel?: string
+  onConfirm?: () => void | Promise<unknown>
+  onDone?: () => void
+  onError?: (reason: unknown) => void
+  trackColor?: string
+  handleColor?: string
+  successColor?: string
+  dangerColor?: string
+  width?: number
+  height?: number
+  radius?: number
+  speed?: number
+  returnBounce?: number
+  landingDip?: number
+  holdMs?: number
+  disabled?: boolean
+  icon?: ReactNode
+  className?: string
+}
 
-const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
-const onColor = hex => {
-  const raw = hex.replace('#', '');
-  const full = raw.length === 3 ? [...raw].map(ch => ch + ch).join('') : raw.slice(0, 6);
-  const n = parseInt(full, 16);
-  if (Number.isNaN(n)) return '#ffffff';
-  const yiq = (((n >> 16) & 255) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000;
-  return yiq >= 128 ? '#111111' : '#ffffff';
-};
-const velocityOf = hist => {
-  if (hist.length < 2) return 0;
-  const [t0, x0] = hist[0];
-  const [t1, x1] = hist[hist.length - 1];
-  return ((x1 - x0) / Math.max(1, t1 - t0)) * 1000;
-};
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value))
+const onColor = (hex: string) => {
+  const raw = hex.replace("#", "")
+  const full = raw.length === 3 ? [...raw].map((ch) => ch + ch).join("") : raw.slice(0, 6)
+  const n = parseInt(full, 16)
+  if (Number.isNaN(n)) return "#ffffff"
+  const yiq = (((n >> 16) & 255) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000
+  return yiq >= 128 ? "#111111" : "#ffffff"
+}
+const velocityOf = (hist: Array<[number, number]>) => {
+  if (hist.length < 2) return 0
+  const [t0, x0] = hist[0]
+  const [t1, x1] = hist[hist.length - 1]
+  return ((x1 - x0) / Math.max(1, t1 - t0)) * 1000
+}
 const finePointer = () =>
-  typeof window !== 'undefined' && !!window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
+  typeof window !== "undefined" && !!window.matchMedia?.("(hover: hover) and (pointer: fine)").matches
 
-const Spinner = ({ size }) => (
+const Spinner = ({ size }: { size: number }) => (
   <svg className="slide-commit__spinner" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
     <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2.4" strokeOpacity="0.25" />
     <path d="M12 3a9 9 0 0 1 9 9" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
   </svg>
-);
+)
 
 export default function SlideCommit({
-  label = 'Slide to pay',
-  doneLabel = 'Paid',
-  errorLabel = 'Payment failed',
+  label = "Slide to pay",
+  doneLabel = "Paid",
+  errorLabel = "Payment failed",
   onConfirm,
   onDone,
   onError,
-  trackColor = '#262626',
-  handleColor = '#f5f5f5',
-  successColor = '#22c55e',
-  dangerColor = '#e5484d',
+  trackColor = "#262626",
+  handleColor = "#f5f5f5",
+  successColor = "#22c55e",
+  dangerColor = "#e5484d",
   width = 280,
   height = 56,
   radius = 28,
@@ -60,8 +90,8 @@ export default function SlideCommit({
   holdMs = 1500,
   disabled = false,
   icon,
-  className = ''
-}) {
+  className = "",
+}: SlideCommitProps) {
   const reduce = useReducedMotion();
   const [phase, setPhase] = useState('idle');
   const [held, setHeld] = useState(false);
@@ -294,7 +324,9 @@ export default function SlideCommit({
       data-disabled={disabled ? '' : undefined}
       style={{
         width,
+        maxWidth: '100%',
         height,
+        boxSizing: 'border-box',
         '--sc-track': trackColor,
         '--sc-ink': handleColor,
         '--sc-ok': successColor,
