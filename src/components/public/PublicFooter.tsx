@@ -17,7 +17,6 @@ const PAGE_LINKS = [
 
 const UTILITY_LINKS = [
   { labelKey: "footer.utility.login", to: APP_ROUTES.public.login },
-  { labelKey: "footer.utility.register", to: APP_ROUTES.public.register },
   { labelKey: "footer.utility.dashboard", to: APP_ROUTES.subscriber.overview, end: true },
   { labelKey: "footer.utility.workout", to: APP_ROUTES.subscriber.workout },
 ] as const

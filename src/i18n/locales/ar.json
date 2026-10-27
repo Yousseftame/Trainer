@@ -88,6 +88,12 @@
     "adminOverview": "لوحة الإدارة",
     "subscriberOverview": "لوحتي"
   },
+  "notFound": {
+    "documentTitle": "الصفحة غير موجودة",
+    "title": "الصفحة غير موجودة",
+    "cta": "العودة للرئيسية"
+  },
+
   "hero": {
     "greeting": "مرحباً، أنا مايك",
     "titleBefore": "مدرب",

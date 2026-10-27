@@ -3,12 +3,11 @@
 export const APP_ROUTES = {
   public: {
     home: "/",
-    about: "/about",
-    services: "/services",
-    register: "/register",
+    about: "/#about",
+    services: "/#services",
     login: "/login",
     forgotPassword: "/forgot-password",
-    contact: "/contact",
+    contact: "/#contact",
   },
   admin: {
     root: "/admin",

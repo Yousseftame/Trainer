@@ -323,7 +323,10 @@ export function FitnessDreamSection() {
   )
 
   return (
-    <section className="w-full bg-white px-6 pb-14 pt-4 md:px-10 md:pb-20 md:pt-6 lg:px-14">
+    <section
+      id="services"
+      className="w-full scroll-mt-24 bg-white px-6 pb-14 pt-4 md:px-10 md:pb-20 md:pt-6 lg:px-14"
+    >
       {/* Mobile: title alone. md+: title + arrows top-right */}
       <div className="mb-6 flex items-start justify-between gap-4 md:mb-10">
         <h2 className="font-heading text-[30px] font-bold leading-[1.08] text-[var(--gym-ink)] sm:text-[36px] md:text-[42px] lg:text-[46px]">

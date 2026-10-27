@@ -143,7 +143,7 @@ export function GoalsBannerSection() {
             </div>
 
             <Link
-              to={APP_ROUTES.public.register}
+              to={APP_ROUTES.public.login}
               className="group mt-1 inline-flex h-[48px] w-fit items-center gap-3 rounded-full bg-[var(--gym-lime)] pe-1.5 ps-6 text-[#111111] sm:mt-2 sm:h-[52px] sm:gap-3.5 sm:pe-2 sm:ps-7"
             >
               <span className="font-heading text-[13px] font-extrabold uppercase tracking-[0.04em] sm:text-[14px]">

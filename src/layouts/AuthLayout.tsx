@@ -7,7 +7,7 @@ import heroImage from "@/assets/heroimage.avif"
 import heroPattern from "@/assets/hero-pattern.avif"
 
 /**
- * Shared shell for login / register / forgot-password.
+ * Shared shell for login / forgot-password.
  * Mobile: compact floating card. Desktop: half-page tall glass panel.
  * Terms always sit at the bottom of the card.
  */

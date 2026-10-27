@@ -88,6 +88,12 @@
     "adminOverview": "Admin overview",
     "subscriberOverview": "My dashboard"
   },
+  "notFound": {
+    "documentTitle": "Page not found",
+    "title": "Page not found",
+    "cta": "Back home"
+  },
+
   "hero": {
     "greeting": "Hi, I'm Mike",
     "titleBefore": "Your",

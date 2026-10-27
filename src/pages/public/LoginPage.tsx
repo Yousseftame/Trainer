@@ -96,18 +96,9 @@ export function LoginPage() {
           </Link>
         </div>
 
-        <div className="mt-0.5 flex flex-col gap-2.5 sm:gap-3">
-          <button type="submit" disabled={submitting} className={authPrimaryBtnClass}>
-            {submitting ? t("auth.submitting") : t("auth.loginSubmit")}
-          </button>
-
-          <p className="relative z-10 text-center text-[13px] text-[var(--gym-muted)] sm:text-[14px]">
-            {t("auth.noAccount")}{" "}
-            <Link to={APP_ROUTES.public.register} className={cn(authLinkClass, "underline")}>
-              {t("nav.register")}
-            </Link>
-          </p>
-        </div>
+        <button type="submit" disabled={submitting} className={cn(authPrimaryBtnClass, "mt-0.5")}>
+          {submitting ? t("auth.submitting") : t("auth.loginSubmit")}
+        </button>
       </form>
     </section>
   )

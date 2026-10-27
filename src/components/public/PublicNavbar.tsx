@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react"
-import { Link, NavLink, useLocation } from "react-router-dom"
+import { Link, useLocation } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { ChevronDown } from "lucide-react"
 import { APP_ROUTES } from "@/config/constants"
@@ -11,21 +11,36 @@ import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher"
 import { cn } from "@/lib/utils"
 
 const primaryLinks = [
-  { labelKey: "nav.home", to: APP_ROUTES.public.home, end: true, enabled: true },
-  { labelKey: "nav.about", to: APP_ROUTES.public.about, enabled: false },
+  { labelKey: "nav.home", to: APP_ROUTES.public.home, end: true },
+  { labelKey: "nav.about", to: APP_ROUTES.public.about },
 ] as const
 
 const pagesLinks = [
-  { labelKey: "nav.home", to: APP_ROUTES.public.home, end: true, enabled: true },
-  { labelKey: "nav.about", to: APP_ROUTES.public.about, enabled: false },
-  { labelKey: "nav.services", to: APP_ROUTES.public.services, enabled: false },
-  { labelKey: "nav.contact", to: APP_ROUTES.public.contact, enabled: false },
-  { labelKey: "nav.login", to: APP_ROUTES.public.login, enabled: false },
-  { labelKey: "nav.register", to: APP_ROUTES.public.register, enabled: false },
+  { labelKey: "nav.home", to: APP_ROUTES.public.home, end: true },
+  { labelKey: "nav.about", to: APP_ROUTES.public.about },
+  { labelKey: "nav.services", to: APP_ROUTES.public.services },
+  { labelKey: "nav.contact", to: APP_ROUTES.public.contact },
+  { labelKey: "nav.login", to: APP_ROUTES.public.login },
 ] as const
 
 const topLinkClass =
   "group relative inline-flex items-center pb-1.5 text-[16px] font-bold text-[var(--gym-ink)] outline-none"
+
+function isHashNavActive(pathname: string, hash: string, to: string, end?: boolean) {
+  const [pathPart, hashPart] = to.split("#")
+  const pathOnly = pathPart || "/"
+  const targetHash = hashPart ? `#${hashPart}` : ""
+
+  if (targetHash) {
+    return pathname === pathOnly && hash === targetHash
+  }
+
+  if (end) {
+    return pathname === pathOnly && !hash
+  }
+
+  return pathname === pathOnly || (pathOnly !== "/" && pathname.startsWith(pathOnly))
+}
 
 export function PublicNavbar() {
   const { t } = useTranslation()
@@ -40,7 +55,7 @@ export function PublicNavbar() {
   useEffect(() => {
     setMobileOpen(false)
     setPagesOpen(false)
-  }, [location.pathname])
+  }, [location.pathname, location.hash])
 
   useEffect(() => {
     if (pagesOpen) {
@@ -106,31 +121,25 @@ export function PublicNavbar() {
         </Link>
 
         <nav className="hidden items-center justify-center gap-8 lg:flex" aria-label={t("nav.main")}>
-          {primaryLinks.map((item) =>
-            item.enabled ? (
-              <NavLink
+          {primaryLinks.map((item) => {
+            const active = isHashNavActive(
+              location.pathname,
+              location.hash,
+              item.to,
+              "end" in item ? item.end : false
+            )
+            return (
+              <Link
                 key={item.to}
                 to={item.to}
-                end={"end" in item ? item.end : false}
                 className={topLinkClass}
-              >
-                {({ isActive }) => (
-                  <>
-                    {t(item.labelKey)}
-                    <NavUnderline active={isActive} />
-                  </>
-                )}
-              </NavLink>
-            ) : (
-              <span
-                key={item.to}
-                className={cn(topLinkClass, "cursor-default")}
-                aria-disabled="true"
+                aria-current={active ? "page" : undefined}
               >
                 {t(item.labelKey)}
-              </span>
+                <NavUnderline active={active} />
+              </Link>
             )
-          )}
+          })}
 
           <div
             ref={pagesRef}
@@ -171,50 +180,55 @@ export function PublicNavbar() {
                 )}
               >
                 <div className="flex flex-col gap-1.5">
-                  {pagesLinks.map((item) =>
-                    item.enabled ? (
-                      <NavLink
+                  {pagesLinks.map((item) => {
+                    const active = isHashNavActive(
+                      location.pathname,
+                      location.hash,
+                      item.to,
+                      "end" in item ? item.end : false
+                    )
+                    return (
+                      <Link
                         key={item.to}
                         to={item.to}
-                        end={"end" in item ? item.end : false}
                         role="menuitem"
                         className="group relative w-fit pb-1 text-[16px] font-bold leading-tight text-[var(--gym-ink)] outline-none"
-                      >
-                        {({ isActive }) => (
-                          <>
-                            {t(item.labelKey)}
-                            <NavUnderline active={isActive} />
-                          </>
-                        )}
-                      </NavLink>
-                    ) : (
-                      <span
-                        key={item.to}
-                        role="menuitem"
-                        aria-disabled="true"
-                        className="w-fit cursor-default pb-1 text-[16px] font-bold leading-tight text-[var(--gym-ink)]"
+                        aria-current={active ? "page" : undefined}
                       >
                         {t(item.labelKey)}
-                      </span>
+                        <NavUnderline active={active} />
+                      </Link>
                     )
-                  )}
+                  })}
                 </div>
               </div>
             ) : null}
           </div>
 
-          <span
-            className={cn(topLinkClass, "cursor-default")}
-            aria-disabled="true"
+          <Link
+            to={APP_ROUTES.public.services}
+            className={topLinkClass}
+            aria-current={
+              isHashNavActive(location.pathname, location.hash, APP_ROUTES.public.services)
+                ? "page"
+                : undefined
+            }
           >
             {t("nav.services")}
-          </span>
+            <NavUnderline
+              active={isHashNavActive(
+                location.pathname,
+                location.hash,
+                APP_ROUTES.public.services
+              )}
+            />
+          </Link>
         </nav>
 
         <div className="flex items-center justify-end gap-4 justify-self-end">
           <div className="hidden items-center gap-4 lg:flex">
             <LanguageSwitcher />
-            <ArrowCtaLink to={APP_ROUTES.public.register} label={t("nav.getStarted")} />
+            <ArrowCtaLink to={APP_ROUTES.public.login} label={t("nav.getStarted")} />
           </div>
 
           <HamburgerButton

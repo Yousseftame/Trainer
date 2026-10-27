@@ -18,7 +18,10 @@ export function WhoIAmSection() {
   const { isRtl } = useLocale()
 
   return (
-    <section className="w-full bg-white px-6 py-16 md:px-10 md:py-24 lg:px-14">
+    <section
+      id="about"
+      className="w-full scroll-mt-24 bg-white px-6 py-16 md:px-10 md:py-24 lg:px-14"
+    >
       <div className="mx-auto grid w-full max-w-[1300px] items-center gap-12 lg:grid-cols-2 lg:gap-16 xl:gap-20">
         {/* Image + soft bottom fade + experience badge */}
         <div className="relative overflow-hidden rounded-[24px]">
@@ -69,7 +72,7 @@ export function WhoIAmSection() {
           </p>
 
           <Link
-            to={APP_ROUTES.public.about}
+            to={APP_ROUTES.public.contact}
             className="group mt-7 inline-flex h-[50px] w-fit items-center text-[16px] font-medium leading-none text-[var(--gym-ink)] sm:mt-8"
           >
             <span className="inline-flex h-full items-center rounded-full bg-[var(--gym-lime)] px-[25px]">

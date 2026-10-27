@@ -18,7 +18,7 @@ const PACKAGES = [
     featured: true,
     tone: "dark" as const,
     featureCount: 6,
-    ctaTo: APP_ROUTES.public.register,
+    ctaTo: APP_ROUTES.public.contact,
   },
   {
     id: "elite",

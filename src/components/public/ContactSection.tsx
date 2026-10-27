@@ -95,7 +95,10 @@ export function ContactSection() {
   }
 
   return (
-    <section className="w-full overflow-x-hidden bg-white px-6 pb-16 pt-8 md:px-10 md:pb-20 md:pt-10 lg:px-14 lg:pb-[72px] lg:pt-12 xl:pb-[96px] xl:pt-14">
+    <section
+      id="contact"
+      className="w-full scroll-mt-24 overflow-x-hidden bg-white px-6 pb-16 pt-8 md:px-10 md:pb-20 md:pt-10 lg:px-14 lg:pb-[72px] lg:pt-12 xl:pb-[96px] xl:pt-14"
+    >
       <div className="mx-auto w-full min-w-0 max-w-[1300px]">
         <AnimatePresence mode="wait">
           {submitted ? (

@@ -1,5 +1,5 @@
 import { useEffect } from "react"
-import { Link, NavLink } from "react-router-dom"
+import { Link, useLocation } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { APP_ROUTES } from "@/config/constants"
 import { ArrowCtaLink } from "@/components/public/ArrowCtaLink"
@@ -8,12 +8,11 @@ import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher"
 import { cn } from "@/lib/utils"
 
 const mobileLinks = [
-  { labelKey: "nav.home", to: APP_ROUTES.public.home, end: true, enabled: true },
-  { labelKey: "nav.about", to: APP_ROUTES.public.about, enabled: false },
-  { labelKey: "nav.services", to: APP_ROUTES.public.services, enabled: false },
-  { labelKey: "nav.contact", to: APP_ROUTES.public.contact, enabled: false },
-  { labelKey: "nav.login", to: APP_ROUTES.public.login, enabled: false },
-  { labelKey: "nav.register", to: APP_ROUTES.public.register, enabled: false },
+  { labelKey: "nav.home", to: APP_ROUTES.public.home, end: true },
+  { labelKey: "nav.about", to: APP_ROUTES.public.about },
+  { labelKey: "nav.services", to: APP_ROUTES.public.services },
+  { labelKey: "nav.contact", to: APP_ROUTES.public.contact },
+  { labelKey: "nav.login", to: APP_ROUTES.public.login },
 ] as const
 
 type MobileNavOverlayProps = {
@@ -21,8 +20,25 @@ type MobileNavOverlayProps = {
   onClose: () => void
 }
 
+function isHashNavActive(pathname: string, hash: string, to: string, end?: boolean) {
+  const [pathPart, hashPart] = to.split("#")
+  const pathOnly = pathPart || "/"
+  const targetHash = hashPart ? `#${hashPart}` : ""
+
+  if (targetHash) {
+    return pathname === pathOnly && hash === targetHash
+  }
+
+  if (end) {
+    return pathname === pathOnly && !hash
+  }
+
+  return pathname === pathOnly || (pathOnly !== "/" && pathname.startsWith(pathOnly))
+}
+
 export function MobileNavOverlay({ open, onClose }: MobileNavOverlayProps) {
   const { t } = useTranslation()
+  const location = useLocation()
 
   useEffect(() => {
     if (!open) return
@@ -38,20 +54,16 @@ export function MobileNavOverlay({ open, onClose }: MobileNavOverlayProps) {
   return (
     <div
       id="public-mobile-nav"
-      role="dialog"
-      aria-modal="true"
-      aria-hidden={!open}
       className={cn(
-        "fixed inset-0 z-[100] flex h-dvh w-full flex-col lg:hidden",
-        "bg-[var(--gym-ink)] text-white",
-        "transition-[opacity,visibility,transform] duration-[400ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
-        open
-          ? "visible translate-y-0 opacity-100"
-          : "invisible pointer-events-none -translate-y-2 opacity-0",
+        "fixed inset-0 z-[60] flex flex-col bg-[var(--gym-ink)] lg:hidden",
+        "transition-[opacity,visibility] duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+        open ? "visible opacity-100" : "invisible opacity-0 pointer-events-none",
       )}
+      aria-hidden={!open}
     >
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.08]"
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.07]"
         style={{
           backgroundImage:
             "radial-gradient(circle at 20% 20%, #b8fe22 0%, transparent 42%), radial-gradient(circle at 85% 75%, #b8fe22 0%, transparent 36%)",
@@ -96,6 +108,12 @@ export function MobileNavOverlay({ open, onClose }: MobileNavOverlayProps) {
         aria-label={t("nav.main")}
       >
         {mobileLinks.map((item, index) => {
+          const active = isHashNavActive(
+            location.pathname,
+            location.hash,
+            item.to,
+            "end" in item ? item.end : false
+          )
           const baseClass = cn(
             "font-heading border-b border-white/10 py-3.5 text-[30px] font-semibold tracking-tight",
             "sm:py-4 sm:text-[34px]",
@@ -108,36 +126,21 @@ export function MobileNavOverlay({ open, onClose }: MobileNavOverlayProps) {
             transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
           } as const
 
-          if (!item.enabled) {
-            return (
-              <span
-                key={item.to}
-                aria-disabled="true"
-                className={cn(baseClass, "cursor-default text-white")}
-                style={style}
-              >
-                {t(item.labelKey)}
-              </span>
-            )
-          }
-
           return (
-            <NavLink
+            <Link
               key={item.to}
               to={item.to}
-              end={"end" in item ? item.end : false}
               onClick={onClose}
-              className={({ isActive }) =>
-                cn(
-                  baseClass,
-                  "transition-colors duration-200",
-                  isActive ? "text-[var(--gym-lime)]" : "text-white hover:text-[var(--gym-lime)]",
-                )
-              }
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                baseClass,
+                "transition-colors duration-200",
+                active ? "text-[var(--gym-lime)]" : "text-white hover:text-[var(--gym-lime)]",
+              )}
               style={style}
             >
               {t(item.labelKey)}
-            </NavLink>
+            </Link>
           )
         })}
       </nav>
@@ -150,7 +153,7 @@ export function MobileNavOverlay({ open, onClose }: MobileNavOverlayProps) {
         )}
       >
         <ArrowCtaLink
-          to={APP_ROUTES.public.register}
+          to={APP_ROUTES.public.login}
           label={t("nav.getStarted")}
           onClick={onClose}
           className="text-[var(--gym-ink)] [&_span:first-child]:border-[var(--gym-ink)] [&_span:first-child]:bg-white [&_span:last-child]:bg-[var(--gym-lime)] [&_span:last-child]:text-[var(--gym-ink)]"

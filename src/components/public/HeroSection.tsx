@@ -60,7 +60,7 @@ export function HeroSection() {
 
           <div className="hero-fade hero-fade-4 mt-8 sm:mt-10">
             <ArrowCtaLink
-              to={APP_ROUTES.public.register}
+              to={APP_ROUTES.public.contact}
               label={t("hero.cta")}
               variant="lime"
             />
