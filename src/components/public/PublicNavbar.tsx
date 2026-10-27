@@ -9,27 +9,20 @@ import { MobileNavOverlay } from "@/components/public/MobileNavOverlay"
 import { NavUnderline } from "@/components/public/NavUnderline"
 import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher"
 import { cn } from "@/lib/utils"
-import logo from "@/assets/brand/logo.png"
 
 const primaryLinks = [
-  { labelKey: "nav.home", to: APP_ROUTES.public.home, end: true },
-  { labelKey: "nav.about", to: APP_ROUTES.public.about },
+  { labelKey: "nav.home", to: APP_ROUTES.public.home, end: true, enabled: true },
+  { labelKey: "nav.about", to: APP_ROUTES.public.about, enabled: false },
 ] as const
 
 const pagesLinks = [
-  { labelKey: "nav.home", to: APP_ROUTES.public.home, end: true },
-  { labelKey: "nav.about", to: APP_ROUTES.public.about },
-  { labelKey: "nav.services", to: APP_ROUTES.public.services },
-  { labelKey: "nav.contact", to: APP_ROUTES.public.contact },
-  { labelKey: "nav.login", to: APP_ROUTES.public.login },
-  { labelKey: "nav.register", to: APP_ROUTES.public.register },
+  { labelKey: "nav.home", to: APP_ROUTES.public.home, end: true, enabled: true },
+  { labelKey: "nav.about", to: APP_ROUTES.public.about, enabled: false },
+  { labelKey: "nav.services", to: APP_ROUTES.public.services, enabled: false },
+  { labelKey: "nav.contact", to: APP_ROUTES.public.contact, enabled: false },
+  { labelKey: "nav.login", to: APP_ROUTES.public.login, enabled: false },
+  { labelKey: "nav.register", to: APP_ROUTES.public.register, enabled: false },
 ] as const
-
-const pagesOnlyPaths: readonly string[] = [
-  APP_ROUTES.public.contact,
-  APP_ROUTES.public.login,
-  APP_ROUTES.public.register,
-]
 
 const topLinkClass =
   "group relative inline-flex items-center pb-1.5 text-[16px] font-bold text-[var(--gym-ink)] outline-none"
@@ -43,8 +36,6 @@ export function PublicNavbar() {
   const closeTimer = useRef<number | null>(null)
   const pagesRef = useRef<HTMLDivElement>(null)
   const pagesMenuId = useId()
-
-  const pagesTriggerActive = pagesOpen || pagesOnlyPaths.includes(location.pathname)
 
   useEffect(() => {
     setMobileOpen(false)
@@ -106,31 +97,40 @@ export function PublicNavbar() {
       <div className="mx-auto grid w-full max-w-[1300px] grid-cols-[auto_1fr_auto] items-center gap-6 px-[15px] py-[22px] md:px-[30px] lg:gap-10 lg:py-[30px]">
         <Link
           to={APP_ROUTES.public.home}
-          className="flex shrink-0 items-center gap-2.5 text-[var(--gym-ink)]"
+          className="flex shrink-0 items-center text-[var(--gym-ink)]"
           aria-label={t("app.name")}
         >
-          <img src={logo} alt="" className="size-11 object-contain md:size-12" />
           <span className="font-heading text-[22px] font-bold tracking-tight md:text-[24px]">
             {t("app.name")}
           </span>
         </Link>
 
         <nav className="hidden items-center justify-center gap-8 lg:flex" aria-label={t("nav.main")}>
-          {primaryLinks.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={"end" in item ? item.end : false}
-              className={topLinkClass}
-            >
-              {({ isActive }) => (
-                <>
-                  {t(item.labelKey)}
-                  <NavUnderline active={isActive} />
-                </>
-              )}
-            </NavLink>
-          ))}
+          {primaryLinks.map((item) =>
+            item.enabled ? (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={"end" in item ? item.end : false}
+                className={topLinkClass}
+              >
+                {({ isActive }) => (
+                  <>
+                    {t(item.labelKey)}
+                    <NavUnderline active={isActive} />
+                  </>
+                )}
+              </NavLink>
+            ) : (
+              <span
+                key={item.to}
+                className={cn(topLinkClass, "cursor-default")}
+                aria-disabled="true"
+              >
+                {t(item.labelKey)}
+              </span>
+            )
+          )}
 
           <div
             ref={pagesRef}
@@ -153,7 +153,7 @@ export function PublicNavbar() {
                 )}
                 strokeWidth={2}
               />
-              <NavUnderline active={pagesTriggerActive} />
+              <NavUnderline active={pagesOpen} />
             </button>
 
             {pagesMounted ? (
@@ -171,35 +171,44 @@ export function PublicNavbar() {
                 )}
               >
                 <div className="flex flex-col gap-1.5">
-                  {pagesLinks.map((item) => (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      end={"end" in item ? item.end : false}
-                      role="menuitem"
-                      className="group relative w-fit pb-1 text-[16px] font-bold leading-tight text-[var(--gym-ink)] outline-none"
-                    >
-                      {({ isActive }) => (
-                        <>
-                          {t(item.labelKey)}
-                          <NavUnderline active={isActive} />
-                        </>
-                      )}
-                    </NavLink>
-                  ))}
+                  {pagesLinks.map((item) =>
+                    item.enabled ? (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        end={"end" in item ? item.end : false}
+                        role="menuitem"
+                        className="group relative w-fit pb-1 text-[16px] font-bold leading-tight text-[var(--gym-ink)] outline-none"
+                      >
+                        {({ isActive }) => (
+                          <>
+                            {t(item.labelKey)}
+                            <NavUnderline active={isActive} />
+                          </>
+                        )}
+                      </NavLink>
+                    ) : (
+                      <span
+                        key={item.to}
+                        role="menuitem"
+                        aria-disabled="true"
+                        className="w-fit cursor-default pb-1 text-[16px] font-bold leading-tight text-[var(--gym-ink)]"
+                      >
+                        {t(item.labelKey)}
+                      </span>
+                    )
+                  )}
                 </div>
               </div>
             ) : null}
           </div>
 
-          <NavLink to={APP_ROUTES.public.services} className={topLinkClass}>
-            {({ isActive }) => (
-              <>
-                {t("nav.services")}
-                <NavUnderline active={isActive} />
-              </>
-            )}
-          </NavLink>
+          <span
+            className={cn(topLinkClass, "cursor-default")}
+            aria-disabled="true"
+          >
+            {t("nav.services")}
+          </span>
         </nav>
 
         <div className="flex items-center justify-end gap-4 justify-self-end">

@@ -6,15 +6,14 @@ import { ArrowCtaLink } from "@/components/public/ArrowCtaLink"
 import { HamburgerButton } from "@/components/public/HamburgerButton"
 import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher"
 import { cn } from "@/lib/utils"
-import logo from "@/assets/brand/logo.png"
 
 const mobileLinks = [
-  { labelKey: "nav.home", to: APP_ROUTES.public.home, end: true },
-  { labelKey: "nav.about", to: APP_ROUTES.public.about },
-  { labelKey: "nav.services", to: APP_ROUTES.public.services },
-  { labelKey: "nav.contact", to: APP_ROUTES.public.contact },
-  { labelKey: "nav.login", to: APP_ROUTES.public.login },
-  { labelKey: "nav.register", to: APP_ROUTES.public.register },
+  { labelKey: "nav.home", to: APP_ROUTES.public.home, end: true, enabled: true },
+  { labelKey: "nav.about", to: APP_ROUTES.public.about, enabled: false },
+  { labelKey: "nav.services", to: APP_ROUTES.public.services, enabled: false },
+  { labelKey: "nav.contact", to: APP_ROUTES.public.contact, enabled: false },
+  { labelKey: "nav.login", to: APP_ROUTES.public.login, enabled: false },
+  { labelKey: "nav.register", to: APP_ROUTES.public.register, enabled: false },
 ] as const
 
 type MobileNavOverlayProps = {
@@ -63,10 +62,9 @@ export function MobileNavOverlay({ open, onClose }: MobileNavOverlayProps) {
         <Link
           to={APP_ROUTES.public.home}
           onClick={onClose}
-          className="flex items-center gap-2.5"
+          className="flex items-center"
           aria-label={t("app.name")}
         >
-          <img src={logo} alt="" className="size-11 object-contain" />
           <span className="font-heading text-[22px] font-bold tracking-tight text-white">
             {t("app.name")}
           </span>
@@ -97,30 +95,51 @@ export function MobileNavOverlay({ open, onClose }: MobileNavOverlayProps) {
         className="relative z-10 flex flex-1 flex-col justify-start overflow-y-auto px-6 pb-4 pt-1"
         aria-label={t("nav.main")}
       >
-        {mobileLinks.map((item, index) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={"end" in item ? item.end : false}
-            onClick={onClose}
-            className={({ isActive }) =>
-              cn(
-                "font-heading border-b border-white/10 py-3.5 text-[30px] font-semibold tracking-tight transition-colors duration-200",
-                "sm:py-4 sm:text-[34px]",
-                isActive ? "text-[var(--gym-lime)]" : "text-white hover:text-[var(--gym-lime)]",
-                open ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0",
-              )
-            }
-            style={{
-              transitionDelay: open ? `${100 + index * 40}ms` : "0ms",
-              transitionProperty: "opacity, transform, color",
-              transitionDuration: "400ms",
-              transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
-            }}
-          >
-            {t(item.labelKey)}
-          </NavLink>
-        ))}
+        {mobileLinks.map((item, index) => {
+          const baseClass = cn(
+            "font-heading border-b border-white/10 py-3.5 text-[30px] font-semibold tracking-tight",
+            "sm:py-4 sm:text-[34px]",
+            open ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0",
+          )
+          const style = {
+            transitionDelay: open ? `${100 + index * 40}ms` : "0ms",
+            transitionProperty: "opacity, transform, color",
+            transitionDuration: "400ms",
+            transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
+          } as const
+
+          if (!item.enabled) {
+            return (
+              <span
+                key={item.to}
+                aria-disabled="true"
+                className={cn(baseClass, "cursor-default text-white")}
+                style={style}
+              >
+                {t(item.labelKey)}
+              </span>
+            )
+          }
+
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={"end" in item ? item.end : false}
+              onClick={onClose}
+              className={({ isActive }) =>
+                cn(
+                  baseClass,
+                  "transition-colors duration-200",
+                  isActive ? "text-[var(--gym-lime)]" : "text-white hover:text-[var(--gym-lime)]",
+                )
+              }
+              style={style}
+            >
+              {t(item.labelKey)}
+            </NavLink>
+          )
+        })}
       </nav>
 
       <div
