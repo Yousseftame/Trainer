@@ -80,6 +80,7 @@ export function TrustSection() {
         </p>
 
         <div
+          dir="ltr"
           className={cn(
             "trust-marquee min-w-0 w-full overflow-hidden md:flex-1",
             "isolate [transform:translateZ(0)]",
@@ -89,8 +90,8 @@ export function TrustSection() {
           aria-label={t("trust.logosLabel")}
         >
           {/*
-            Two identical sets + physical pr-* (not pe-*) so set widths stay equal
-            under any page direction. Track itself is forced LTR in CSS.
+            Overflow box is dir=ltr so the loop is visible at t=0 in Arabic.
+            Two identical sets + physical pr-* keep -50% wrap math equal.
           */}
           <div
             key={i18n.language}

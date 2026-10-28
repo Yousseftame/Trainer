@@ -103,20 +103,27 @@ function GalleryRow({
   direction,
   onOpen,
   trackKey,
+  isRtl,
 }: {
   images: readonly string[]
   direction: "left" | "right"
   onOpen: (src: string) => void
   trackKey: string
+  isRtl: boolean
 }) {
   return (
     <div
+      dir="ltr"
       className={cn(
         "gallery-marquee",
-        direction === "right" && "gallery-marquee--reverse"
+        direction === "right" && "gallery-marquee--reverse",
+        isRtl && "gallery-marquee--rtl"
       )}
     >
-      {/* Remount on language change so EN/AR both restart a clean LTR loop */}
+      {/*
+        Overflow box is dir=ltr so both rows are visible at t=0 in Arabic.
+        Two identical sets + physical padding-right keep -50% wrap math equal.
+      */}
       <div key={trackKey} className="gallery-marquee__track">
         <GallerySet images={images} onOpen={onOpen} />
         <GallerySet images={images} ariaHidden onOpen={onOpen} />
@@ -343,6 +350,7 @@ export function TransformationsSection() {
           direction="left"
           onOpen={openSrc}
           trackKey={`${trackKey}-top`}
+          isRtl={isRtl}
         />
         <div className="gallery-marquee-spacer" />
         <GalleryRow
@@ -350,6 +358,7 @@ export function TransformationsSection() {
           direction="right"
           onOpen={openSrc}
           trackKey={`${trackKey}-bottom`}
+          isRtl={isRtl}
         />
       </div>
 

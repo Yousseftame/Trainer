@@ -11,9 +11,9 @@ export function HeroSection() {
     <section className="w-full px-[15px] pb-6 pt-1 md:pb-7 lg:px-[30px]">
       <div className="hero-wrap relative mx-auto min-h-[560px] w-full overflow-hidden rounded-[24px] bg-[var(--gym-ink)] sm:min-h-[640px] sm:rounded-[30px] lg:min-h-[709px]">
         {/*
-          Trainer image: LTR on the right, RTL on the left (end).
-          RTL mirrors the photo so he faces the text, and object-position
-          keeps his face in the clear zone (not under the gradient).
+          Trainer image sits on the end (right in EN, left in AR).
+          RTL mirrors so he faces the copy. Keep the same focal point after
+          the mirror — inverting X to 28% crops to the arm on mobile.
         */}
         <img
           src={heroImage}
@@ -83,10 +83,10 @@ export function HeroSection() {
 
 function cnHeroImage() {
   return [
-    "pointer-events-none absolute inset-y-0 end-0 z-[1] h-full w-[88%] object-cover sm:w-[78%] lg:w-[80%]",
-    /* LTR: keep subject toward the right (clear of left text) */
-    "object-[72%_top]",
-    /* RTL: mirror so he faces the text; bias subject into the clear left zone */
-    "rtl:-scale-x-100 rtl:object-[28%_top]",
+    "pointer-events-none absolute inset-y-0 end-0 z-[1] h-full object-cover",
+    "w-full sm:w-[88%] lg:w-[80%]",
+    /* Face sits ~70% from the left of the source. Same focal point after the mirror. */
+    "object-[70%_12%] sm:object-[72%_top]",
+    "rtl:-scale-x-100 rtl:object-[70%_12%] sm:rtl:object-[72%_top]",
   ].join(" ")
 }

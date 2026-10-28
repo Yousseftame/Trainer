@@ -2,7 +2,8 @@ import { useState } from "react"
 import { Link } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { AnimatePresence, motion } from "motion/react"
-import { PanelLeft, Search, UserRound } from "lucide-react"
+import { PanelLeft, Search } from "lucide-react"
+import { ProfileMenu } from "@/components/dashboard/ProfileMenu"
 import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher"
 import { APP_ROUTES } from "@/config/constants"
 import { cn } from "@/lib/utils"
@@ -26,7 +27,7 @@ export function DashboardTopbar({
   return (
     <header
       className={cn(
-        "z-40 shrink-0 bg-[#F4F4F4] px-4 pt-4 pb-3 sm:px-6 sm:pt-5 sm:pb-3.5 lg:px-7",
+        "z-50 shrink-0 bg-[#F4F4F4] px-4 pt-4 pb-3 sm:px-6 sm:pt-5 sm:pb-3.5 lg:px-7",
         className,
       )}
     >
@@ -93,13 +94,7 @@ export function DashboardTopbar({
 
           <LanguageSwitcher variant="dashboard" />
 
-          <button
-            type="button"
-            className="inline-flex size-11 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] text-white transition-opacity hover:opacity-90"
-            aria-label={t("nav.profile")}
-          >
-            <UserRound className="size-[18px]" strokeWidth={1.8} />
-          </button>
+          <ProfileMenu />
         </div>
       </div>
 

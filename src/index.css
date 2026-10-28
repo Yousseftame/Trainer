@@ -262,6 +262,9 @@ body:has(.public-site) {
 
 /* Trust logos — pure CSS marquee (avoids JS RAF wrap freezes on mobile) */
 .public-site .trust-marquee {
+  /* Overflow origin must stay LTR. An RTL overflow box starts at the
+     trailing edge, so reverse marquee (from -50%) sits off-screen for ~45s. */
+  direction: ltr;
   -webkit-mask-image: linear-gradient(
     to right,
     transparent 0%,
@@ -294,18 +297,21 @@ body:has(.public-site) {
     );
   }
 
+  /* Label sits on the right in Arabic — fade the edge next to it */
   .public-site .trust-marquee--rtl {
     -webkit-mask-image: linear-gradient(
-      to left,
-      transparent 0%,
-      rgba(0, 0, 0, 0.45) 7%,
-      #000 18%
+      to right,
+      #000 0%,
+      #000 82%,
+      rgba(0, 0, 0, 0.45) 93%,
+      transparent 100%
     );
     mask-image: linear-gradient(
-      to left,
-      transparent 0%,
-      rgba(0, 0, 0, 0.45) 7%,
-      #000 18%
+      to right,
+      #000 0%,
+      #000 82%,
+      rgba(0, 0, 0, 0.45) 93%,
+      transparent 100%
     );
   }
 }
@@ -319,25 +325,16 @@ body:has(.public-site) {
   }
 }
 
-@keyframes trust-marquee-right {
-  from {
-    transform: translate3d(-50%, 0, 0);
-  }
-  to {
-    transform: translate3d(0, 0, 0);
-  }
-}
-
 .public-site .trust-marquee__track {
-  /* Keep track layout LTR so duplicated sets + -50% loop math never break under dir=rtl */
   direction: ltr;
   flex-direction: row;
   animation: trust-marquee-left 45s linear infinite;
   backface-visibility: hidden;
 }
 
+/* Reverse uses the same 0 ↔ -50% loop, so SET2 is on-screen at t=0 */
 .public-site .trust-marquee--rtl .trust-marquee__track {
-  animation-name: trust-marquee-right;
+  animation-direction: reverse;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -367,7 +364,9 @@ body:has(.public-site) {
 
 .public-site .gallery-marquee {
   overflow: hidden;
-  /* Same isolation trick as trust-marquee — keeps LTR/RTL pages animating */
+  /* Overflow origin must stay LTR. An RTL overflow box starts at the
+     trailing edge, so 0 ↔ -50% loops sit off-screen for most of the cycle. */
+  direction: ltr;
   isolation: isolate;
   transform: translateZ(0);
 }
@@ -389,6 +388,11 @@ body:has(.public-site) {
 .public-site .gallery-marquee--reverse .gallery-marquee__track {
   animation: gallery-marquee-right 90s linear infinite;
   animation-play-state: running;
+}
+
+/* Reverse uses the same 0 ↔ -50% loops, so a set is on-screen at t=0 */
+.public-site .gallery-marquee--rtl .gallery-marquee__track {
+  animation-direction: reverse;
 }
 
 .public-site .gallery-marquee__set {
@@ -461,22 +465,33 @@ body.gallery-lightbox-open .public-site .gallery-marquee__track {
   animation-play-state: paused !important;
 }
 
-/* Mission banner — ghost watermark marquee (LTR: left → right) */
+/* Mission banner — ghost watermark marquee (LTR: left → right)
+   Overflow origin must stay LTR. An RTL overflow box starts at the
+   trailing edge, so the loop sits off-screen for most of the 36s cycle. */
+.public-site .mission-marquee {
+  direction: ltr;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    #000 10%,
+    #000 90%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    #000 10%,
+    #000 90%,
+    transparent 100%
+  );
+}
+
 @keyframes mission-marquee-ltr {
   from {
     transform: translate3d(-50%, 0, 0);
   }
   to {
     transform: translate3d(0, 0, 0);
-  }
-}
-
-@keyframes mission-marquee-rtl {
-  from {
-    transform: translate3d(0, 0, 0);
-  }
-  to {
-    transform: translate3d(-50%, 0, 0);
   }
 }
 
@@ -488,8 +503,9 @@ body.gallery-lightbox-open .public-site .gallery-marquee__track {
   backface-visibility: hidden;
 }
 
+/* Reverse uses the same -50% ↔ 0 loop, so a copy is on-screen at t=0 */
 .public-site .mission-marquee--rtl .mission-marquee__track {
-  animation-name: mission-marquee-rtl;
+  animation-direction: reverse;
 }
 
 .public-site .mission-marquee__text {

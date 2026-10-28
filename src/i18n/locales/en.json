@@ -95,7 +95,30 @@
     "collapse": "Collapse",
     "expand": "Expand",
     "searchPlaceholder": "Search anything..",
-    "website": "Website"
+    "website": "Website",
+    "profile": {
+      "settings": "Change settings",
+      "changePassword": "Change password",
+      "save": "Save",
+      "cancel": "Cancel",
+      "updatePassword": "Update password",
+      "name": "Display name",
+      "phone": "Phone",
+      "email": "Email",
+      "nameRequired": "Enter a display name",
+      "currentPassword": "Current password",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm password",
+      "passwordShort": "Use at least 8 characters",
+      "passwordMismatch": "Passwords do not match",
+      "settingsSaved": "Settings saved",
+      "passwordUpdated": "Password updated",
+      "roles": {
+        "head_coach": "Head coach",
+        "assistant": "Assistant",
+        "subscriber": "Subscriber"
+      }
+    }
   },
   "pages": {
     "home": "Home",

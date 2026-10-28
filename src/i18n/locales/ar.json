@@ -95,7 +95,30 @@
     "collapse": "طي القائمة",
     "expand": "توسيع القائمة",
     "searchPlaceholder": "ابحث عن أي شيء..",
-    "website": "الموقع"
+    "website": "الموقع",
+    "profile": {
+      "settings": "تغيير الإعدادات",
+      "changePassword": "تغيير كلمة المرور",
+      "save": "حفظ",
+      "cancel": "إلغاء",
+      "updatePassword": "تحديث كلمة المرور",
+      "name": "الاسم الظاهر",
+      "phone": "الهاتف",
+      "email": "البريد الإلكتروني",
+      "nameRequired": "أدخل الاسم الظاهر",
+      "currentPassword": "كلمة المرور الحالية",
+      "newPassword": "كلمة المرور الجديدة",
+      "confirmPassword": "تأكيد كلمة المرور",
+      "passwordShort": "استخدم 8 أحرف على الأقل",
+      "passwordMismatch": "كلمتا المرور غير متطابقتين",
+      "settingsSaved": "تم حفظ الإعدادات",
+      "passwordUpdated": "تم تحديث كلمة المرور",
+      "roles": {
+        "head_coach": "المدرب الرئيسي",
+        "assistant": "مساعد",
+        "subscriber": "مشترك"
+      }
+    }
   },
   "pages": {
     "home": "الرئيسية",

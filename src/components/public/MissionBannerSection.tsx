@@ -113,15 +113,24 @@ export function MissionBannerSection() {
             Desktop (lg+): absolute overlay — unchanged.
           */}
           <div
+            dir="ltr"
             className={cn(
-              "pointer-events-none relative mt-10 h-[3.4rem] overflow-hidden sm:mt-12 sm:h-[3.8rem]",
+              "mission-marquee pointer-events-none relative mt-10 overflow-hidden sm:mt-12",
+              /* Arabic glyphs sit lower in the em box — extra height so they are not clipped */
+              isRtl ? "h-[4rem] sm:h-[4.4rem]" : "h-[3.4rem] sm:h-[3.8rem]",
               /* break out of px-8 / sm:px-10 so marquee hits the card sides */
               "-mx-8 w-[calc(100%+4rem)] sm:-mx-10 sm:w-[calc(100%+5rem)]",
-              "lg:absolute lg:inset-x-0 lg:bottom-10 lg:mx-0 lg:mt-0 lg:h-auto lg:w-auto",
+              "lg:absolute lg:inset-x-0 lg:mx-0 lg:mt-0 lg:h-auto lg:w-auto",
+              /* Lift Arabic off the rounded card edge (dir=ltr on this node, so no rtl: variant) */
+              isRtl ? "lg:bottom-16" : "lg:bottom-10",
               isRtl && "mission-marquee--rtl"
             )}
             aria-hidden
           >
+            {/*
+              Overflow box is dir=ltr so the loop is visible at t=0 in Arabic.
+              Two identical copies + physical pr-* keep -50% wrap math equal.
+            */}
             <div
               key={i18n.language}
               className="mission-marquee__track flex w-max will-change-transform"
@@ -131,8 +140,10 @@ export function MissionBannerSection() {
                   key={copy}
                   dir={isRtl ? "rtl" : "ltr"}
                   className={cn(
-                    "mission-marquee__text shrink-0 whitespace-nowrap pr-8 font-heading text-[44px] font-extrabold leading-none sm:text-[52px] lg:text-[72px]",
-                    isRtl ? "tracking-normal" : "uppercase tracking-[-0.02em]"
+                    "mission-marquee__text shrink-0 whitespace-nowrap pr-8 font-heading text-[44px] font-extrabold sm:text-[52px] lg:text-[72px]",
+                    isRtl
+                      ? "tracking-normal leading-[1.18] pb-[0.12em]"
+                      : "uppercase leading-none tracking-[-0.02em]"
                   )}
                 >
                   {marqueeUnit}
