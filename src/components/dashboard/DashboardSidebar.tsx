@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { AnimatePresence, motion } from "motion/react"
 import { useTranslation } from "react-i18next"
@@ -44,6 +44,7 @@ export function DashboardSidebar({
   const { t } = useTranslation()
   const { locale } = useLocale()
   const location = useLocation()
+  const asideRef = useRef<HTMLElement>(null)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
@@ -59,6 +60,11 @@ export function DashboardSidebar({
     })
   }, [location.pathname, items, homeTo])
 
+  useEffect(() => {
+    if (!mobileOpen) return
+    asideRef.current?.scrollTo({ top: 0 })
+  }, [mobileOpen])
+
   function toggleGroup(key: string) {
     setOpenGroups((prev) => ({ ...prev, [key]: !prev[key] }))
   }
@@ -67,7 +73,7 @@ export function DashboardSidebar({
     <>
       <div
         className={cn(
-          "fixed inset-0 z-40 bg-[var(--gym-ink,#063434)]/30 transition-opacity duration-300 lg:hidden",
+          "fixed inset-0 z-[60] bg-[var(--gym-ink,#063434)]/30 transition-opacity duration-300 lg:hidden",
           mobileOpen ? "opacity-100" : "pointer-events-none opacity-0",
         )}
         onClick={onMobileClose}
@@ -75,8 +81,12 @@ export function DashboardSidebar({
       />
 
       <aside
+        ref={asideRef}
         className={cn(
-          "fixed inset-y-0 start-0 z-50 flex h-dvh shrink-0 flex-col overflow-x-hidden overflow-y-auto no-scrollbar bg-[#F4F4F4] py-6 transition-[width,transform,padding] lg:relative lg:h-full",
+          "fixed inset-y-0 start-0 z-[70] flex h-dvh max-h-dvh shrink-0 flex-col overflow-x-hidden overscroll-none bg-[#F4F4F4] transition-[width,transform,padding] lg:relative lg:h-full lg:max-h-none lg:overflow-y-auto lg:overscroll-auto lg:py-6",
+          /* Hide the bar: mobile must not scroll-clip the brand/Overview under the topbar */
+          "max-lg:overflow-hidden max-lg:pt-[max(12px,env(safe-area-inset-top))] max-lg:pb-[max(12px,env(safe-area-inset-bottom))]",
+          "no-scrollbar",
           SIDEBAR_EASE,
           collapsed ? "lg:w-[76px] lg:px-3" : "lg:w-[340px] lg:px-5",
           "w-[min(340px,88vw)] px-5",
@@ -87,7 +97,7 @@ export function DashboardSidebar({
       >
         <div
           className={cn(
-            "mb-4 flex items-center justify-between gap-2",
+            "mb-3 flex shrink-0 items-center justify-between gap-2 lg:mb-4",
             collapsed ? "lg:h-11 lg:justify-center" : "h-12 px-3",
           )}
         >
@@ -148,7 +158,7 @@ export function DashboardSidebar({
           </button>
         </div>
 
-        <nav className="flex flex-1 flex-col gap-1" aria-label={t("nav.main")}>
+        <nav className="flex min-h-0 flex-1 flex-col justify-start gap-0.5 lg:gap-1" aria-label={t("nav.main")}>
           {items.map((item) =>
             item.children?.length ? (
               <SidebarNavGroup
@@ -174,7 +184,7 @@ export function DashboardSidebar({
           )}
         </nav>
 
-        <div className="mt-4 flex flex-col gap-1">
+        <div className="mt-3 flex shrink-0 flex-col gap-0.5 lg:mt-4 lg:gap-1">
           <button
             type="button"
             onClick={onToggle}
@@ -366,8 +376,8 @@ function navItemClass({
     "flex items-center text-[15px] font-medium transition-[width,height,background-color,color,box-shadow,gap,border-radius]",
     SIDEBAR_EASE,
     collapsed
-      ? "gap-3 px-3 py-3 lg:mx-auto lg:h-11 lg:w-11 lg:justify-center lg:gap-0 lg:rounded-2xl lg:px-0 lg:py-0"
-      : "w-full gap-3 rounded-2xl px-3 py-3",
+      ? "gap-3 px-3 py-2.5 lg:mx-auto lg:h-11 lg:w-11 lg:justify-center lg:gap-0 lg:rounded-2xl lg:px-0 lg:py-0"
+      : "w-full gap-3 rounded-2xl px-3 py-2.5 lg:py-3",
     danger
       ? "text-[#FF6A55] hover:bg-[#FFE8E4] hover:text-[#FF6A55]"
       : active
