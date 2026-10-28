@@ -1,5 +1,13 @@
 export type ContentKind = "pdf" | "video" | "document"
 
+/** How the trainer organizes the library — finer than storage kind. */
+export type ContentCategory =
+  | "workoutPdf"
+  | "nutritionPdf"
+  | "exerciseVideo"
+  | "education"
+  | "reference"
+
 export type ContentVisibility = "library" | "assigned" | "package"
 
 /**

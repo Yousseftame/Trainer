@@ -1,2 +1,26 @@
-/** Measurements, progress photos, and historical charts. */
-export {}
+export {
+  DEMO_ADHERENCE,
+  DEMO_LIFTS,
+  DEMO_MEASUREMENTS,
+  DEMO_PHOTOS,
+  DEMO_TODAY,
+  adherenceFor,
+  adherenceScore,
+  daysSinceCheckIn,
+  firstMeasurement,
+  getRosterPerson,
+  isStale,
+  lastCheckIn,
+  latestMeasurement,
+  latestWeek,
+  liftSeries,
+  liftsFor,
+  measurementsFor,
+  photosFor,
+  previousMeasurement,
+  programsFor,
+  progressRoster,
+  progressStats,
+  weightDelta,
+} from "@/features/progress/demo"
+export type { AdherenceWeek, ProgressFilter, RosterPerson, RosterTone } from "@/features/progress/demo"

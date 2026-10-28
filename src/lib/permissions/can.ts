@@ -5,6 +5,11 @@ import type { Role } from "@/lib/permissions/roles"
 
 type PermissionSubject = Pick<AppUser, "role" | "permissions"> | null | undefined
 
+type PermissibleItem<T> = T & {
+  permission?: Permission
+  children?: PermissibleItem<T>[]
+}
+
 function resolvePermissions(subject: PermissionSubject): readonly Permission[] {
   if (!subject) return []
   if (subject.permissions?.length) return subject.permissions
@@ -25,9 +30,21 @@ export function canAll(subject: PermissionSubject, permissions: Permission[]): b
   return permissions.every((permission) => can(subject, permission))
 }
 
-export function filterByPermission<T extends { permission?: Permission }>(
+export function filterByPermission<T extends { permission?: Permission; children?: T[] }>(
   subject: PermissionSubject,
   items: T[],
 ): T[] {
-  return items.filter((item) => !item.permission || can(subject, item.permission))
+  return items
+    .map((item) => {
+      if (!item.children?.length) return item
+
+      const children = filterByPermission(subject, item.children)
+      return { ...item, children }
+    })
+    .filter((item) => {
+      if (item.children) {
+        return item.children.length > 0
+      }
+      return !item.permission || can(subject, item.permission)
+    }) as PermissibleItem<T>[]
 }

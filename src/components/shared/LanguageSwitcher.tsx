@@ -10,18 +10,26 @@ const options: { value: AppLocale; label: string }[] = [
 
 type LanguageSwitcherProps = {
   className?: string
+  variant?: "default" | "dashboard"
 }
 
-export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
+export function LanguageSwitcher({
+  className,
+  variant = "default",
+}: LanguageSwitcherProps) {
   const { t } = useTranslation()
   const { locale, setLocale } = useLocale()
+  const isDashboard = variant === "dashboard"
 
   return (
     <div
       role="group"
       aria-label={t("nav.language")}
       className={cn(
-        "inline-flex h-10 items-center rounded-full border border-[var(--gym-ink,#063434)] bg-white p-1",
+        "inline-flex items-center rounded-full p-1",
+        isDashboard
+          ? "h-11 bg-[var(--gym-ink,#063434)]"
+          : "h-10 border border-[var(--gym-ink,#063434)] bg-white",
         className,
       )}
     >
@@ -35,10 +43,20 @@ export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
             onClick={() => setLocale(option.value)}
             aria-pressed={active}
             className={cn(
-              "inline-flex h-8 min-w-10 items-center justify-center rounded-full px-3 text-[13px] font-semibold tracking-wide transition-colors duration-200 ease-out",
-              active
-                ? "bg-[var(--gym-ink,#063434)] text-white"
-                : "text-[var(--gym-ink,#063434)] hover:bg-[var(--gym-ink,#063434)]/5",
+              "inline-flex items-center justify-center rounded-full text-[12px] font-bold tracking-wide transition-colors duration-200 ease-out",
+              isDashboard
+                ? cn(
+                    "h-9 min-w-9 px-3",
+                    active
+                      ? "bg-[var(--gym-lime,#b8fe22)] text-[var(--gym-ink,#063434)]"
+                      : "text-white/70 hover:text-white",
+                  )
+                : cn(
+                    "h-8 min-w-10 px-3 text-[13px] font-semibold",
+                    active
+                      ? "bg-[var(--gym-ink,#063434)] text-white"
+                      : "text-[var(--gym-ink,#063434)] hover:bg-[var(--gym-ink,#063434)]/5",
+                  ),
             )}
           >
             {option.label}

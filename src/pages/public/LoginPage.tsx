@@ -1,11 +1,8 @@
-import { useState, type FormEvent } from "react"
-import { Link } from "react-router-dom"
+import { useEffect, useState, type FormEvent } from "react"
+import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { Eye, EyeOff } from "lucide-react"
 import { APP_ROUTES } from "@/config/constants"
-import { useDocumentTitle } from "@/hooks/useDocumentTitle"
-import { appToast } from "@/lib/toast"
-import { cn } from "@/lib/utils"
 import {
   authInputClass,
   authLabelClass,
@@ -13,12 +10,33 @@ import {
   authPageTitleClass,
   authPrimaryBtnClass,
 } from "@/components/auth/styles"
+import { resolveDemoLogin } from "@/features/auth/demo"
+import { useAuth } from "@/features/auth/auth-context"
+import { useDocumentTitle } from "@/hooks/useDocumentTitle"
+import { isAdminRole } from "@/lib/permissions/roles"
+import { appToast } from "@/lib/toast"
+import { cn } from "@/lib/utils"
 
 export function LoginPage() {
   const { t } = useTranslation()
   useDocumentTitle(t("auth.loginTitle"))
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { status, user, setDemoUser } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (status !== "authenticated" || !user) return
+    const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname
+    if (from) {
+      navigate(from, { replace: true })
+      return
+    }
+    navigate(isAdminRole(user.role) ? APP_ROUTES.admin.root : APP_ROUTES.subscriber.root, {
+      replace: true,
+    })
+  }, [status, user, location.state, navigate])
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -29,10 +47,21 @@ export function LoginPage() {
       return
     }
 
+    const data = new FormData(form)
+    const email = String(data.get("email") ?? "")
+
     setSubmitting(true)
-    await new Promise((r) => window.setTimeout(r, 700))
+    await new Promise((r) => window.setTimeout(r, 450))
+
+    const session = resolveDemoLogin(email)
+    setDemoUser(session.user, session.subscriptionStatus)
     setSubmitting(false)
-    appToast.success(t("app.comingSoon"))
+    appToast.success(t("auth.toast.demoReady"))
+
+    navigate(
+      isAdminRole(session.user.role) ? APP_ROUTES.admin.root : APP_ROUTES.subscriber.root,
+      { replace: true },
+    )
   }
 
   return (
@@ -99,6 +128,10 @@ export function LoginPage() {
         <button type="submit" disabled={submitting} className={cn(authPrimaryBtnClass, "mt-0.5")}>
           {submitting ? t("auth.submitting") : t("auth.loginSubmit")}
         </button>
+
+        <p className="rounded-[14px] bg-[var(--gym-ink)]/[0.04] px-3.5 py-3 text-start text-[12px] leading-relaxed text-[var(--gym-muted)]">
+          {t("auth.demoHint")}
+        </p>
       </form>
     </section>
   )

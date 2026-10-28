@@ -164,6 +164,35 @@
   max-width: 100%;
 }
 
+/* Admin + Subscriber dashboard shell — same brand tokens as public site */
+.dashboard-shell {
+  --gym-ink: #063434;
+  --gym-lime: #b8fe22;
+  --gym-muted: #4e5151;
+  --dash-ink: #063434;
+  --dash-muted: #8c8c8c;
+  --dash-surface: #ffffff;
+  --dash-canvas: #f4f4f4;
+  --dash-lime: #b8fe22;
+  font-family: var(--font-public);
+}
+
+.dashboard-shell h1,
+.dashboard-shell h2,
+.dashboard-shell h3,
+.dashboard-shell .font-heading {
+  font-family: var(--font-heading);
+}
+
+.dashboard-shell .no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.dashboard-shell .no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 html:has(.public-site),
 body:has(.public-site) {
   overflow-x: clip;

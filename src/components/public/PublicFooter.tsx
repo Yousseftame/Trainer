@@ -12,7 +12,7 @@ const PAGE_LINKS = [
   { labelKey: "footer.pages.home", to: APP_ROUTES.public.home, end: true },
   { labelKey: "footer.pages.about", to: APP_ROUTES.public.about },
   { labelKey: "footer.pages.services", to: APP_ROUTES.public.services },
-  { labelKey: "footer.pages.packages", to: `${APP_ROUTES.public.home}#packages` },
+  { labelKey: "footer.pages.packages", to: APP_ROUTES.public.packages },
 ] as const
 
 const UTILITY_LINKS = [

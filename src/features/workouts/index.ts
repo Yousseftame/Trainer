@@ -1,2 +1,6 @@
-/** Workout templates, assignments, and completion logging. */
-export {}
+export {
+  DEMO_WORKOUTS,
+  formatRest,
+  trainingDayCount,
+} from "@/features/workouts/demo"
+export type { DemoWorkoutProgram, DemoWorkoutDay } from "@/features/workouts/demo"

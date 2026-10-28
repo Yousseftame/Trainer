@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth"
 import { AuthContext, type AuthContextValue } from "@/features/auth/auth-context"
+import { readDemoSession, writeDemoSession } from "@/features/auth/demo"
 import { hasActiveEntitlement, type AuthState } from "@/features/auth/types"
 import { isFirebaseConfigured } from "@/config/env"
 import { tryGetFirebaseAuth } from "@/lib/firebase/auth"
@@ -34,6 +35,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [])
 
   const signOut = useCallback(async () => {
+    writeDemoSession(null)
     const auth = tryGetFirebaseAuth()
     if (auth) {
       await firebaseSignOut(auth)
@@ -48,10 +50,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const setDemoUser = useCallback(
     (user: AppUser | null, subscriptionStatus: SubscriptionStatus | null = null) => {
+      if (user) {
+        const nextStatus = isSubscriberRole(user.role) ? subscriptionStatus : null
+        writeDemoSession({ user, subscriptionStatus: nextStatus })
+        setState({
+          status: "authenticated",
+          user,
+          subscriptionStatus: nextStatus,
+          error: null,
+        })
+        return
+      }
+
+      writeDemoSession(null)
       setState({
-        status: user ? "authenticated" : "unauthenticated",
-        user,
-        subscriptionStatus: user && isSubscriberRole(user.role) ? subscriptionStatus : null,
+        status: "unauthenticated",
+        user: null,
+        subscriptionStatus: null,
         error: null,
       })
     },
@@ -60,28 +75,58 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     if (!isFirebaseConfigured()) {
-      setState({
-        status: "unauthenticated",
-        user: null,
-        subscriptionStatus: null,
-        error: null,
-      })
+      const demo = readDemoSession()
+      setState(
+        demo
+          ? {
+              status: "authenticated",
+              user: demo.user,
+              subscriptionStatus: demo.subscriptionStatus,
+              error: null,
+            }
+          : {
+              status: "unauthenticated",
+              user: null,
+              subscriptionStatus: null,
+              error: null,
+            },
+      )
       return
     }
 
     const auth = tryGetFirebaseAuth()
     if (!auth) {
-      setState({
-        status: "unauthenticated",
-        user: null,
-        subscriptionStatus: null,
-        error: null,
-      })
+      const demo = readDemoSession()
+      setState(
+        demo
+          ? {
+              status: "authenticated",
+              user: demo.user,
+              subscriptionStatus: demo.subscriptionStatus,
+              error: null,
+            }
+          : {
+              status: "unauthenticated",
+              user: null,
+              subscriptionStatus: null,
+              error: null,
+            },
+      )
       return
     }
 
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (!firebaseUser) {
+        const demo = readDemoSession()
+        if (demo) {
+          setState({
+            status: "authenticated",
+            user: demo.user,
+            subscriptionStatus: demo.subscriptionStatus,
+            error: null,
+          })
+          return
+        }
         setState({
           status: "unauthenticated",
           user: null,

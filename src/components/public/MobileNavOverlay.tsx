@@ -11,6 +11,7 @@ const mobileLinks = [
   { labelKey: "nav.home", to: APP_ROUTES.public.home, end: true },
   { labelKey: "nav.about", to: APP_ROUTES.public.about },
   { labelKey: "nav.services", to: APP_ROUTES.public.services },
+  { labelKey: "nav.packages", to: APP_ROUTES.public.packages },
   { labelKey: "nav.contact", to: APP_ROUTES.public.contact },
   { labelKey: "nav.login", to: APP_ROUTES.public.login },
 ] as const

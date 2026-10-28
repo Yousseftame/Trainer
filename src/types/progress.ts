@@ -11,13 +11,26 @@ export type BodyMeasurement = {
   notes?: string
 }
 
+export type ProgressPhotoPose = "front" | "side" | "back"
+
 export type ProgressPhoto = {
   id: string
   subscriberId: string
   storagePath: string
   takenAt: string
+  pose?: ProgressPhotoPose
   caption?: string
   createdAt: string
+}
+
+export type PerformanceRecord = {
+  id: string
+  subscriberId: string
+  recordedAt: string
+  name: string
+  value: number
+  unit: "kg" | "reps"
+  notes?: string
 }
 
 export type WorkoutLogEntry = {

@@ -1,2 +1,32 @@
-/** Admin overview aggregates and exports. */
-export {}
+export {
+  DEMO_NOTICES,
+  EXPIRING_DAYS,
+  REPORT_TABS,
+  REPORT_TODAY,
+  activityRows,
+  adherenceRows,
+  adherenceTotals,
+  contentUsageRows,
+  contentUsageStats,
+  daysFromToday,
+  downloadText,
+  exportReport,
+  expiringSubscriptions,
+  noticePerson,
+  packageRows,
+  progressRows,
+  reportPulse,
+  toCsv,
+} from "@/features/reports/demo"
+export type {
+  ActivityRow,
+  AdherenceRow,
+  ContentUsageRow,
+  DemoNotice,
+  ExportKind,
+  NoticeKind,
+  NoticeStatus,
+  PackageRow,
+  ProgressRow,
+  ReportTab,
+} from "@/features/reports/demo"

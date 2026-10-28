@@ -7,6 +7,7 @@ export const APP_ROUTES = {
     services: "/#services",
     login: "/login",
     forgotPassword: "/forgot-password",
+    packages: "/#packages",
     contact: "/#contact",
   },
   admin: {

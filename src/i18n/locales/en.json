@@ -14,7 +14,7 @@
     "about": "About",
     "pages": "Pages",
     "services": "Services",
-    "contact": "Contact",
+    "contact": "Contact us",
     "login": "Log in",
     "register": "Register",
     "getStarted": "Get started",
@@ -32,7 +32,13 @@
     "progress": "Progress",
     "staff": "Staff & permissions",
     "reports": "Reports",
+    "peopleSection": "People",
+    "billingSection": "Billing",
+    "workoutSection": "Workout",
+    "nutritionSection": "Nutrition",
     "workout": "Workout plan",
+    "workoutPlan": "Workout plan",
+    "nutritionPlan": "Nutrition plan",
     "library": "Videos & documents",
     "workoutLog": "Workout log",
     "nutritionLog": "Nutrition log",
@@ -75,10 +81,21 @@
       "password": "Enter your password"
     },
     "toast": {
-      "invalid": "Please fill in all fields correctly"
+      "invalid": "Please fill in all fields correctly",
+      "demoReady": "Demo session ready"
     },
+    "demoHint": "Demo mode: any password works. Use an email with “admin” for the Admin dashboard, or any other email for the Subscriber portal.",
     "unauthorized": "You do not have access to this area.",
     "subscriptionExpired": "Your subscription is inactive or expired."
+  },
+  "dashboard": {
+    "adminArea": "Admin Panel",
+    "subscriberArea": "Member Portal",
+    "user": "User",
+    "collapse": "Collapse",
+    "expand": "Expand",
+    "searchPlaceholder": "Search anything..",
+    "website": "Website"
   },
   "pages": {
     "home": "Home",
@@ -92,6 +109,543 @@
     "documentTitle": "Page not found",
     "title": "Page not found",
     "cta": "Back home"
+  },
+  "admin": {
+    "common": {
+      "all": "All",
+      "actions": "Actions",
+      "view": "View",
+      "manage": "Manage",
+      "back": "Back",
+      "demoOnly": "Demo only — Firebase is not connected yet"
+    },
+    "overview": {
+      "hello": "Welcome back, {{name}}",
+      "hint": "This week’s studio pulse — current seats, adherence, and what needs a decision.",
+      "queueCta": "{{count}} need a look",
+      "stats": {
+        "subscribers": "Roster",
+        "subscribersHint": "{{count}} active accounts",
+        "activeSubs": "Live plans",
+        "activeSubsHint": "{{count}} ending in 21 days",
+        "adherence": "Adherence",
+        "vsLastWeek": "vs last week",
+        "queue": "To review",
+        "queueHint": "{{count}} registration requests"
+      },
+      "charts": {
+        "subscriptions": "Current seats",
+        "adherence": "Weekly adherence",
+        "adherenceHint": "Assigned people only, this week vs the last eight.",
+        "packages": "Package seats",
+        "progress": "Progress health",
+        "workout": "Workouts",
+        "nutrition": "Nutrition",
+        "live": "Live",
+        "seatsOn": "{{count}} live · {{share}}%"
+      },
+      "mix": {
+        "active": "Live",
+        "expired": "Expired",
+        "pending": "Pending",
+        "suspended": "Paused"
+      },
+      "progress": {
+        "onTrack": "On track",
+        "attention": "Needs attention",
+        "quiet": "No logs",
+        "checkIns_one": "{{count}} check-in this week",
+        "checkIns_other": "{{count}} check-ins this week"
+      },
+      "kind": {
+        "request": "Request",
+        "expiring": "Renew",
+        "expired": "Expired",
+        "stale": "Quiet"
+      },
+      "attention": {
+        "title": "Priority",
+        "empty": "Nothing waiting right now.",
+        "request": "Registration request",
+        "expiring": "Ends in {{count}} days",
+        "expired": "Plan ended — renew before assigning",
+        "stale": "No check-in for {{count}} days"
+      },
+      "actions": {
+        "title": "Shortcuts",
+        "requests": "Review requests",
+        "requestsHint": "{{count}} waiting on a decision",
+        "progress": "Check progress",
+        "progressHint": "Weights, photos, adherence",
+        "subscriptions": "Renewals",
+        "subscriptionsHint": "Live and expiring seats",
+        "reports": "Reports inbox",
+        "reportsHint": "Expiration emails and logs",
+        "workouts": "Workouts",
+        "nutrition": "Nutrition"
+      },
+      "programs": {
+        "workouts": "{{count}} live workout programs",
+        "nutrition": "{{count}} live nutrition plans"
+      }
+    },
+    "status": {
+      "active": "Active",
+      "pending": "Pending",
+      "suspended": "Suspended",
+      "rejected": "Rejected",
+      "expired": "Expired",
+      "cancelled": "Cancelled"
+    },
+    "subscribers": {
+      "search": "Search subscribers..",
+      "add": "Add subscriber",
+      "empty": "No subscribers match this filter.",
+      "notFound": "Subscriber not found.",
+      "joined": "Joined {{date}}",
+      "profile": "Profile",
+      "currentSubscription": "Current subscription",
+      "noSubscription": "No subscription assigned yet.",
+      "history": "Subscription history",
+      "language": "Language",
+      "assignPackage": "Assign package",
+      "updateStatus": "Update status",
+      "viewProgress": "View progress",
+      "openWorkspace": "Open workspace",
+      "weightNow": "Current weight",
+      "lastCheckIn": "Last check-in",
+      "adherence": "Adherence",
+      "remaining": "Subscription",
+      "daysLeft": "{{count}} days left",
+      "endedAgo": "Ended {{count}} days ago",
+      "endsToday": "Ends today",
+      "height": "Height",
+      "heightValue": "{{value}} cm",
+      "sex": "Sex",
+      "sexValue": {
+        "male": "Male",
+        "female": "Female"
+      },
+      "bmi": "BMI",
+      "goal": "Goal",
+      "notes": "Notes",
+      "coachNotes": "Coach notes",
+      "currentWorkout": "Current workout",
+      "currentNutrition": "Current nutrition",
+      "progressSnapshot": "Progress snapshot",
+      "trainingDays": "Training days",
+      "mealsWeek": "Meals / week",
+      "calories": "kcal target",
+      "updated": "Updated",
+      "file": "File",
+      "stats": {
+        "total": "Subscribers",
+        "active": "Active",
+        "pending": "Pending",
+        "suspended": "Suspended"
+      },
+      "columns": {
+        "name": "Subscriber",
+        "email": "Email",
+        "phone": "Phone",
+        "account": "Account",
+        "package": "Package",
+        "subscription": "Subscription",
+        "expires": "Expires"
+      }
+    },
+    "subscriptions": {
+      "search": "Search subscriptions..",
+      "assign": "Assign subscription",
+      "empty": "No subscriptions match this filter.",
+      "renew": "Renew",
+      "activate": "Activate",
+      "stats": {
+        "active": "Active",
+        "expiring": "Expiring soon",
+        "pending": "Pending",
+        "expired": "Expired"
+      },
+      "columns": {
+        "subscriber": "Subscriber",
+        "starts": "Starts",
+        "ends": "Ends",
+        "activatedBy": "Activated by"
+      }
+    },
+    "packages": {
+      "search": "Search packages..",
+      "add": "New package",
+      "empty": "No packages match this filter.",
+      "featured": "Best value",
+      "edit": "Edit",
+      "archive": "Archive",
+      "restore": "Restore",
+      "duration": "{{count}} days",
+      "subscribers": "{{count}} active",
+      "filter": {
+        "active": "Live",
+        "archived": "Archived"
+      },
+      "stats": {
+        "total": "Packages",
+        "live": "Live",
+        "assigned": "Active seats",
+        "archived": "Archived"
+      }
+    },
+    "requests": {
+      "search": "Search requests..",
+      "empty": "No registration requests match this filter.",
+      "hint": "Open a row to read the request. Approve only after you are ready to create the account.",
+      "approve": "Approve",
+      "reject": "Reject",
+      "reviewed": "Reviewed",
+      "goal": "What they asked for",
+      "source": "Source",
+      "toast": {
+        "approved": "Request approved — account will be created when Firebase is connected",
+        "rejected": "Request rejected"
+      },
+      "status": {
+        "pending": "Needs review",
+        "approved": "Approved",
+        "rejected": "Rejected"
+      },
+      "sources": {
+        "contact": "Contact form",
+        "manual": "Added by staff"
+      },
+      "stats": {
+        "pending": "Needs review",
+        "pendingHint": "Waiting on your decision",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "total": "All requests"
+      },
+      "columns": {
+        "person": "Request",
+        "package": "Requested plan",
+        "received": "Received",
+        "status": "Decision"
+      }
+    },
+    "workouts": {
+      "search": "Search programs..",
+      "empty": "No workout programs in this view.",
+      "newTemplate": "New template",
+      "assign": "Assign program",
+      "copied": "Assigned copy — edits stay with this subscriber",
+      "reusable": "Reusable template — assigning creates a copy",
+      "updated": "Updated {{date}}",
+      "version": "v{{version}}",
+      "thisWeek": "Logged this week",
+      "pdfHint": "This program is delivered as a protected PDF, not an interactive week.",
+      "session": "Train",
+      "restLabel": "Rest",
+      "restDay": "Rest day",
+      "restHint": "No session programmed. Recovery stays on the calendar so the week is complete.",
+      "daysCount": "{{count}} training days",
+      "exerciseCount": "{{count}} exercises",
+      "sets": "{{count}} sets",
+      "reps": "{{value}} reps",
+      "restTime": "{{value}} rest",
+      "scope": {
+        "template": "Templates",
+        "active": "Assigned",
+        "archived": "History"
+      },
+      "format": {
+        "interactive": "Interactive",
+        "pdf": "PDF"
+      },
+      "weekdays": {
+        "0": "Mon",
+        "1": "Tue",
+        "2": "Wed",
+        "3": "Thu",
+        "4": "Fri",
+        "5": "Sat",
+        "6": "Sun"
+      },
+      "stats": {
+        "templates": "Templates",
+        "assigned": "Assigned",
+        "sessions": "Sessions logged",
+        "archived": "History"
+      }
+    },
+    "nutrition": {
+      "search": "Search nutrition plans..",
+      "empty": "No nutrition plans in this view.",
+      "newTemplate": "New template",
+      "assign": "Assign plan",
+      "copied": "Assigned copy — edits stay with this subscriber",
+      "reusable": "Reusable template — assigning creates a copy",
+      "thisWeek": "Meals logged",
+      "pdfHint": "This plan is a protected PDF. It is not an interactive meal week.",
+      "target": "{{value}} kcal target",
+      "noMacros": "Macros not provided for this day",
+      "emptyDay": "No meals on this day. Keep it on the week so the plan stays complete.",
+      "mealsCount": "{{count}} meals / week",
+      "mealsShort": "{{count}} meals",
+      "off": "Off",
+      "scope": {
+        "template": "Templates",
+        "active": "Assigned",
+        "archived": "History"
+      },
+      "slots": {
+        "breakfast": "Breakfast",
+        "lunch": "Lunch",
+        "snack": "Snack",
+        "dinner": "Dinner"
+      },
+      "stats": {
+        "templates": "Templates",
+        "assigned": "Assigned",
+        "logged": "Meals logged",
+        "archived": "History"
+      }
+    },
+    "content": {
+      "search": "Search videos, PDFs, and documents..",
+      "empty": "No content matches this filter.",
+      "upload": "Upload content",
+      "update": "Update",
+      "associate": "Link to program",
+      "assign": "Assign",
+      "preview": "Protected in-platform viewer",
+      "play": "Play video",
+      "streamingHint": "Video file sits on a streaming provider ({{provider}}). The library keeps metadata and a playback reference — not the binary.",
+      "pdfHint": "Protected in-platform viewer. Direct download and print stay hidden from subscribers.",
+      "linked": "Linked",
+      "unlinked": "Not linked yet",
+      "linkedPrograms": "Used in programs",
+      "linkedExercises": "Exercise cues",
+      "linkedSubscribers": "Assigned subscribers",
+      "packages": "Package access",
+      "noPrograms": "Not attached to a workout or nutrition program yet.",
+      "noExercises": "No exercise in a current program uses this video.",
+      "noSubscribers": "No direct subscriber assignment.",
+      "noPackages": "Not bundled with a package entitlement.",
+      "accessNote": "Subscribers only see this file when a program, package, or assignment grants it.",
+      "updated": "Updated {{date}}",
+      "pages": "{{count}} pages",
+      "filter": {
+        "exerciseVideo": "Videos",
+        "workoutPdf": "Workout PDFs",
+        "nutritionPdf": "Nutrition PDFs",
+        "education": "Education",
+        "reference": "Reference"
+      },
+      "kind": {
+        "exerciseVideo": "Exercise video",
+        "workoutPdf": "Workout PDF",
+        "nutritionPdf": "Nutrition PDF",
+        "education": "Educational document",
+        "reference": "Reference"
+      },
+      "visibility": {
+        "library": "Library",
+        "assigned": "Assigned",
+        "package": "Package"
+      },
+      "stats": {
+        "videos": "Videos",
+        "workoutPdfs": "Workout PDFs",
+        "nutritionPdfs": "Nutrition PDFs",
+        "resources": "Resources"
+      }
+    },
+    "progress": {
+      "search": "Search subscribers..",
+      "chooseSubscriber": "Choose subscriber",
+      "subscriberCount": "{{count}} subscribers",
+      "empty": "No subscribers match this filter.",
+      "emptyPerson": "No progress recorded yet. Assign a program and the logs will land here.",
+      "emptyBody": "No weight or measurements logged for this subscriber.",
+      "emptyPhotos": "No progress photos uploaded yet. Photos stay on this profile only.",
+      "emptyPerformance": "No lifts or adherence weeks recorded yet.",
+      "emptyHistory": "No workout or nutrition assignments on file.",
+      "privacy": "Review one subscriber at a time. Photos and measurements never appear in the roster.",
+      "profile": "Open profile",
+      "logged": "Has logs",
+      "noLogs": "No logs yet",
+      "stale": "Check-in overdue",
+      "lastCheckIn": "Last check-in {{date}} · {{days}}d ago",
+      "weightTrend": "Body weight",
+      "measurements": "Measurements",
+      "sinceStart": "Since first check-in",
+      "vsPrevious": "Vs previous check-in",
+      "liftLog": "Lift log",
+      "liftName": "Lift",
+      "liftValue": "Load",
+      "workoutWeek": "Workout this week",
+      "nutritionWeek": "Nutrition this week",
+      "latestPhotos": "Latest photos",
+      "currentPrograms": "Current programs",
+      "noProgram": "No program assigned",
+      "needMorePoints": "Need at least two weigh-ins to draw a trend.",
+      "photoStart": "Starting photos",
+      "photoLatest": "Latest photos",
+      "photoTimeline": "Photo history",
+      "performanceTrend": "Lift trend",
+      "adherenceHistory": "Weekly adherence",
+      "workoutHistory": "Workout programs",
+      "nutritionHistory": "Nutrition plans",
+      "filter": {
+        "all": "All",
+        "attention": "Needs attention",
+        "ontrack": "On track",
+        "quiet": "No logs"
+      },
+      "tabs": {
+        "overview": "Overview",
+        "body": "Body",
+        "photos": "Photos",
+        "performance": "Performance",
+        "history": "History"
+      },
+      "pose": {
+        "front": "Front",
+        "side": "Side",
+        "back": "Back"
+      },
+      "metrics": {
+        "date": "Date",
+        "weight": "Weight",
+        "chest": "Chest",
+        "waist": "Waist",
+        "hips": "Hips",
+        "arms": "Arms",
+        "thighs": "Thighs",
+        "notes": "Notes"
+      },
+      "stats": {
+        "onTrack": "On track",
+        "attention": "Needs attention",
+        "checkIns": "Check-ins this week",
+        "photos": "Photos this month"
+      }
+    },
+    "reports": {
+      "hint": "This week’s slice.",
+      "send": "Send email",
+      "retry": "Retry email",
+      "thisWeek": "This week",
+      "lastWeek": "Last week",
+      "daysLeft": "{{count}} days left",
+      "tabs": {
+        "inbox": "Inbox",
+        "activity": "Activity",
+        "billing": "Packages",
+        "adherence": "Adherence",
+        "progress": "Progress",
+        "content": "Content",
+        "export": "Export"
+      },
+      "stats": {
+        "expiring": "Expiring",
+        "expiringHint": "Active seats ending in 21 days",
+        "attention": "Needs attention",
+        "attentionHint": "Stale check-in or low adherence",
+        "pending": "Approvals",
+        "pendingHint": "Registration requests waiting",
+        "queued": "Emails queued",
+        "queuedHint": "Operational email, not WhatsApp"
+      },
+      "noticeKind": {
+        "registration": "Registration",
+        "approval": "Approval",
+        "activation": "Activation",
+        "expiration": "Expiration"
+      },
+      "noticeStatus": {
+        "queued": "Queued",
+        "sent": "Sent",
+        "failed": "Failed"
+      },
+      "channel": {
+        "email": "Email"
+      },
+      "inbox": {
+        "title": "Operational emails",
+        "note": "Registration, approval, activation, and expiration reminders. Send only the queued items — nothing is broadcast."
+      },
+      "activity": {
+        "title": "Subscriber activity",
+        "note": "Active and paused seats only. Check-ins this week versus last week, plus this week’s workout and nutrition logs.",
+        "compare": "{{quiet}} people have not checked in this week.",
+        "logged": "Logged",
+        "quiet": "No check-in",
+        "last": "Last log",
+        "workout": "Workout",
+        "nutrition": "Nutrition"
+      },
+      "billing": {
+        "title": "Packages & expirations",
+        "note": "Live packages with current seats. Share is of active subscriptions, not a full history dump.",
+        "active": "Active",
+        "pending": "Pending",
+        "expiring": "Expiring",
+        "expiringList": "Ending in 21 days"
+      },
+      "adherence": {
+        "title": "Workout & nutrition adherence",
+        "note": "This week versus the previous week for people with assigned programs. Open a row to review the person.",
+        "compare": "Studio totals for the latest logged week — not a lifetime average.",
+        "workout": "Workout",
+        "nutrition": "Nutrition",
+        "workoutNow": "Workout this week",
+        "nutritionNow": "Nutrition this week"
+      },
+      "progress": {
+        "title": "Progress summaries",
+        "note": "Weight change and check-in recency. Photos stay on the individual progress file — only counts appear here.",
+        "photosMonth": "Photos this month",
+        "logged": "People with logs",
+        "photos": "Photos on file",
+        "privacy": "No progress photos are listed in this report."
+      },
+      "content": {
+        "title": "Content usage",
+        "note": "Usage is inferred from program and package links. Streaming play counts are not stored in the library.",
+        "linked": "Linked",
+        "unlinked": "Unlinked",
+        "active": "In live programs",
+        "videos": "Videos",
+        "programs": "Live programs",
+        "people": "People",
+        "packages": "Packages"
+      },
+      "export": {
+        "title": "Export snapshots",
+        "note": "Each file is the current slice on this desk. Photos and full measurement history are not included.",
+        "download": "Download CSV",
+        "expiring": "Expiring subscriptions",
+        "expiringHint": "Active seats ending in the next 21 days.",
+        "adherence": "Adherence this week",
+        "adherenceHint": "Workout and nutrition rates versus the previous week.",
+        "progress": "Progress summaries",
+        "progressHint": "Weight, delta, last check-in, and photo counts — no images.",
+        "packages": "Package occupancy",
+        "packagesHint": "Live packages with active, pending, and expiring seats.",
+        "notices": "Email log",
+        "noticesHint": "Registration, approval, activation, and expiration emails.",
+        "roster": "Subscriber roster",
+        "rosterHint": "Current accounts with package, dates, and last check-in. Rejected requests excluded."
+      },
+      "empty": {
+        "inbox": "No emails in this slice.",
+        "expiring": "No active subscriptions end in the next 21 days."
+      },
+      "toast": {
+        "sent": "Email marked sent — Firebase mail is not connected yet",
+        "exported": "Snapshot downloaded",
+        "noExport": "Your role can read reports but cannot export them"
+      }
+    }
   },
 
   "hero": {
