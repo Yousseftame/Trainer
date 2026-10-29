@@ -9,12 +9,12 @@ const emptyToUndefined = z
   })
 
 const envSchema = z.object({
-  VITE_APP_NAME: z.string().optional().transform((v) => v?.trim() || "Trainer"),
+  VITE_APP_NAME: z.string().optional().transform((v) => v?.trim() || "Derpy Fit"),
   VITE_SUPPORT_WHATSAPP: emptyToUndefined,
   VITE_DEFAULT_LOCALE: z
     .string()
     .optional()
-    .transform((v) => (v === "ar" ? "ar" : "en") as "en" | "ar"),
+    .transform((v) => (v === "en" ? "en" : "ar") as "en" | "ar"),
 })
 
 const parsed = envSchema.safeParse(import.meta.env)

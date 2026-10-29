@@ -15,18 +15,19 @@ void i18n
       ar: { translation: ar },
     },
     fallbackLng: env.defaultLocale,
-    supportedLngs: ["en", "ar"],
+    supportedLngs: ["ar", "en"],
     interpolation: { escapeValue: false },
     detection: {
-      order: ["localStorage", "navigator"],
+      order: ["localStorage"],
+      lookupLocalStorage: "derpyfit_locale",
       caches: ["localStorage"],
     },
   })
 
-applyDocumentLocale((i18n.language?.startsWith("ar") ? "ar" : "en") as AppLocale)
+applyDocumentLocale((i18n.language?.startsWith("en") ? "en" : "ar") as AppLocale)
 
 i18n.on("languageChanged", (lng) => {
-  applyDocumentLocale((lng.startsWith("ar") ? "ar" : "en") as AppLocale)
+  applyDocumentLocale((lng.startsWith("en") ? "en" : "ar") as AppLocale)
 })
 
 export default i18n

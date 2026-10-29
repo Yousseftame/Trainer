@@ -2,8 +2,9 @@ import { Link, Outlet } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { APP_ROUTES } from "@/config/constants"
 import { BrandLogo } from "@/components/shared/BrandLogo"
+import { useLocale } from "@/hooks/useLocale"
 import { cn } from "@/lib/utils"
-import heroImage from "@/assets/heroimage.avif"
+import heroImage from "@/assets/herosection.png"
 import heroPattern from "@/assets/hero-pattern.avif"
 
 /**
@@ -13,6 +14,7 @@ import heroPattern from "@/assets/hero-pattern.avif"
  */
 export function AuthLayout() {
   const { t } = useTranslation()
+  const { isRtl } = useLocale()
 
   return (
     <div className="public-site relative h-dvh overflow-hidden bg-[var(--gym-dark,#24030c)]">
@@ -20,25 +22,28 @@ export function AuthLayout() {
         src={heroImage}
         alt=""
         aria-hidden
-        className={[
-          "pointer-events-none absolute inset-y-0 end-0 z-[1] h-full w-full object-cover select-none sm:w-[88%] lg:w-[80%]",
-          "object-[72%_center] sm:object-[72%_top]",
-          "rtl:-scale-x-100 rtl:object-[28%_center] sm:rtl:object-[28%_top]",
-        ].join(" ")}
         draggable={false}
+        className={cn(
+          "pointer-events-none absolute inset-y-0 z-[1] h-full object-cover select-none",
+          "max-lg:inset-0 max-lg:w-full max-lg:object-[36%_top]",
+          isRtl
+            ? "lg:inset-0 lg:w-full lg:object-[15%_center]"
+            : "lg:-right-[9%] lg:left-auto lg:w-[74%] lg:object-[12%_center]",
+        )}
       />
 
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 z-[1] rtl:-scale-x-100"
+        className="pointer-events-none absolute inset-0 z-[1] hidden lg:block"
         style={{
-          background:
-            "linear-gradient(90deg, #24030c 0%, #24030c 37%, rgba(36, 3, 12, 0))",
+          background: isRtl
+            ? "linear-gradient(270deg, #24030c 0%, #24030c 30%, rgba(36, 3, 12, 0.55) 45%, rgba(36, 3, 12, 0) 62%)"
+            : "linear-gradient(90deg, #24030c 0%, #24030c 34%, rgba(36, 3, 12, 0.62) 43%, rgba(36, 3, 12, 0) 52%)",
         }}
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 z-[1] bg-[linear-gradient(180deg,rgba(36,3,12,0.35)_0%,rgba(36,3,12,0.55)_100%)] lg:hidden"
+        className="pointer-events-none absolute inset-0 z-[1] bg-[linear-gradient(180deg,rgba(36,3,12,0.35)_0%,rgba(36,3,12,0.58)_100%)] lg:hidden"
       />
 
       <img

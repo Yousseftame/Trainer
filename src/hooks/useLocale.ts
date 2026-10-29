@@ -4,7 +4,7 @@ import type { AppLocale } from "@/i18n/rtl"
 
 export function useLocale() {
   const { i18n } = useTranslation()
-  const locale: AppLocale = i18n.language?.startsWith("ar") ? "ar" : "en"
+  const locale: AppLocale = i18n.language?.startsWith("en") ? "en" : "ar"
 
   const setLocale = useCallback(
     (next: AppLocale) => {

@@ -4,8 +4,8 @@ import type { AppLocale } from "@/i18n/rtl"
 import { cn } from "@/lib/utils"
 
 const options: { value: AppLocale; label: string }[] = [
-  { value: "en", label: "EN" },
   { value: "ar", label: "AR" },
+  { value: "en", label: "EN" },
 ]
 
 type LanguageSwitcherProps = {

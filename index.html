@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="apple-touch-icon" href="/favicon.png" />
+    <link id="app-favicon" rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
     <link rel="preload" as="image" href="/derbyfit-logo-ink.png" fetchpriority="high" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>trainer</title>
+    <title>Derpy Fit</title>
     <style>
       #initial-splash {
         position: fixed;
@@ -59,12 +59,55 @@
       <img
         id="initial-splash-logo"
         src="/derbyfit-logo-ink.png"
-        alt="DerbyFit"
+        alt="Derpy Fit"
         fetchpriority="high"
         decoding="sync"
         draggable="false"
       />
     </div>
+    <script>
+      (function () {
+        var img = document.getElementById("initial-splash-logo");
+        if (!img) return;
+        function applySquareFavicon() {
+          if (!img.naturalWidth || !img.naturalHeight) return;
+          var size = 128;
+          var canvas = document.createElement("canvas");
+          canvas.width = size;
+          canvas.height = size;
+          var ctx = canvas.getContext("2d");
+          if (!ctx) return;
+          ctx.beginPath();
+          if (typeof ctx.roundRect === "function") {
+            ctx.roundRect(0, 0, size, size, 30);
+          } else {
+            ctx.rect(0, 0, size, size);
+          }
+          ctx.fillStyle = "#ffffff";
+          ctx.fill();
+          ctx.clip();
+          var sx = img.naturalWidth * 0.025;
+          var sy = img.naturalHeight * 0.16;
+          var sw = img.naturalWidth * 0.95;
+          var sh = img.naturalHeight * 0.72;
+          var drawW = size - 10;
+          var drawH = drawW * (sh / sw);
+          var dx = (size - drawW) / 2;
+          var dy = (size - drawH) / 2;
+          ctx.drawImage(img, sx, sy, sw, sh, dx, dy, drawW, drawH);
+          var link = document.getElementById("app-favicon");
+          if (link) {
+            link.setAttribute("type", "image/png");
+            link.setAttribute("href", canvas.toDataURL("image/png"));
+          }
+        }
+        if (img.complete && img.naturalWidth) {
+          applySquareFavicon();
+        } else {
+          img.addEventListener("load", applySquareFavicon, { once: true });
+        }
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

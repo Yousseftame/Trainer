@@ -1,49 +1,57 @@
 import { useTranslation } from "react-i18next"
 import { APP_ROUTES } from "@/config/constants"
 import { ArrowCtaLink } from "@/components/public/ArrowCtaLink"
-import heroImage from "@/assets/heroimage.avif"
+import { useLocale } from "@/hooks/useLocale"
+import { cn } from "@/lib/utils"
+import heroImage from "@/assets/herosection.png"
 import heroPattern from "@/assets/hero-pattern.avif"
 
 export function HeroSection() {
   const { t } = useTranslation()
+  const { isRtl } = useLocale()
 
   return (
     <section className="w-full px-[15px] pb-6 pt-1 md:pb-7 lg:px-[30px]">
       <div className="hero-wrap relative mx-auto min-h-[560px] w-full overflow-hidden rounded-[24px] bg-[var(--gym-dark)] sm:min-h-[640px] sm:rounded-[30px] lg:min-h-[709px]">
-        {/*
-          Trainer image sits on the end (right in EN, left in AR).
-          RTL mirrors so he faces the copy. Keep the same focal point after
-          the mirror — inverting X to 28% crops to the arm on mobile.
-        */}
         <img
           src={heroImage}
           alt=""
-          className={cnHeroImage()}
+          draggable={false}
+          className={cn(
+            "pointer-events-none absolute inset-y-0 end-0 z-[1] h-full object-cover select-none",
+            isRtl
+              ? "w-full object-[18%_center] sm:object-[15%_center]"
+              : "w-full object-[0%_center] sm:inset-y-0 sm:-right-[8%] sm:left-auto sm:w-[78%] sm:object-[14%_center] lg:-right-[9%] lg:w-[74%] lg:object-[12%_center]",
+          )}
         />
 
         {/* Soft fade into photo — solid behind text, clear over the subject */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 z-[1] rtl:-scale-x-100"
+          className="pointer-events-none absolute inset-0 z-[1]"
           style={{
-            background:
-              "linear-gradient(90deg, #24030c 0%, #24030c 37%, rgba(36, 3, 12, 0))",
+            background: isRtl
+              ? "linear-gradient(270deg, #24030c 0%, #24030c 30%, rgba(36, 3, 12, 0.55) 45%, rgba(36, 3, 12, 0) 62%)"
+              : "linear-gradient(90deg, #24030c 0%, #24030c 34%, rgba(36, 3, 12, 0.62) 43%, rgba(36, 3, 12, 0) 52%)",
           }}
         />
 
-        {/*
-          Glass panes from the original pattern only — no extra CSS grid,
-          so each cell stays a clean solid color (no nested boxes).
-        */}
+        {/* Glass panes pattern */}
         <img
           src={heroPattern}
           alt=""
           aria-hidden
-          className="pointer-events-none absolute inset-0 z-[2] h-full w-full object-cover object-left opacity-30 rtl:object-right rtl:-scale-x-100"
+          draggable={false}
+          className="pointer-events-none absolute inset-0 z-[2] h-full w-full object-cover object-left opacity-30 select-none rtl:object-right rtl:-scale-x-100"
         />
 
         {/* Copy */}
-        <div className="relative z-20 flex min-h-[560px] flex-col justify-center px-8 py-14 sm:min-h-[640px] sm:px-12 lg:min-h-[709px] lg:max-w-[54%] lg:ps-20 lg:pe-10 lg:py-20 xl:ps-24">
+        <div
+          className={cn(
+            "relative z-20 flex min-h-[560px] flex-col justify-center px-8 py-14 sm:min-h-[640px] sm:px-12 lg:min-h-[709px] lg:ps-20 lg:pe-10 lg:py-20 xl:ps-24",
+            isRtl ? "lg:max-w-[54%]" : "sm:max-w-[54%] lg:max-w-[46%] xl:max-w-[44%]",
+          )}
+        >
           <p className="hero-fade hero-fade-1 mb-3 text-[22px] font-extrabold text-white sm:mb-4 sm:text-[28px] lg:text-[38px]">
             {t("hero.greeting")}
           </p>
@@ -79,14 +87,4 @@ export function HeroSection() {
       </div>
     </section>
   )
-}
-
-function cnHeroImage() {
-  return [
-    "pointer-events-none absolute inset-y-0 end-0 z-[1] h-full object-cover",
-    "w-full sm:w-[88%] lg:w-[80%]",
-    /* Face sits ~70% from the left of the source. Same focal point after the mirror. */
-    "object-[70%_12%] sm:object-[72%_top]",
-    "rtl:-scale-x-100 rtl:object-[70%_12%] sm:rtl:object-[72%_top]",
-  ].join(" ")
 }
