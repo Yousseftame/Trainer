@@ -40,7 +40,7 @@ export function WhoIAmSection() {
             className="pointer-events-none absolute inset-0 z-[1]"
             style={{
               background: [
-                "linear-gradient(to top, rgba(6,20,20,0.88) 0%, rgba(6,20,20,0.62) 18%, rgba(6,20,20,0.32) 38%, rgba(6,20,20,0.1) 58%, transparent 78%)",
+                "linear-gradient(to top, rgba(26,2,8,0.88) 0%, rgba(26,2,8,0.62) 18%, rgba(26,2,8,0.32) 38%, rgba(26,2,8,0.1) 58%, transparent 78%)",
                 "linear-gradient(to top, transparent 45%, rgba(0,0,0,0.12) 100%)",
               ].join(", "),
             }}
@@ -75,7 +75,7 @@ export function WhoIAmSection() {
             to={APP_ROUTES.public.contact}
             className="group mt-7 inline-flex h-[50px] w-fit items-center text-[16px] font-medium leading-none text-[var(--gym-ink)] sm:mt-8"
           >
-            <span className="inline-flex h-full items-center rounded-full bg-[var(--gym-lime)] px-[25px]">
+            <span className="inline-flex h-full items-center rounded-full bg-[var(--gym-lime)] px-[25px] text-white">
               {t("whoIAm.cta")}
             </span>
             <span className="inline-flex size-[50px] shrink-0 items-center justify-center rounded-full bg-[var(--gym-ink)] text-white">

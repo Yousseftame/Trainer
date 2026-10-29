@@ -58,6 +58,10 @@
     "forgotTitle": "Forgot password",
     "forgotSubtitle": "Enter your email and we’ll send reset instructions.",
     "forgotSubmit": "Send reset link",
+    "forgotResend": "Resend reset link",
+    "forgotResendIn": "Resend in {{seconds}}s",
+    "forgotSentTitle": "Check your inbox",
+    "forgotSentSubtitle": "If an account exists for {{email}}, a reset link is on its way.",
     "forgotPassword": "Forgot password?",
     "backToLogin": "Back to log in",
     "remember": "Keep me logged in",
@@ -82,9 +86,22 @@
     },
     "toast": {
       "invalid": "Please fill in all fields correctly",
-      "demoReady": "Demo session ready"
+      "signedIn": "Welcome back",
+      "signedOut": "Signed out successfully",
+      "resetSent": "If that email is registered, a reset link is on its way"
     },
-    "demoHint": "Demo mode: any password works. Use an email with “admin” for the Admin dashboard, or any other email for the Subscriber portal.",
+    "errors": {
+      "generic": "Could not complete that request. Try again.",
+      "invalidEmail": "Enter a valid email address",
+      "invalidCredential": "Incorrect email or password",
+      "userDisabled": "This account has been disabled",
+      "tooManyRequests": "Too many attempts. Try again later.",
+      "network": "Check your connection and try again",
+      "requiresRecentLogin": "Enter your current password and try again",
+      "weakPassword": "Choose a stronger password",
+      "unauthorizedDomain": "This domain is not allowed for sign-in",
+      "operationNotAllowed": "Email and password sign-in is not enabled"
+    },
     "unauthorized": "You do not have access to this area.",
     "subscriptionExpired": "Your subscription is inactive or expired."
   },
@@ -96,6 +113,12 @@
     "expand": "Expand",
     "searchPlaceholder": "Search anything..",
     "website": "Website",
+    "logoutModal": {
+      "title": "Log out?",
+      "description": "You will need to sign in again to access the dashboard",
+      "cancel": "Stay",
+      "confirm": "Log out"
+    },
     "profile": {
       "settings": "Change settings",
       "changePassword": "Change password",

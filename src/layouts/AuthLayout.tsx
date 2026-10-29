@@ -1,7 +1,7 @@
 import { Link, Outlet } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { APP_ROUTES } from "@/config/constants"
-import { authBrandClass } from "@/components/auth/styles"
+import { BrandLogo } from "@/components/shared/BrandLogo"
 import { cn } from "@/lib/utils"
 import heroImage from "@/assets/heroimage.avif"
 import heroPattern from "@/assets/hero-pattern.avif"
@@ -15,7 +15,7 @@ export function AuthLayout() {
   const { t } = useTranslation()
 
   return (
-    <div className="relative h-dvh overflow-hidden bg-[var(--gym-ink)]">
+    <div className="public-site relative h-dvh overflow-hidden bg-[var(--gym-dark,#24030c)]">
       <img
         src={heroImage}
         alt=""
@@ -33,12 +33,12 @@ export function AuthLayout() {
         className="pointer-events-none absolute inset-0 z-[1] rtl:-scale-x-100"
         style={{
           background:
-            "linear-gradient(90deg, #063434 0%, #063434 37%, rgba(6, 52, 52, 0))",
+            "linear-gradient(90deg, #24030c 0%, #24030c 37%, rgba(36, 3, 12, 0))",
         }}
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 z-[1] bg-[linear-gradient(180deg,rgba(6,52,52,0.35)_0%,rgba(6,52,52,0.55)_100%)] lg:hidden"
+        className="pointer-events-none absolute inset-0 z-[1] bg-[linear-gradient(180deg,rgba(36,3,12,0.35)_0%,rgba(36,3,12,0.55)_100%)] lg:hidden"
       />
 
       <img
@@ -72,20 +72,17 @@ export function AuthLayout() {
           <div className="flex min-h-0 w-full flex-1 flex-col px-5 py-6 sm:px-8 sm:py-8 lg:px-10 lg:pb-6 lg:pt-10">
             <Link
               to={APP_ROUTES.public.home}
-              className={cn(
-                authBrandClass,
-                "shrink-0 text-center text-[30px] sm:text-[36px] lg:text-[40px]"
-              )}
+              className="mx-auto flex shrink-0 items-center justify-center"
               aria-label={t("app.name")}
             >
-              {t("app.name")}
+              <BrandLogo className="h-12 object-center sm:h-14 lg:h-16" />
             </Link>
 
-            <div className="flex min-h-0 flex-1 flex-col justify-center py-4 sm:py-5 lg:py-6">
+            <div className="flex min-h-0 flex-1 flex-col justify-start overflow-y-auto py-3 [scrollbar-width:none] sm:py-4 lg:justify-center lg:py-6 [&::-webkit-scrollbar]:hidden">
               <Outlet />
             </div>
 
-            <p className="mt-auto shrink-0 pt-2 text-center text-[11px] leading-relaxed text-[var(--gym-muted)] sm:text-[12px]">
+            <p className="mt-auto shrink-0 bg-transparent pt-3 text-center text-[11px] leading-relaxed text-[var(--gym-muted)] sm:text-[12px]">
               <Link
                 to={APP_ROUTES.public.home}
                 className="relative z-10 transition-colors hover:text-[var(--gym-ink)]"

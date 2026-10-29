@@ -135,7 +135,7 @@ function DreamCardView({ item, tone }: { item: DreamCard; tone: string }) {
         <h3 className="font-heading text-[22px] font-bold leading-tight text-[var(--gym-ink)] sm:text-[26px] lg:text-[28px]">
           {t(item.titleKey)}
         </h3>
-        <p className="mt-4 line-clamp-4 text-[16px] leading-[1.6] text-[#2a4a45] sm:mt-5 sm:text-[17px] lg:text-[18px]">
+        <p className="mt-4 line-clamp-4 text-[16px] leading-[1.6] text-[var(--gym-muted)] sm:mt-5 sm:text-[17px] lg:text-[18px]">
           {t(item.bodyKey)}
         </p>
       </div>
@@ -159,9 +159,9 @@ function DreamCardView({ item, tone }: { item: DreamCard; tone: string }) {
           aria-label={t("dreams.openItem", { title: t(item.titleKey) })}
           className={cn(
             "absolute bottom-5 end-5 z-10 inline-flex size-12 items-center justify-center rounded-full sm:bottom-6 sm:end-6",
-            "bg-white text-[var(--gym-ink)] shadow-[0_6px_16px_rgba(6,52,52,0.12)]",
+            "bg-white text-[var(--gym-ink)] shadow-[0_6px_16px_rgba(0,0,0,0.12)]",
             "transition-colors duration-[450ms] ease-out",
-            "[@media(hover:hover)_and_(pointer:fine)]:group-hover/card:bg-[var(--gym-lime)]",
+            "[@media(hover:hover)_and_(pointer:fine)]:group-hover/card:bg-[var(--gym-lime)] [@media(hover:hover)_and_(pointer:fine)]:group-hover/card:text-white",
             "active:scale-95"
           )}
         >

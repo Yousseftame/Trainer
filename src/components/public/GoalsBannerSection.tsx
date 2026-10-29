@@ -57,7 +57,7 @@ export function GoalsBannerSection() {
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(5,20,20,0.45)_0%,rgba(6,30,30,0.58)_100%)]"
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(26,2,8,0.45)_0%,rgba(36,3,12,0.58)_100%)]"
       />
 
       <div className="relative z-[1] mx-auto w-full max-w-[1300px]">
@@ -94,7 +94,7 @@ export function GoalsBannerSection() {
                 {selected ? (
                   <motion.span
                     layoutId="goals-tab-pill"
-                    className="absolute inset-0 rounded-full border border-[var(--gym-lime)]/80 bg-white/[0.06] shadow-[0_0_0_1px_rgba(184,254,34,0.12)]"
+                    className="absolute inset-0 rounded-full border border-[var(--gym-lime)]/80 bg-white/[0.06] shadow-[0_0_0_1px_rgba(251,80,1,0.15)]"
                     transition={{ type: "spring", stiffness: 420, damping: 36 }}
                   />
                 ) : null}
@@ -144,12 +144,12 @@ export function GoalsBannerSection() {
 
             <Link
               to={APP_ROUTES.public.login}
-              className="group mt-1 inline-flex h-[48px] w-fit items-center gap-3 rounded-full bg-[var(--gym-lime)] pe-1.5 ps-6 text-[#111111] sm:mt-2 sm:h-[52px] sm:gap-3.5 sm:pe-2 sm:ps-7"
+              className="group mt-1 inline-flex h-[48px] w-fit items-center gap-3 rounded-full bg-[var(--gym-lime)] pe-1.5 ps-6 text-white sm:mt-2 sm:h-[52px] sm:gap-3.5 sm:pe-2 sm:ps-7"
             >
               <span className="font-heading text-[13px] font-extrabold uppercase tracking-[0.04em] sm:text-[14px]">
                 {t("goalsBanner.cta")}
               </span>
-              <span className="inline-flex size-[36px] shrink-0 items-center justify-center rounded-full bg-[#111111] text-white sm:size-[40px]">
+              <span className="inline-flex size-[36px] shrink-0 items-center justify-center rounded-full bg-white text-[#111111] sm:size-[40px]">
                 <ArrowRight
                   className={cn(
                     "size-[17px] transition-transform duration-300 ease-out sm:size-[18px]",

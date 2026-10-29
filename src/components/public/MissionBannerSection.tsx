@@ -47,7 +47,7 @@ export function MissionBannerSection() {
 
   return (
     <section className="w-full px-[15px] py-12 md:py-16 lg:px-[30px]">
-      <div className="relative mx-auto flex min-h-[640px] w-full flex-col overflow-hidden rounded-[24px] bg-[var(--gym-ink)] sm:min-h-[680px] sm:rounded-[30px] lg:min-h-[560px] lg:flex-row">
+      <div className="relative mx-auto flex min-h-[640px] w-full flex-col overflow-hidden rounded-[24px] bg-[var(--gym-dark)] sm:min-h-[680px] sm:rounded-[30px] lg:min-h-[560px] lg:flex-row">
         {/* Left — autoplay video (taller on mobile only) */}
         <div className="relative min-h-[360px] w-full shrink-0 overflow-hidden sm:min-h-[400px] lg:min-h-0 lg:w-[58%] lg:flex-1 lg:shrink">
           <video
@@ -77,7 +77,7 @@ export function MissionBannerSection() {
         </div>
 
         {/* Right — mission copy + socials + ghost marquee */}
-        <div className="relative z-10 flex w-full flex-col justify-start overflow-hidden bg-[var(--gym-ink)] px-8 pb-8 pt-8 sm:px-10 sm:pb-10 sm:pt-10 lg:w-[42%] lg:px-12 lg:pb-24 lg:pt-12 xl:px-14">
+        <div className="relative z-10 flex w-full flex-col justify-start overflow-hidden bg-[var(--gym-dark)] px-8 pb-8 pt-8 sm:px-10 sm:pb-10 sm:pt-10 lg:w-[42%] lg:px-12 lg:pb-24 lg:pt-12 xl:px-14">
           <h2 className="max-w-[18ch] font-heading text-[28px] font-bold leading-[1.18] text-white sm:text-[32px] md:text-[34px] lg:text-[36px]">
             {t("mission.headline")}
           </h2>
@@ -100,7 +100,7 @@ export function MissionBannerSection() {
                   target="_blank"
                   rel="noreferrer"
                   aria-label={label}
-                  className="inline-flex size-7 items-center justify-center rounded-[7px] bg-[var(--gym-lime)] text-[var(--gym-ink)] transition-transform duration-300 ease-out hover:scale-105 active:scale-95 sm:size-8 sm:rounded-[8px]"
+                  className="inline-flex size-7 items-center justify-center rounded-[7px] bg-[var(--gym-lime)] text-white transition-transform duration-300 ease-out hover:scale-105 active:scale-95 sm:size-8 sm:rounded-[8px]"
                 >
                   <Icon className="size-3.5 sm:size-4" />
                 </a>

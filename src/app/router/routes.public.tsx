@@ -1,5 +1,6 @@
 import type { RouteObject } from "react-router-dom"
 import { Navigate } from "react-router-dom"
+import { RequireGuest } from "@/app/router/guards"
 import { PublicLayout } from "@/layouts/PublicLayout"
 import { AuthLayout } from "@/layouts/AuthLayout"
 import { HomePage } from "@/pages/public/HomePage"
@@ -18,10 +19,15 @@ export const publicRoutes: RouteObject[] = [
     ],
   },
   {
-    element: <AuthLayout />,
+    element: <RequireGuest />,
     children: [
-      { path: "login", element: <LoginPage /> },
-      { path: "forgot-password", element: <ForgotPasswordPage /> },
+      {
+        element: <AuthLayout />,
+        children: [
+          { path: "login", element: <LoginPage /> },
+          { path: "forgot-password", element: <ForgotPasswordPage /> },
+        ],
+      },
     ],
   },
 ]

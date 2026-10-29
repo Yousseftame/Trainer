@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next"
 import { APP_ROUTES } from "@/config/constants"
 import { ArrowCtaLink } from "@/components/public/ArrowCtaLink"
 import { HamburgerButton } from "@/components/public/HamburgerButton"
+import { BrandLogo } from "@/components/shared/BrandLogo"
 import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher"
 import { cn } from "@/lib/utils"
 
@@ -56,7 +57,7 @@ export function MobileNavOverlay({ open, onClose }: MobileNavOverlayProps) {
     <div
       id="public-mobile-nav"
       className={cn(
-        "fixed inset-0 z-[60] flex flex-col bg-[var(--gym-ink)] lg:hidden",
+        "fixed inset-0 z-[60] flex flex-col bg-[var(--gym-dark)] lg:hidden",
         "transition-[opacity,visibility] duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
         open ? "visible opacity-100" : "invisible opacity-0 pointer-events-none",
       )}
@@ -67,7 +68,7 @@ export function MobileNavOverlay({ open, onClose }: MobileNavOverlayProps) {
         className="pointer-events-none absolute inset-0 opacity-[0.07]"
         style={{
           backgroundImage:
-            "radial-gradient(circle at 20% 20%, #b8fe22 0%, transparent 42%), radial-gradient(circle at 85% 75%, #b8fe22 0%, transparent 36%)",
+            "radial-gradient(circle at 20% 20%, #fb5001 0%, transparent 42%), radial-gradient(circle at 85% 75%, #b20033 0%, transparent 36%)",
         }}
       />
 
@@ -78,9 +79,7 @@ export function MobileNavOverlay({ open, onClose }: MobileNavOverlayProps) {
           className="flex items-center"
           aria-label={t("app.name")}
         >
-          <span className="font-heading text-[22px] font-bold tracking-tight text-white">
-            {t("app.name")}
-          </span>
+          <BrandLogo variant="onDark" className="h-9" />
         </Link>
 
         <HamburgerButton open onClick={onClose} label={t("nav.closeMenu")} />
@@ -98,7 +97,7 @@ export function MobileNavOverlay({ open, onClose }: MobileNavOverlayProps) {
             "h-11 w-auto border-white/25 bg-white/10 p-1",
             "[&_button]:h-9 [&_button]:min-w-[44px] [&_button]:px-3.5 [&_button]:text-[14px]",
             "[&_button]:text-white",
-            "[&_button[aria-pressed=true]]:bg-[var(--gym-lime)] [&_button[aria-pressed=true]]:text-[var(--gym-ink)]",
+            "[&_button[aria-pressed=true]]:bg-[var(--gym-lime)] [&_button[aria-pressed=true]]:text-white",
             "[&_button[aria-pressed=false]]:hover:bg-white/10",
           )}
         />
@@ -157,7 +156,7 @@ export function MobileNavOverlay({ open, onClose }: MobileNavOverlayProps) {
           to={APP_ROUTES.public.login}
           label={t("nav.getStarted")}
           onClick={onClose}
-          className="text-[var(--gym-ink)] [&_span:first-child]:border-[var(--gym-ink)] [&_span:first-child]:bg-white [&_span:last-child]:bg-[var(--gym-lime)] [&_span:last-child]:text-[var(--gym-ink)]"
+          className="text-[var(--gym-ink)] [&_span:first-child]:border-[var(--gym-ink)] [&_span:first-child]:bg-white [&_span:last-child]:bg-[var(--gym-lime)] [&_span:last-child]:text-white"
         />
       </div>
     </div>

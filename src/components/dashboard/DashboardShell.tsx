@@ -3,10 +3,13 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar"
 import { DashboardTopbar } from "@/components/dashboard/DashboardTopbar"
+import { LogoutConfirmDialog } from "@/components/dashboard/LogoutConfirmDialog"
 import { flattenNavItems, type NavItem } from "@/config/navigation"
 import { useAuth } from "@/features/auth/auth-context"
+import { firebaseAuthErrorKey } from "@/features/auth/errors"
 import { APP_ROUTES } from "@/config/constants"
 import { env } from "@/config/env"
+import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 
 const COLLAPSE_KEY = "trainer.dashboard.sidebar.collapsed"
@@ -39,6 +42,7 @@ export function DashboardShell({ area, items, homeTo }: DashboardShellProps) {
   const { signOut } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
+  const [logoutOpen, setLogoutOpen] = useState(false)
 
   useEffect(() => {
     setCollapsed(readCollapsed())
@@ -81,16 +85,27 @@ export function DashboardShell({ area, items, homeTo }: DashboardShellProps) {
     })
   }
 
-  async function handleSignOut() {
-    await signOut()
-    navigate(APP_ROUTES.public.login, { replace: true })
+  function requestSignOut() {
+    setMobileOpen(false)
+    setLogoutOpen(true)
+  }
+
+  async function handleConfirmSignOut() {
+    try {
+      await signOut()
+      setLogoutOpen(false)
+      appToast.success(t("auth.toast.signedOut"))
+      navigate(APP_ROUTES.public.login, { replace: true, state: null })
+    } catch (error) {
+      appToast.error(t(firebaseAuthErrorKey(error)))
+    }
   }
 
   const areaLabel =
     area === "admin" ? t("dashboard.adminArea") : t("dashboard.subscriberArea")
 
   return (
-    <div className={cn("dashboard-shell flex h-dvh max-h-dvh overflow-hidden bg-[#F4F4F4] text-[var(--gym-ink,#063434)]")}>
+    <div className={cn("dashboard-shell flex h-dvh max-h-dvh overflow-hidden bg-[#F4F4F4] text-[var(--gym-ink,#111111)]")}>
       <DashboardSidebar
         items={items}
         brand={env.appName}
@@ -100,13 +115,14 @@ export function DashboardShell({ area, items, homeTo }: DashboardShellProps) {
         collapsed={collapsed}
         onMobileClose={() => setMobileOpen(false)}
         onToggle={toggleCollapsed}
-        onSignOut={() => void handleSignOut()}
+        onSignOut={requestSignOut}
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <DashboardTopbar
           title={t(titleKey)}
           areaLabel={areaLabel}
+          onSignOut={requestSignOut}
           onSidebarToggle={() => {
             if (window.matchMedia("(min-width: 1024px)").matches) {
               toggleCollapsed()
@@ -119,6 +135,12 @@ export function DashboardShell({ area, items, homeTo }: DashboardShellProps) {
           <Outlet />
         </main>
       </div>
+
+      <LogoutConfirmDialog
+        open={logoutOpen}
+        onCancel={() => setLogoutOpen(false)}
+        onConfirm={handleConfirmSignOut}
+      />
     </div>
   )
 }

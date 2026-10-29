@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { AnimatePresence, motion } from "motion/react"
 import { Eye, EyeOff, KeyRound, LogOut, Settings2, X } from "lucide-react"
+import { LogoutConfirmDialog } from "@/components/dashboard/LogoutConfirmDialog"
 import { APP_ROUTES } from "@/config/constants"
 import { useAuth } from "@/features/auth/auth-context"
+import { firebaseAuthErrorKey } from "@/features/auth/errors"
 import { initials } from "@/lib/format"
 import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
@@ -14,13 +16,18 @@ const EASE = [0.22, 1, 0.36, 1] as const
 
 type DialogKind = "settings" | "password"
 
-export function ProfileMenu() {
+type ProfileMenuProps = {
+  onRequestSignOut?: () => void
+}
+
+export function ProfileMenu({ onRequestSignOut }: ProfileMenuProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { user, signOut, setDemoUser, subscriptionStatus } = useAuth()
+  const { user, signOut, updateAccount, changePassword } = useAuth()
   const menuId = useId()
   const [open, setOpen] = useState(false)
   const [dialog, setDialog] = useState<DialogKind | null>(null)
+  const [logoutOpen, setLogoutOpen] = useState(false)
 
   useEffect(() => {
     if (!open && !dialog) return
@@ -59,27 +66,34 @@ export function ProfileMenu() {
     setDialog(kind)
   }
 
-  async function handleSignOut() {
+  function handleSignOutClick() {
     setOpen(false)
-    await signOut()
-    navigate(APP_ROUTES.public.login, { replace: true })
+    if (onRequestSignOut) {
+      onRequestSignOut()
+      return
+    }
+    setLogoutOpen(true)
   }
 
-  function handleSettingsSave(displayName: string, phone: string) {
-    setDemoUser(
-      {
-        ...account,
-        displayName,
-        phone: phone.trim() || undefined,
-        updatedAt: new Date().toISOString(),
-      },
-      subscriptionStatus,
-    )
+  async function handleConfirmSignOut() {
+    try {
+      await signOut()
+      setLogoutOpen(false)
+      appToast.success(t("auth.toast.signedOut"))
+      navigate(APP_ROUTES.public.login, { replace: true, state: null })
+    } catch (error) {
+      appToast.error(t(firebaseAuthErrorKey(error)))
+    }
+  }
+
+  async function handleSettingsSave(displayName: string, phone: string) {
+    await updateAccount({ displayName, phone })
     setDialog(null)
     appToast.success(t("dashboard.profile.settingsSaved"))
   }
 
-  function handlePasswordSave() {
+  async function handlePasswordSave(currentPassword: string, nextPassword: string) {
+    await changePassword(currentPassword, nextPassword)
     setDialog(null)
     appToast.success(t("dashboard.profile.passwordUpdated"))
   }
@@ -168,7 +182,7 @@ export function ProfileMenu() {
                 icon={<LogOut className="size-[18px] rtl:-scale-x-100" strokeWidth={1.8} />}
                 label={t("nav.logout")}
                 danger
-                onClick={() => void handleSignOut()}
+                onClick={handleSignOutClick}
               />
             </motion.div>
           </>
@@ -189,6 +203,12 @@ export function ProfileMenu() {
           <PasswordDialog onClose={() => setDialog(null)} onSave={handlePasswordSave} />
         ) : null}
       </AnimatePresence>
+
+      <LogoutConfirmDialog
+        open={logoutOpen}
+        onCancel={() => setLogoutOpen(false)}
+        onConfirm={handleConfirmSignOut}
+      />
     </div>
   )
 }
@@ -290,20 +310,28 @@ function SettingsDialog({
   email: string
   phone: string
   onClose: () => void
-  onSave: (name: string, phone: string) => void
+  onSave: (name: string, phone: string) => Promise<void>
 }) {
   const { t } = useTranslation()
   const [displayName, setDisplayName] = useState(name)
   const [nextPhone, setNextPhone] = useState(phone)
+  const [saving, setSaving] = useState(false)
 
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const trimmed = displayName.trim()
     if (!trimmed) {
       appToast.error(t("dashboard.profile.nameRequired"))
       return
     }
-    onSave(trimmed, nextPhone)
+    setSaving(true)
+    try {
+      await onSave(trimmed, nextPhone)
+    } catch (error) {
+      appToast.error(t(firebaseAuthErrorKey(error)))
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -323,11 +351,11 @@ function SettingsDialog({
           type="tel"
         />
         <Field label={t("dashboard.profile.email")} value={email} readOnly />
-        <p className="text-[12px] font-medium text-[#8c8c8c]">{t("admin.common.demoOnly")}</p>
         <DialogActions
           cancelLabel={t("dashboard.profile.cancel")}
-          confirmLabel={t("dashboard.profile.save")}
+          confirmLabel={saving ? t("auth.submitting") : t("dashboard.profile.save")}
           onCancel={onClose}
+          disabled={saving}
         />
       </form>
     </DialogShell>
@@ -339,14 +367,15 @@ function PasswordDialog({
   onSave,
 }: {
   onClose: () => void
-  onSave: () => void
+  onSave: (currentPassword: string, nextPassword: string) => Promise<void>
 }) {
   const { t } = useTranslation()
   const [current, setCurrent] = useState("")
   const [next, setNext] = useState("")
   const [confirm, setConfirm] = useState("")
+  const [saving, setSaving] = useState(false)
 
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!current || !next || !confirm) {
       appToast.error(t("auth.toast.invalid"))
@@ -360,7 +389,14 @@ function PasswordDialog({
       appToast.error(t("dashboard.profile.passwordMismatch"))
       return
     }
-    onSave()
+    setSaving(true)
+    try {
+      await onSave(current, next)
+    } catch (error) {
+      appToast.error(t(firebaseAuthErrorKey(error)))
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -384,11 +420,11 @@ function PasswordDialog({
           onChange={setConfirm}
           autoComplete="new-password"
         />
-        <p className="text-[12px] font-medium text-[#8c8c8c]">{t("admin.common.demoOnly")}</p>
         <DialogActions
           cancelLabel={t("dashboard.profile.cancel")}
-          confirmLabel={t("dashboard.profile.updatePassword")}
+          confirmLabel={saving ? t("auth.submitting") : t("dashboard.profile.updatePassword")}
           onCancel={onClose}
+          disabled={saving}
         />
       </form>
     </DialogShell>
@@ -476,23 +512,27 @@ function DialogActions({
   cancelLabel,
   confirmLabel,
   onCancel,
+  disabled = false,
 }: {
   cancelLabel: string
   confirmLabel: string
   onCancel: () => void
+  disabled?: boolean
 }) {
   return (
     <div className="mt-1 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
       <button
         type="button"
         onClick={onCancel}
-        className="inline-flex h-11 items-center justify-center rounded-full px-4 text-[13px] font-bold text-[var(--gym-ink,#063434)] hover:bg-[#F4F4F4]"
+        disabled={disabled}
+        className="inline-flex h-11 items-center justify-center rounded-full px-4 text-[13px] font-bold text-[var(--gym-ink,#063434)] hover:bg-[#F4F4F4] disabled:opacity-50"
       >
         {cancelLabel}
       </button>
       <button
         type="submit"
-        className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] px-5 text-[13px] font-bold text-white"
+        disabled={disabled}
+        className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] px-5 text-[13px] font-bold text-white disabled:opacity-50"
       >
         {confirmLabel}
       </button>

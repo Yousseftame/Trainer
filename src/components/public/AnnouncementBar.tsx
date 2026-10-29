@@ -40,7 +40,7 @@ export function AnnouncementBar({ href = APP_ROUTES.public.contact }: Announceme
       className="relative w-full border-y border-black/10"
       style={{
         background:
-          "linear-gradient(90deg, #052a2a 0%, #063434 35%, #0a4540 50%, #063434 65%, #052a2a 100%)",
+          "linear-gradient(90deg, #1a0208 0%, #24030c 32%, #6e001f 50%, #24030c 68%, #1a0208 100%)",
       }}
     >
       <div className="mx-auto flex min-h-11 w-full max-w-[1300px] items-center justify-center px-10 py-2.5 text-center sm:px-12">

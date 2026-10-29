@@ -40,7 +40,7 @@ export function ArrowCtaLink({
         className={cn(
           "inline-flex h-full items-center rounded-full px-[25px]",
           isLime
-            ? "border-0 bg-[var(--gym-lime)]"
+            ? "border-0 bg-[var(--gym-lime)] text-white"
             : "border border-[var(--gym-ink)] bg-white",
         )}
       >

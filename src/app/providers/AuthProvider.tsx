@@ -1,15 +1,22 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
-import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth"
+import { useQueryClient } from "@tanstack/react-query"
+import {
+  EmailAuthProvider,
+  onIdTokenChanged,
+  reauthenticateWithCredential,
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  updatePassword,
+  updateProfile,
+} from "firebase/auth"
 import { AuthContext, type AuthContextValue } from "@/features/auth/auth-context"
-import { readDemoSession, writeDemoSession } from "@/features/auth/demo"
+import { mapFirebaseUser } from "@/features/auth/map-user"
+import { getLiveFirebaseUser, verifyLiveFirebaseSession } from "@/features/auth/session"
 import { hasActiveEntitlement, type AuthState } from "@/features/auth/types"
-import { isFirebaseConfigured } from "@/config/env"
-import { tryGetFirebaseAuth } from "@/lib/firebase/auth"
+import { getFirebaseAuth } from "@/lib/firebase/auth"
 import { can } from "@/lib/permissions/can"
 import { isAdminRole, isSubscriberRole } from "@/lib/permissions/roles"
 import type { Permission } from "@/lib/permissions/permissions"
-import type { AppUser } from "@/types/user"
-import type { SubscriptionStatus } from "@/types/subscription"
 
 const initialState: AuthState = {
   status: "loading",
@@ -28,105 +35,71 @@ type AuthProviderProps = {
  */
 export function AuthProvider({ children }: AuthProviderProps) {
   const [state, setState] = useState<AuthState>(initialState)
+  const queryClient = useQueryClient()
 
   const refreshProfile = useCallback(async () => {
-    // Profile + subscription entitlement will load from Firestore / claims in the auth feature.
-    // Kept as a stable API surface for guards and post-login refresh.
+    const current = getFirebaseAuth().currentUser
+    if (!current) return
+    setState({
+      status: "authenticated",
+      user: mapFirebaseUser(current),
+      subscriptionStatus: null,
+      error: null,
+    })
+  }, [])
+
+  const signIn = useCallback(async (email: string, password: string) => {
+    await signInWithEmailAndPassword(getFirebaseAuth(), email.trim(), password)
   }, [])
 
   const signOut = useCallback(async () => {
-    writeDemoSession(null)
-    const auth = tryGetFirebaseAuth()
-    if (auth) {
-      await firebaseSignOut(auth)
-    }
+    await firebaseSignOut(getFirebaseAuth())
+    queryClient.clear()
     setState({
       status: "unauthenticated",
       user: null,
       subscriptionStatus: null,
       error: null,
     })
+  }, [queryClient])
+
+  const updateAccount = useCallback(async (patch: { displayName?: string; phone?: string }) => {
+    const current = getFirebaseAuth().currentUser
+    if (!current) throw new Error("auth/unauthenticated")
+
+    if (patch.displayName != null) {
+      await updateProfile(current, { displayName: patch.displayName })
+    }
+
+    setState((prev) => {
+      if (!prev.user) return prev
+      return {
+        ...prev,
+        user: {
+          ...prev.user,
+          displayName: patch.displayName ?? prev.user.displayName,
+          phone: patch.phone?.trim() ? patch.phone.trim() : prev.user.phone,
+          updatedAt: new Date().toISOString(),
+        },
+      }
+    })
   }, [])
 
-  const setDemoUser = useCallback(
-    (user: AppUser | null, subscriptionStatus: SubscriptionStatus | null = null) => {
-      if (user) {
-        const nextStatus = isSubscriberRole(user.role) ? subscriptionStatus : null
-        writeDemoSession({ user, subscriptionStatus: nextStatus })
-        setState({
-          status: "authenticated",
-          user,
-          subscriptionStatus: nextStatus,
-          error: null,
-        })
-        return
-      }
+  const changePassword = useCallback(async (currentPassword: string, nextPassword: string) => {
+    const current = getFirebaseAuth().currentUser
+    const email = current?.email
+    if (!current || !email) throw new Error("auth/unauthenticated")
 
-      writeDemoSession(null)
-      setState({
-        status: "unauthenticated",
-        user: null,
-        subscriptionStatus: null,
-        error: null,
-      })
-    },
-    [],
-  )
+    const credential = EmailAuthProvider.credential(email, currentPassword)
+    await reauthenticateWithCredential(current, credential)
+    await updatePassword(current, nextPassword)
+  }, [])
 
   useEffect(() => {
-    if (!isFirebaseConfigured()) {
-      const demo = readDemoSession()
-      setState(
-        demo
-          ? {
-              status: "authenticated",
-              user: demo.user,
-              subscriptionStatus: demo.subscriptionStatus,
-              error: null,
-            }
-          : {
-              status: "unauthenticated",
-              user: null,
-              subscriptionStatus: null,
-              error: null,
-            },
-      )
-      return
-    }
+    const auth = getFirebaseAuth()
 
-    const auth = tryGetFirebaseAuth()
-    if (!auth) {
-      const demo = readDemoSession()
-      setState(
-        demo
-          ? {
-              status: "authenticated",
-              user: demo.user,
-              subscriptionStatus: demo.subscriptionStatus,
-              error: null,
-            }
-          : {
-              status: "unauthenticated",
-              user: null,
-              subscriptionStatus: null,
-              error: null,
-            },
-      )
-      return
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onIdTokenChanged(auth, (firebaseUser) => {
       if (!firebaseUser) {
-        const demo = readDemoSession()
-        if (demo) {
-          setState({
-            status: "authenticated",
-            user: demo.user,
-            subscriptionStatus: demo.subscriptionStatus,
-            error: null,
-          })
-          return
-        }
         setState({
           status: "unauthenticated",
           user: null,
@@ -136,33 +109,65 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return
       }
 
-      // Keep loading until profile/claims hydrate — avoids guard flicker into login.
-      setState((prev) => ({
-        status: prev.user?.uid === firebaseUser.uid ? "authenticated" : "loading",
-        user: prev.user?.uid === firebaseUser.uid ? prev.user : null,
-        subscriptionStatus:
-          prev.user?.uid === firebaseUser.uid ? prev.subscriptionStatus : null,
+      setState({
+        status: "authenticated",
+        user: mapFirebaseUser(firebaseUser),
+        subscriptionStatus: null,
         error: null,
-      }))
-      void refreshProfile()
+      })
     })
 
-    return unsubscribe
-  }, [refreshProfile])
+    async function revalidate() {
+      if (document.visibilityState !== "visible") return
+      if (!auth.currentUser) return
+      const ok = await verifyLiveFirebaseSession()
+      if (!ok) {
+        await firebaseSignOut(auth).catch(() => undefined)
+        setState({
+          status: "unauthenticated",
+          user: null,
+          subscriptionStatus: null,
+          error: null,
+        })
+      }
+    }
+
+    document.addEventListener("visibilitychange", revalidate)
+    window.addEventListener("focus", revalidate)
+
+    return () => {
+      unsubscribe()
+      document.removeEventListener("visibilitychange", revalidate)
+      window.removeEventListener("focus", revalidate)
+    }
+  }, [])
 
   const value = useMemo<AuthContextValue>(() => {
-    const user = state.user
+    const live = getLiveFirebaseUser()
+    const user = live && state.user?.uid === live.uid ? state.user : null
+    const status =
+      state.status === "loading" || state.status === "idle"
+        ? state.status
+        : live && user
+          ? "authenticated"
+          : "unauthenticated"
+
     return {
-      ...state,
+      status,
+      user,
+      subscriptionStatus: user ? state.subscriptionStatus : null,
+      error: state.error,
       isAdmin: isAdminRole(user?.role),
       isSubscriber: isSubscriberRole(user?.role),
       hasPermission: (permission: Permission) => can(user, permission),
-      hasActiveSubscription: hasActiveEntitlement(state.subscriptionStatus),
+      hasActiveSubscription: hasActiveEntitlement(user ? state.subscriptionStatus : null),
       refreshProfile,
+      signIn,
       signOut,
-      setDemoUser,
+      updateAccount,
+      changePassword,
     }
-  }, [state, refreshProfile, signOut, setDemoUser])
+  }, [state, refreshProfile, signIn, signOut, updateAccount, changePassword])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

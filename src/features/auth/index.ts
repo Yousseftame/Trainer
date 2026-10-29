@@ -1,4 +1,6 @@
 export { useAuth } from "@/features/auth/auth-context"
 export type { AuthState, AuthStatus } from "@/features/auth/types"
 export { hasActiveEntitlement } from "@/features/auth/types"
-export { resolveDemoLogin } from "@/features/auth/demo"
+export { firebaseAuthErrorKey } from "@/features/auth/errors"
+export { mapFirebaseUser } from "@/features/auth/map-user"
+export { getLiveFirebaseUser, hasLiveFirebaseSession } from "@/features/auth/session"

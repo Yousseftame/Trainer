@@ -9,7 +9,7 @@ export function HeroSection() {
 
   return (
     <section className="w-full px-[15px] pb-6 pt-1 md:pb-7 lg:px-[30px]">
-      <div className="hero-wrap relative mx-auto min-h-[560px] w-full overflow-hidden rounded-[24px] bg-[var(--gym-ink)] sm:min-h-[640px] sm:rounded-[30px] lg:min-h-[709px]">
+      <div className="hero-wrap relative mx-auto min-h-[560px] w-full overflow-hidden rounded-[24px] bg-[var(--gym-dark)] sm:min-h-[640px] sm:rounded-[30px] lg:min-h-[709px]">
         {/*
           Trainer image sits on the end (right in EN, left in AR).
           RTL mirrors so he faces the copy. Keep the same focal point after
@@ -27,7 +27,7 @@ export function HeroSection() {
           className="pointer-events-none absolute inset-0 z-[1] rtl:-scale-x-100"
           style={{
             background:
-              "linear-gradient(90deg, #063434 0%, #063434 37%, rgba(6, 52, 52, 0))",
+              "linear-gradient(90deg, #24030c 0%, #24030c 37%, rgba(36, 3, 12, 0))",
           }}
         />
 

@@ -1,0 +1,6 @@
+export { app, auth, db, storage, functions, analytics } from "@/lib/firebase/firebase"
+export { getFirebaseApp, tryGetFirebaseApp } from "@/lib/firebase/app"
+export { getFirebaseAuth, tryGetFirebaseAuth } from "@/lib/firebase/auth"
+export { getDb, tryGetDb } from "@/lib/firebase/firestore"
+export { getFirebaseStorage, tryGetFirebaseStorage } from "@/lib/firebase/storage"
+export { getFirebaseFunctions, tryGetFirebaseFunctions } from "@/lib/firebase/functions"

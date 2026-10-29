@@ -12,6 +12,7 @@ type DashboardTopbarProps = {
   title: string
   areaLabel: string
   onSidebarToggle: () => void
+  onSignOut?: () => void
   className?: string
 }
 
@@ -19,6 +20,7 @@ export function DashboardTopbar({
   title,
   areaLabel,
   onSidebarToggle,
+  onSignOut,
   className,
 }: DashboardTopbarProps) {
   const { t } = useTranslation()
@@ -94,7 +96,7 @@ export function DashboardTopbar({
 
           <LanguageSwitcher variant="dashboard" />
 
-          <ProfileMenu />
+          <ProfileMenu onRequestSignOut={onSignOut} />
         </div>
       </div>
 

@@ -6,6 +6,7 @@ import { ArrowCtaLink } from "@/components/public/ArrowCtaLink"
 import { HamburgerButton } from "@/components/public/HamburgerButton"
 import { MobileNavOverlay } from "@/components/public/MobileNavOverlay"
 import { NavUnderline } from "@/components/public/NavUnderline"
+import { BrandLogo } from "@/components/shared/BrandLogo"
 import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher"
 
 const primaryLinks = [
@@ -56,12 +57,10 @@ export function PublicNavbar() {
       <div className="mx-auto grid w-full max-w-[1300px] grid-cols-[auto_1fr_auto] items-center gap-6 px-[15px] py-[22px] md:px-[30px] lg:gap-10 lg:py-[30px]">
         <Link
           to={APP_ROUTES.public.home}
-          className="flex shrink-0 items-center text-[var(--gym-ink)]"
+          className="flex shrink-0 items-center"
           aria-label={t("app.name")}
         >
-          <span className="font-heading text-[22px] font-bold tracking-tight md:text-[24px]">
-            {t("app.name")}
-          </span>
+          <BrandLogo className="h-9 md:h-10" />
         </Link>
 
         <nav className="hidden items-center justify-center gap-8 lg:flex" aria-label={t("nav.main")}>

@@ -1,7 +1,6 @@
 import { createContext, useContext } from "react"
 import type { AuthState } from "@/features/auth/types"
 import type { Permission } from "@/lib/permissions/permissions"
-import type { AppUser } from "@/types/user"
 
 export type AuthContextValue = AuthState & {
   isAdmin: boolean
@@ -9,9 +8,10 @@ export type AuthContextValue = AuthState & {
   hasPermission: (permission: Permission) => boolean
   hasActiveSubscription: boolean
   refreshProfile: () => Promise<void>
+  signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
-  /** Dev / scaffold helper until Firebase auth is wired */
-  setDemoUser: (user: AppUser | null, subscriptionStatus?: AuthState["subscriptionStatus"]) => void
+  updateAccount: (patch: { displayName?: string; phone?: string }) => Promise<void>
+  changePassword: (currentPassword: string, nextPassword: string) => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)

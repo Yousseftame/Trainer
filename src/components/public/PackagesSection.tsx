@@ -56,12 +56,12 @@ export function PackagesSection() {
                 className={cn(
                   "relative flex h-full flex-col rounded-[30px] p-5 sm:p-6 xl:p-[50px]",
                   pkg.tone === "light" && "bg-[#f5f5f5]",
-                  pkg.tone === "dark" && "bg-[var(--gym-ink)]",
-                  pkg.tone === "sage" && "bg-[#eef1e8]"
+                  pkg.tone === "dark" && "bg-[var(--gym-dark)]",
+                  pkg.tone === "sage" && "bg-[#f3f0e8]"
                 )}
               >
                 {pkg.featured ? (
-                  <span className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-[var(--gym-lime)] px-5 py-[5px] text-[15px] font-medium leading-[1.3] text-[#1e2222] sm:text-[16px]">
+                  <span className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-[var(--gym-lime)] px-5 py-[5px] text-[15px] font-medium leading-[1.3] text-white sm:text-[16px]">
                     {t("packages.bestValue")}
                   </span>
                 ) : null}
@@ -101,7 +101,7 @@ export function PackagesSection() {
                     className={cn(
                       "mt-7 inline-flex h-[50px] w-full shrink-0 items-center justify-center rounded-full border px-[25px] text-center text-[16px] font-medium leading-none transition-colors duration-300 sm:mt-8",
                       isDark
-                        ? "border-white bg-transparent text-white hover:border-[var(--gym-lime)] hover:bg-[var(--gym-lime)] hover:text-[var(--gym-ink)]"
+                        ? "border-white bg-transparent text-white hover:border-[var(--gym-lime)] hover:bg-[var(--gym-lime)] hover:text-white"
                         : "border-[#1e2222] bg-white text-[#1e2222] hover:bg-[var(--gym-ink)] hover:text-white"
                     )}
                   >

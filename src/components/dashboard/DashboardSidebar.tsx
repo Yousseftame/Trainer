@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react"
 import { useTranslation } from "react-i18next"
 import { ChevronDown, ChevronsLeft, LogOut, X } from "lucide-react"
 import type { NavItem } from "@/config/navigation"
+import { BrandLogo } from "@/components/shared/BrandLogo"
 import { useLocale } from "@/hooks/useLocale"
 import { cn } from "@/lib/utils"
 
@@ -107,44 +108,37 @@ export function DashboardSidebar({
             className={cn(
               "relative flex min-w-0 shrink items-center overflow-hidden transition-[width,height]",
               SIDEBAR_EASE,
-              collapsed ? "lg:h-11 lg:w-11 lg:justify-center" : "h-11 flex-1",
+              collapsed ? "lg:h-11 lg:w-full lg:justify-center" : "h-11 flex-1",
             )}
             aria-label={brand}
           >
             <div
               className={cn(
-                "flex min-w-0 items-center gap-2.5 transition-opacity",
+                "flex min-w-0 flex-col justify-center gap-0.5 transition-opacity",
                 SIDEBAR_EASE,
                 collapsed ? "lg:opacity-0" : "opacity-100",
               )}
             >
-              <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-2xl bg-[var(--gym-ink,#063434)] font-heading text-[15px] font-bold text-[var(--gym-lime,#b8fe22)]">
-                {brand.slice(0, 1).toUpperCase()}
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate font-heading text-[18px] font-extrabold tracking-tight text-[var(--gym-ink,#063434)]">
-                  {brand}
-                </span>
-                <span
-                  className={cn(
-                    "block text-[11px] font-semibold text-[#8c8c8c]",
-                    locale === "ar" ? "tracking-normal" : "tracking-[0.14em] uppercase",
-                  )}
-                >
-                  {areaLabel}
-                </span>
+              <BrandLogo className="h-[30px] max-w-[160px]" />
+              <span
+                className={cn(
+                  "min-w-0 text-[11px] font-semibold text-[#8c8c8c]",
+                  locale === "ar" ? "tracking-normal" : "tracking-[0.14em] uppercase",
+                )}
+              >
+                {areaLabel}
               </span>
             </div>
 
             <span
               className={cn(
-                "absolute inline-flex size-9 items-center justify-center rounded-2xl bg-[var(--gym-ink,#063434)] font-heading text-[15px] font-bold text-[var(--gym-lime,#b8fe22)] opacity-0 transition-opacity",
+                "absolute flex items-center justify-center opacity-0 transition-opacity",
                 SIDEBAR_EASE,
                 collapsed && "lg:opacity-100",
               )}
               aria-hidden
             >
-              {brand.slice(0, 1).toUpperCase()}
+              <BrandLogo className="h-7 max-w-[52px] object-center" />
             </span>
           </Link>
 

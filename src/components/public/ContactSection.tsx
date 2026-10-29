@@ -21,7 +21,7 @@ const baseFieldClass = cn(
   "placeholder:font-normal placeholder:text-[var(--gym-muted)]/55",
   "transition-[background-color,box-shadow,border-color] duration-300 ease-out",
   "hover:border-[var(--gym-ink)]/14 hover:bg-[#f3f3f3]",
-  "focus:border-[var(--gym-ink)]/20 focus:bg-white focus:shadow-[0_8px_28px_rgba(6,52,52,0.08)]",
+  "focus:border-[var(--gym-ink)]/20 focus:bg-white focus:shadow-[0_8px_28px_rgba(0,0,0,0.08)]",
   "sm:text-[15px]"
 )
 
@@ -110,7 +110,7 @@ export function ContactSection() {
               transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
               className="flex min-h-[420px] flex-col items-center justify-center py-16 text-center sm:min-h-[480px] sm:py-20"
             >
-              <span className="inline-flex size-16 items-center justify-center rounded-full bg-[var(--gym-lime)] text-[var(--gym-ink)] sm:size-[72px]">
+              <span className="inline-flex size-16 items-center justify-center rounded-full bg-[var(--gym-lime)] text-white sm:size-[72px]">
                 <Check className="size-8 sm:size-9" strokeWidth={2.5} />
               </span>
               <h2 className="mt-6 max-w-[18ch] font-heading text-[32px] font-extrabold leading-[1.15] tracking-tight text-[var(--gym-ink)] sm:mt-8 sm:text-[40px] md:text-[46px]">
@@ -168,14 +168,14 @@ export function ContactSection() {
                     href={`mailto:${t("contact.supportEmail")}`}
                     className="flex items-center gap-3.5 rounded-[12px] bg-[var(--gym-lime)] px-4 py-4 shadow-[0_10px_30px_rgba(0,0,0,0.12)] transition-transform duration-300 hover:-translate-y-0.5 sm:gap-4 sm:px-5 sm:py-[18px]"
                   >
-                    <span className="inline-flex shrink-0 items-center justify-center text-[var(--gym-ink)]">
+                    <span className="inline-flex shrink-0 items-center justify-center text-white">
                       <Mail className="size-9 sm:size-10" strokeWidth={1.6} />
                     </span>
                     <span className="min-w-0">
-                      <span className="block text-[13px] font-medium text-[var(--gym-ink)]/75 sm:text-[14px]">
+                      <span className="block text-[13px] font-medium text-white/85 sm:text-[14px]">
                         {t("contact.supportLabel")}
                       </span>
-                      <span className="mt-1 block truncate font-heading text-[15px] font-extrabold uppercase tracking-tight text-[var(--gym-ink)] sm:text-[17px]">
+                      <span className="mt-1 block truncate font-heading text-[15px] font-extrabold uppercase tracking-tight text-white sm:text-[17px]">
                         {t("contact.supportEmail")}
                       </span>
                     </span>
@@ -309,9 +309,9 @@ export function ContactSection() {
                           appToast.success(t("contact.toast.success"))
                           window.setTimeout(() => setSubmitted(true), 900)
                         }}
-                        trackColor="#063434"
-                        handleColor="#b8fe22"
-                        successColor="#b8fe22"
+                        trackColor="#24030c"
+                        handleColor="#fb5001"
+                        successColor="#fb5001"
                         dangerColor="#e5484d"
                         width={slideWidth}
                         height={56}

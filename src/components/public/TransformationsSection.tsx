@@ -56,7 +56,7 @@ function GalleryCard({
       />
       <span
         aria-hidden
-        className="pointer-events-none absolute inset-0 rounded-[30px] bg-[var(--gym-ink)] opacity-0 transition-opacity duration-300 group-hover:opacity-50 group-focus-visible:opacity-50"
+        className="pointer-events-none absolute inset-0 rounded-[30px] bg-[var(--gym-dark)] opacity-0 transition-opacity duration-300 group-hover:opacity-50 group-focus-visible:opacity-50"
       />
       <img
         src={hoverIcon}

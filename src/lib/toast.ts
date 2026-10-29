@@ -28,8 +28,8 @@ export const appToast = {
       ...options,
       style: { ...baseStyle, ...options?.style },
       iconTheme: {
-        primary: "#b8fe22",
-        secondary: "#111111",
+        primary: "#fb5001",
+        secondary: "#ffffff",
         ...options?.iconTheme,
       },
     })

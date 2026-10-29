@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom"
 import { useAuth } from "@/features/auth/auth-context"
+import { hasLiveFirebaseSession } from "@/features/auth/session"
 import { FullPageSpinner } from "@/components/feedback/FullPageSpinner"
 import { APP_ROUTES } from "@/config/constants"
 import type { Permission } from "@/lib/permissions/permissions"
@@ -7,17 +8,13 @@ import type { Permission } from "@/lib/permissions/permissions"
 export function RequireAuth() {
   const { status, user } = useAuth()
   const location = useLocation()
+  const live = hasLiveFirebaseSession()
 
   if (status === "loading" || status === "idle") {
     return <FullPageSpinner />
   }
 
-  // Firebase session exists but profile/claims not hydrated yet
-  if (status === "authenticated" && !user) {
-    return <FullPageSpinner />
-  }
-
-  if (status !== "authenticated" || !user) {
+  if (status !== "authenticated" || !user || !live) {
     return <Navigate to={APP_ROUTES.public.login} replace state={{ from: location }} />
   }
 
@@ -30,12 +27,34 @@ type RequireRoleProps = {
 
 export function RequireRole({ allowed }: RequireRoleProps) {
   const { isAdmin, isSubscriber, user } = useAuth()
+  if (!hasLiveFirebaseSession()) {
+    return <Navigate to={APP_ROUTES.public.login} replace />
+  }
 
   const ok =
     (allowed.includes("admin") && isAdmin) || (allowed.includes("subscriber") && isSubscriber)
 
   if (!ok || !user) {
+    if (isAdmin && allowed.includes("subscriber")) {
+      return <Navigate to={APP_ROUTES.admin.root} replace />
+    }
     return <Navigate to={APP_ROUTES.errors.unauthorized} replace />
+  }
+
+  return <Outlet />
+}
+
+/** Login / forgot-password: signed-in users go to the admin panel. */
+export function RequireGuest() {
+  const { status, user } = useAuth()
+  const live = hasLiveFirebaseSession()
+
+  if (status === "loading" || status === "idle") {
+    return <FullPageSpinner />
+  }
+
+  if (status === "authenticated" && user && live) {
+    return <Navigate to={APP_ROUTES.admin.root} replace />
   }
 
   return <Outlet />
@@ -47,6 +66,9 @@ type RequirePermissionProps = {
 
 export function RequirePermission({ permission }: RequirePermissionProps) {
   const { hasPermission } = useAuth()
+  if (!hasLiveFirebaseSession()) {
+    return <Navigate to={APP_ROUTES.public.login} replace />
+  }
 
   if (!hasPermission(permission)) {
     return <Navigate to={APP_ROUTES.errors.unauthorized} replace />

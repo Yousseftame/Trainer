@@ -28,8 +28,8 @@ export function LanguageSwitcher({
       className={cn(
         "inline-flex items-center rounded-full p-1",
         isDashboard
-          ? "h-11 bg-[var(--gym-ink,#063434)]"
-          : "h-10 border border-[var(--gym-ink,#063434)] bg-white",
+          ? "h-11 bg-[var(--gym-ink,#111111)]"
+          : "h-10 border border-[var(--gym-ink,#111111)] bg-white",
         className,
       )}
     >
@@ -48,14 +48,14 @@ export function LanguageSwitcher({
                 ? cn(
                     "h-9 min-w-9 px-3",
                     active
-                      ? "bg-[var(--gym-lime,#b8fe22)] text-[var(--gym-ink,#063434)]"
+                      ? "bg-[var(--gym-lime,#fb5001)] text-white"
                       : "text-white/70 hover:text-white",
                   )
                 : cn(
                     "h-8 min-w-10 px-3 text-[13px] font-semibold",
                     active
-                      ? "bg-[var(--gym-ink,#063434)] text-white"
-                      : "text-[var(--gym-ink,#063434)] hover:bg-[var(--gym-ink,#063434)]/5",
+                      ? "bg-[var(--gym-ink,#111111)] text-white"
+                      : "text-[var(--gym-ink,#111111)] hover:bg-[var(--gym-ink,#111111)]/5",
                   ),
             )}
           >

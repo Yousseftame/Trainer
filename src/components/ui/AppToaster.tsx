@@ -32,8 +32,8 @@ export function AppToaster() {
         success: {
           duration: 3400,
           iconTheme: {
-            primary: "#b8fe22",
-            secondary: "#111111",
+            primary: "#fb5001",
+            secondary: "#ffffff",
           },
         },
         error: {

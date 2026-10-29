@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { useTranslation } from "react-i18next"
+import { BrandLogo } from "@/components/shared/BrandLogo"
 import { APP_ROUTES } from "@/config/constants"
 import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
@@ -22,9 +23,9 @@ const UTILITY_LINKS = [
 ] as const
 
 const fieldClass = cn(
-  "w-full border-0 border-b border-[#133e3e] bg-transparent px-0 py-2 sm:py-2.5",
-  "font-heading text-[15px] text-[#d7dddd] outline-none sm:text-[16px]",
-  "placeholder:text-[#d7dddd]/80",
+  "w-full border-0 border-b border-white/15 bg-transparent px-0 py-2 sm:py-2.5",
+  "font-heading text-[15px] text-[#dcd6d8] outline-none sm:text-[16px]",
+  "placeholder:text-[#dcd6d8]/80",
   "transition-[border-color] duration-300",
   "focus:border-[var(--gym-lime)]"
 )
@@ -55,7 +56,7 @@ function FooterNavLink({
       to={to}
       className={cn(
         "font-heading text-[14px] transition-colors duration-300 sm:text-[16px]",
-        isCurrent ? "text-[var(--gym-lime)]" : "text-[#d7dddd] hover:text-[var(--gym-lime)]"
+        isCurrent ? "text-[var(--gym-lime)]" : "text-[#dcd6d8] hover:text-[var(--gym-lime)]"
       )}
       aria-current={isCurrent ? "page" : undefined}
     >
@@ -85,7 +86,7 @@ export function PublicFooter() {
   }
 
   return (
-    <footer className="public-footer relative overflow-hidden bg-[var(--gym-ink)] pt-8 pb-6 sm:pt-14 sm:pb-9 lg:pt-[72px] lg:pb-12">
+    <footer className="public-footer relative overflow-hidden bg-[var(--gym-dark)] pt-8 pb-6 sm:pt-14 sm:pb-9 lg:pt-[72px] lg:pb-12">
       {/* Background pattern — same asset & placement as GymTrainer */}
       <img
         src={footerPattern}
@@ -108,9 +109,10 @@ export function PublicFooter() {
           <div className="flex h-full flex-col items-start gap-4 sm:gap-7">
             <Link
               to={APP_ROUTES.public.home}
-              className="font-heading text-[28px] font-bold leading-none tracking-tight text-white transition-colors duration-300 hover:text-[var(--gym-lime)] sm:text-[40px] lg:text-[44px]"
+              className="inline-flex items-center transition-opacity duration-300 hover:opacity-90"
+              aria-label={t("app.name")}
             >
-              {t("app.name")}
+              <BrandLogo variant="onDark" className="h-11 sm:h-14 lg:h-16" />
             </Link>
 
             <div className="flex w-full flex-col gap-4 sm:gap-7">
@@ -162,7 +164,7 @@ export function PublicFooter() {
             </div>
 
             {/* Credit stays with brand on desktop; moved to footer end on mobile */}
-            <p className="mt-auto hidden text-[14px] leading-relaxed text-[#d7dddd] sm:block sm:text-[15px]">
+            <p className="mt-auto hidden text-[14px] leading-relaxed text-[#dcd6d8] sm:block sm:text-[15px]">
               {t("footer.creditBefore")}{" "}
               <span className="text-[var(--gym-lime)]">{t("footer.creditBrand")}</span>
             </p>
@@ -244,7 +246,7 @@ export function PublicFooter() {
               <button
                 type="submit"
                 disabled={sending}
-                className="mt-0.5 inline-flex h-11 w-full items-center justify-center rounded-[10px] bg-[var(--gym-lime)] px-5 font-heading text-[15px] font-medium text-[#1e2222] transition-opacity duration-300 hover:opacity-90 disabled:opacity-70 sm:h-12 sm:w-auto sm:px-[25px] sm:text-[17px]"
+                className="mt-0.5 inline-flex h-11 w-full items-center justify-center rounded-[10px] bg-[var(--gym-lime)] px-5 font-heading text-[15px] font-medium text-white transition-opacity duration-300 hover:opacity-90 disabled:opacity-70 sm:h-12 sm:w-auto sm:px-[25px] sm:text-[17px]"
               >
                 {sending ? t("footer.form.sending") : t("footer.form.submit")}
               </button>
@@ -252,7 +254,7 @@ export function PublicFooter() {
           </div>
         </div>
 
-        <p className="mt-6 text-[13px] leading-relaxed text-[#d7dddd] sm:hidden">
+        <p className="mt-6 text-[13px] leading-relaxed text-[#dcd6d8] sm:hidden">
           {t("footer.creditBefore")}{" "}
           <span className="text-[var(--gym-lime)]">{t("footer.creditBrand")}</span>
         </p>

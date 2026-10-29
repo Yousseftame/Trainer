@@ -16,7 +16,7 @@ export function HamburgerButton({ open, onClick, label, className }: HamburgerBu
       aria-expanded={open}
       aria-label={label}
       className={cn(
-        "relative inline-flex size-12 shrink-0 items-center justify-center rounded-full bg-[var(--gym-lime)] text-[var(--gym-ink)] transition-transform duration-300 ease-out active:scale-95 lg:hidden",
+        "relative inline-flex size-12 shrink-0 items-center justify-center rounded-full bg-[var(--gym-lime)] text-white transition-transform duration-300 ease-out active:scale-95 lg:hidden",
         className,
       )}
     >

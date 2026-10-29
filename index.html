@@ -4,10 +4,67 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/favicon.png" />
+    <link rel="preload" as="image" href="/derbyfit-logo-ink.png" fetchpriority="high" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>trainer</title>
+    <style>
+      #initial-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #ffffff;
+        padding: 0 24px;
+        will-change: opacity;
+      }
+
+      #initial-splash-logo {
+        height: 44px;
+        width: auto;
+        object-fit: contain;
+        user-select: none;
+        -webkit-user-drag: none;
+        will-change: transform, opacity, filter;
+        animation: splash-logo-enter 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+
+      @media (min-width: 640px) {
+        #initial-splash-logo {
+          height: 50px;
+        }
+      }
+
+      @media (min-width: 768px) {
+        #initial-splash-logo {
+          height: 56px;
+        }
+      }
+
+      @keyframes splash-logo-enter {
+        0% {
+          opacity: 0.35;
+          transform: translateY(5px) scale(0.96);
+        }
+        100% {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="initial-splash" aria-hidden="true">
+      <img
+        id="initial-splash-logo"
+        src="/derbyfit-logo-ink.png"
+        alt="DerbyFit"
+        fetchpriority="high"
+        decoding="sync"
+        draggable="false"
+      />
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

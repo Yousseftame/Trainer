@@ -19,7 +19,7 @@ export function SecondHeroSection() {
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "linear-gradient(160deg, #052a2a 0%, #063434 38%, #0a4540 58%, #063434 78%, #052a2a 100%)",
+            "linear-gradient(160deg, #1a0208 0%, #24030c 38%, #6e001f 58%, #24030c 78%, #1a0208 100%)",
         }}
       />
 
