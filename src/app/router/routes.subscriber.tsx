@@ -4,6 +4,7 @@ import { SubscriberLayout } from "@/layouts/SubscriberLayout"
 import {
   RequireActiveSubscription,
   RequireAuth,
+  RequirePackageEntitlement,
   RequireRole,
 } from "@/app/router/guards"
 
@@ -55,12 +56,28 @@ export const subscriberRoutes: RouteObject[] = [
               {
                 element: <RequireActiveSubscription />,
                 children: [
-                  { path: "workout", element: <WorkoutPlanPage /> },
-                  { path: "nutrition", element: <NutritionPlanPage /> },
-                  { path: "library", element: <LibraryPage /> },
-                  { path: "workout-log", element: <WorkoutLogPage /> },
-                  { path: "nutrition-log", element: <NutritionLogPage /> },
-                  { path: "progress", element: <ProgressPage /> },
+                  {
+                    element: <RequirePackageEntitlement entitlement="workoutProgram" />,
+                    children: [
+                      { path: "workout", element: <WorkoutPlanPage /> },
+                      { path: "workout-log", element: <WorkoutLogPage /> },
+                    ],
+                  },
+                  {
+                    element: <RequirePackageEntitlement entitlement="nutritionProgram" />,
+                    children: [
+                      { path: "nutrition", element: <NutritionPlanPage /> },
+                      { path: "nutrition-log", element: <NutritionLogPage /> },
+                    ],
+                  },
+                  {
+                    element: <RequirePackageEntitlement entitlement="pdfDocuments" />,
+                    children: [{ path: "library", element: <LibraryPage /> }],
+                  },
+                  {
+                    element: <RequirePackageEntitlement entitlement="progressTracking" />,
+                    children: [{ path: "progress", element: <ProgressPage /> }],
+                  },
                   { path: "history", element: <HistoryPage /> },
                 ],
               },

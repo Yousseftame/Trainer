@@ -3,12 +3,13 @@ import { useTranslation } from "react-i18next"
 import { AnimatePresence, motion } from "motion/react"
 import { Check, Headphones, Mail } from "lucide-react"
 import SlideCommit from "@/components/SlideCommit.tsx"
+import { useCreateRegistrationRequestMutation } from "@/features/subscribers/hooks"
+import { DEMO_PACKAGES } from "@/features/subscriptions/demo"
+import { usePackagesQuery } from "@/features/subscriptions/hooks"
 import { useLocale } from "@/hooks/useLocale"
 import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 import contactImage from "@/assets/contact.webp"
-
-const PLAN_IDS = ["quick", "transform", "elite"] as const
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PHONE_RE = /^\+?[\d\s()-]{8,20}$/
@@ -36,11 +37,28 @@ const labelClass =
 
 export function ContactSection() {
   const { t } = useTranslation()
-  const { isRtl } = useLocale()
+  const { locale, isRtl } = useLocale()
+  const { data: packages = DEMO_PACKAGES } = usePackagesQuery()
+  const createRequestMutation = useCreateRegistrationRequestMutation()
+  const activePackages = packages.filter((pkg) => pkg.isActive)
+
   const formRef = useRef<HTMLFormElement>(null)
   const slideWrapRef = useRef<HTMLDivElement>(null)
   const [slideWidth, setSlideWidth] = useState(320)
   const [submitted, setSubmitted] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState("")
+
+  useEffect(() => {
+    function onSelectPackage(event: Event) {
+      const detail = (event as CustomEvent<{ packageId?: string }>).detail
+      if (detail?.packageId) {
+        setSelectedPlan(detail.packageId)
+      }
+    }
+    window.addEventListener("derpyfit:select-package", onSelectPackage)
+    return () =>
+      window.removeEventListener("derpyfit:select-package", onSelectPackage)
+  }, [])
 
   useEffect(() => {
     if (submitted) return
@@ -72,7 +90,7 @@ export function ContactSection() {
     if (firstName.length < 2 || lastName.length < 2) return false
     if (!EMAIL_RE.test(email)) return false
     if (!PHONE_RE.test(phone) || phone.replace(/\D/g, "").length < 8) return false
-    if (!(PLAN_IDS as readonly string[]).includes(plan)) return false
+    if (!plan) return false
     if (message.length < MESSAGE_MIN || message.length > MESSAGE_MAX) return false
 
     return true
@@ -84,9 +102,25 @@ export function ContactSection() {
       throw new Error("invalid")
     }
 
+    const form = formRef.current
+    if (!form) throw new Error("invalid")
+    const data = new FormData(form)
+    const firstName = String(data.get("firstName") ?? "").trim()
+    const lastName = String(data.get("lastName") ?? "").trim()
+    const email = String(data.get("email") ?? "").trim()
+    const phone = String(data.get("phone") ?? "").trim()
+    const plan = String(data.get("plan") ?? "").trim()
+    const message = String(data.get("message") ?? "").trim()
+
     try {
-      await new Promise<void>((resolve) => {
-        window.setTimeout(resolve, 1400)
+      await createRequestMutation.mutateAsync({
+        displayName: `${firstName} ${lastName}`.trim(),
+        email,
+        phone,
+        locale,
+        packageId: plan || null,
+        goal: message,
+        source: "contact",
       })
     } catch {
       appToast.error(t("contact.toast.failed"))
@@ -245,15 +279,16 @@ export function ContactSection() {
                     <div className="relative">
                       <select
                         name="plan"
-                        defaultValue=""
+                        value={selectedPlan}
+                        onChange={(e) => setSelectedPlan(e.target.value)}
                         className={cn(inputFieldClass, "appearance-none pe-12")}
                       >
                         <option value="" disabled>
                           {t("contact.placeholders.plan")}
                         </option>
-                        {PLAN_IDS.map((id) => (
-                          <option key={id} value={id}>
-                            {t(`packages.items.${id}.name`)}
+                        {activePackages.map((pkg) => (
+                          <option key={pkg.id} value={pkg.id}>
+                            {pkg.name[locale]} — {pkg.price[locale]}
                           </option>
                         ))}
                       </select>

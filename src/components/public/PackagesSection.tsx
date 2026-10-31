@@ -1,37 +1,16 @@
-import { Link } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { ArrowRight } from "lucide-react"
-import { APP_ROUTES } from "@/config/constants"
+import { DEMO_PACKAGES } from "@/features/subscriptions/demo"
+import { usePackagesQuery } from "@/features/subscriptions/hooks"
 import { useLocale } from "@/hooks/useLocale"
 import { cn } from "@/lib/utils"
 
-const PACKAGES = [
-  {
-    id: "quick",
-    featured: false,
-    tone: "light" as const,
-    featureCount: 5,
-    ctaTo: APP_ROUTES.public.contact,
-  },
-  {
-    id: "transform",
-    featured: true,
-    tone: "dark" as const,
-    featureCount: 6,
-    ctaTo: APP_ROUTES.public.contact,
-  },
-  {
-    id: "elite",
-    featured: false,
-    tone: "sage" as const,
-    featureCount: 6,
-    ctaTo: APP_ROUTES.public.contact,
-  },
-] as const
-
 export function PackagesSection() {
   const { t } = useTranslation()
-  const { isRtl } = useLocale()
+  const { locale, isRtl } = useLocale()
+  const { data: packages = DEMO_PACKAGES } = usePackagesQuery()
+
+  const activePackages = packages.filter((pkg) => pkg.isActive)
 
   return (
     <section
@@ -44,11 +23,9 @@ export function PackagesSection() {
         </h2>
 
         <div className="mt-10 grid grid-cols-1 items-stretch gap-5 pt-4 md:mt-12 md:grid-cols-2 md:gap-[20px] lg:mt-14 lg:grid-cols-3 xl:gap-[20px]">
-          {PACKAGES.map((pkg) => {
+          {activePackages.map((pkg) => {
             const isDark = pkg.tone === "dark"
-            const features = Array.from({ length: pkg.featureCount }, (_, i) =>
-              t(`packages.items.${pkg.id}.features.${i}`)
-            )
+            const features = pkg.featureList[locale]
 
             return (
               <article
@@ -74,7 +51,7 @@ export function PackagesSection() {
                       isDark ? "text-white" : "text-[var(--gym-ink)]"
                     )}
                   >
-                    {t(`packages.items.${pkg.id}.name`)}
+                    {pkg.name[locale]}
                   </h3>
 
                   <div className="mt-4 flex min-h-[3.25rem] flex-wrap items-end gap-1 sm:mt-5 sm:min-h-[3.5rem] xl:min-h-[3.75rem]">
@@ -84,7 +61,7 @@ export function PackagesSection() {
                         isDark ? "text-[var(--gym-lime)]" : "text-[#1e2222]"
                       )}
                     >
-                      {t(`packages.items.${pkg.id}.price`)}
+                      {pkg.price[locale]}
                     </p>
                     <p
                       className={cn(
@@ -92,12 +69,19 @@ export function PackagesSection() {
                         isDark ? "text-[var(--gym-lime)]" : "text-[#1e2222]"
                       )}
                     >
-                      {t(`packages.items.${pkg.id}.period`)}
+                      {pkg.period[locale]}
                     </p>
                   </div>
 
-                  <Link
-                    to={pkg.ctaTo}
+                  <a
+                    href="#contact"
+                    onClick={() => {
+                      window.dispatchEvent(
+                        new CustomEvent("derpyfit:select-package", {
+                          detail: { packageId: pkg.id },
+                        }),
+                      )
+                    }}
                     className={cn(
                       "mt-7 inline-flex h-[50px] w-full shrink-0 items-center justify-center rounded-full border px-[25px] text-center text-[16px] font-medium leading-none transition-colors duration-300 sm:mt-8",
                       isDark
@@ -105,8 +89,8 @@ export function PackagesSection() {
                         : "border-[#1e2222] bg-white text-[#1e2222] hover:bg-[var(--gym-ink)] hover:text-white"
                     )}
                   >
-                    {t(`packages.items.${pkg.id}.cta`)}
-                  </Link>
+                    {t("packages.items.quick.cta")}
+                  </a>
                 </div>
 
                 <div

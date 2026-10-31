@@ -29,6 +29,14 @@ import adminBanner from "@/assets/admin.webp"
 import { APP_ROUTES } from "@/config/constants"
 import { useAuth } from "@/features/auth/auth-context"
 import { overviewSnapshot, type PriorityKind } from "@/features/overview"
+import {
+  useRegistrationRequestsQuery,
+  useSubscribersQuery,
+} from "@/features/subscribers/hooks"
+import {
+  usePackagesQuery,
+  useSubscriptionsQuery,
+} from "@/features/subscriptions/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatChartDate, formatDate, initials } from "@/lib/format"
@@ -82,7 +90,18 @@ export function OverviewPage() {
   const { user, hasPermission } = useAuth()
   useDocumentTitle(t("nav.overview"))
 
-  const data = useMemo(() => overviewSnapshot(), [])
+  const { data: packages = [] } = usePackagesQuery()
+  const { data: subscriptions = [] } = useSubscriptionsQuery()
+  const { data: subscribers = [] } = useSubscribersQuery()
+  const { data: registrationRequests = [] } = useRegistrationRequestsQuery()
+
+  const data = useMemo(() => {
+    void packages
+    void subscriptions
+    void subscribers
+    void registrationRequests
+    return overviewSnapshot()
+  }, [packages, subscriptions, subscribers, registrationRequests])
   const rtl = locale === "ar"
   const Chevron = rtl ? ChevronLeft : ChevronRight
   const name = user?.displayName ?? ""

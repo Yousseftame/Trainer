@@ -45,7 +45,7 @@ export function DashboardSidebar({
   const { t } = useTranslation()
   const { locale } = useLocale()
   const location = useLocation()
-  const asideRef = useRef<HTMLElement>(null)
+  const navRef = useRef<HTMLElement>(null)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
@@ -63,7 +63,7 @@ export function DashboardSidebar({
 
   useEffect(() => {
     if (!mobileOpen) return
-    asideRef.current?.scrollTo({ top: 0 })
+    navRef.current?.scrollTo({ top: 0 })
   }, [mobileOpen])
 
   function toggleGroup(key: string) {
@@ -74,7 +74,7 @@ export function DashboardSidebar({
     <>
       <div
         className={cn(
-          "fixed inset-0 z-[60] bg-[var(--gym-ink,#063434)]/30 transition-opacity duration-300 lg:hidden",
+          "fixed inset-0 z-[60] bg-[var(--gym-ink,#111111)]/30 transition-opacity duration-300 lg:hidden",
           mobileOpen ? "opacity-100" : "pointer-events-none opacity-0",
         )}
         onClick={onMobileClose}
@@ -82,12 +82,9 @@ export function DashboardSidebar({
       />
 
       <aside
-        ref={asideRef}
         className={cn(
-          "fixed inset-y-0 start-0 z-[70] flex h-dvh max-h-dvh shrink-0 flex-col overflow-x-hidden overscroll-none bg-[#F4F4F4] transition-[width,transform,padding] lg:relative lg:h-full lg:max-h-none lg:overflow-y-auto lg:overscroll-auto lg:py-6",
-          /* Hide the bar: mobile must not scroll-clip the brand/Overview under the topbar */
-          "max-lg:overflow-hidden max-lg:pt-[max(12px,env(safe-area-inset-top))] max-lg:pb-[max(12px,env(safe-area-inset-bottom))]",
-          "no-scrollbar",
+          "fixed inset-y-0 start-0 z-[70] flex h-dvh max-h-dvh shrink-0 flex-col overflow-hidden overscroll-none bg-[#F4F4F4] transition-[width,transform,padding] lg:relative lg:z-auto lg:h-dvh lg:max-h-dvh lg:py-5",
+          "max-lg:pt-[max(12px,env(safe-area-inset-top))] max-lg:pb-[max(12px,env(safe-area-inset-bottom))]",
           SIDEBAR_EASE,
           collapsed ? "lg:w-[76px] lg:px-3" : "lg:w-[340px] lg:px-5",
           "w-[min(340px,88vw)] px-5",
@@ -98,7 +95,7 @@ export function DashboardSidebar({
       >
         <div
           className={cn(
-            "mb-3 flex shrink-0 items-center justify-between gap-2 lg:mb-4",
+            "mb-2 flex shrink-0 items-center justify-between gap-2 lg:mb-3",
             collapsed ? "lg:h-11 lg:justify-center" : "h-12 px-3",
           )}
         >
@@ -146,13 +143,17 @@ export function DashboardSidebar({
             type="button"
             onClick={onMobileClose}
             aria-label={t("nav.closeMenu")}
-            className="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#063434)] shadow-[0_8px_24px_rgba(6,52,52,0.08)] transition-transform active:scale-[0.97] lg:hidden"
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-transform active:scale-[0.97] lg:hidden"
           >
             <X className="size-5" strokeWidth={1.8} />
           </button>
         </div>
 
-        <nav className="flex min-h-0 flex-1 flex-col justify-start gap-0.5 lg:gap-1" aria-label={t("nav.main")}>
+        <nav
+          ref={navRef}
+          className="no-scrollbar flex min-h-0 flex-1 flex-col justify-start gap-0.5 overflow-x-hidden overflow-y-auto py-1 lg:gap-1"
+          aria-label={t("nav.main")}
+        >
           {items.map((item) =>
             item.children?.length ? (
               <SidebarNavGroup
@@ -178,7 +179,7 @@ export function DashboardSidebar({
           )}
         </nav>
 
-        <div className="mt-3 flex shrink-0 flex-col gap-0.5 lg:mt-4 lg:gap-1">
+        <div className="mt-2 flex shrink-0 flex-col gap-0.5 border-t border-black/[0.06] pt-2 lg:mt-3 lg:gap-1 lg:pt-2.5">
           <button
             type="button"
             onClick={onToggle}
@@ -267,7 +268,7 @@ function SidebarNavGroup({
   }
 
   return (
-    <div className="flex flex-col">
+    <div className="flex shrink-0 flex-col">
       <button
         type="button"
         title={t(item.labelKey)}
@@ -300,7 +301,7 @@ function SidebarNavGroup({
             transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
           >
-            <div className="ms-4 mt-1 flex flex-col gap-0.5 border-s border-[var(--gym-ink,#063434)]/10 ps-2">
+            <div className="ms-4 mt-1 flex flex-col gap-0.5 border-s border-[var(--gym-ink,#111111)]/10 ps-2">
               {children.map((child) => (
                 <SidebarNavLink
                   key={child.to}
@@ -316,7 +317,6 @@ function SidebarNavGroup({
           </motion.div>
         ) : null}
       </AnimatePresence>
-
     </div>
   )
 }
@@ -346,7 +346,7 @@ function SidebarNavLink({
       className={cn(
         navItemClass({ collapsed, active }),
         "justify-start",
-        nested && "py-2.5 text-[14px]",
+        nested && "py-2 text-[14px] lg:py-2.5",
       )}
     >
       <span className="relative inline-flex size-[18px] shrink-0 items-center justify-center">
@@ -367,16 +367,16 @@ function navItemClass({
   danger?: boolean
 }) {
   return cn(
-    "flex items-center text-[15px] font-medium transition-[width,height,background-color,color,box-shadow,gap,border-radius]",
+    "flex shrink-0 items-center text-[15px] font-medium transition-[width,height,background-color,color,box-shadow,gap,border-radius]",
     SIDEBAR_EASE,
     collapsed
       ? "gap-3 px-3 py-2.5 lg:mx-auto lg:h-11 lg:w-11 lg:justify-center lg:gap-0 lg:rounded-2xl lg:px-0 lg:py-0"
-      : "w-full gap-3 rounded-2xl px-3 py-2.5 lg:py-3",
+      : "w-full gap-3 rounded-2xl px-3 py-2.5",
     danger
       ? "text-[#FF6A55] hover:bg-[#FFE8E4] hover:text-[#FF6A55]"
       : active
-        ? "bg-white font-semibold text-[var(--gym-ink,#063434)] shadow-[0_8px_24px_rgba(6,52,52,0.08)]"
-        : "text-[#6B7280] hover:bg-white/70 hover:text-[var(--gym-ink,#063434)]",
+        ? "bg-white font-semibold text-[var(--gym-ink,#111111)] shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
+        : "text-[#6B7280] hover:bg-white/70 hover:text-[var(--gym-ink,#111111)]",
   )
 }
 

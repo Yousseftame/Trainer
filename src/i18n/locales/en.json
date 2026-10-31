@@ -428,6 +428,8 @@
       "assign": "Assign plan",
       "copied": "Assigned copy — edits stay with this subscriber",
       "reusable": "Reusable template — assigning creates a copy",
+      "updated": "Updated {{date}}",
+      "version": "v{{version}}",
       "thisWeek": "Meals logged",
       "pdfHint": "This plan is a protected PDF. It is not an interactive meal week.",
       "target": "{{value}} kcal target",
@@ -441,11 +443,26 @@
         "active": "Assigned",
         "archived": "History"
       },
+      "format": {
+        "interactive": "Interactive",
+        "pdf": "PDF"
+      },
+      "weekdays": {
+        "0": "Mon",
+        "1": "Tue",
+        "2": "Wed",
+        "3": "Thu",
+        "4": "Fri",
+        "5": "Sat",
+        "6": "Sun"
+      },
       "slots": {
         "breakfast": "Breakfast",
         "lunch": "Lunch",
         "snack": "Snack",
-        "dinner": "Dinner"
+        "dinner": "Dinner",
+        "pre_workout": "Pre-workout",
+        "post_workout": "Post-workout"
       },
       "stats": {
         "templates": "Templates",

@@ -13,6 +13,13 @@ import { AuthContext, type AuthContextValue } from "@/features/auth/auth-context
 import { mapFirebaseUser } from "@/features/auth/map-user"
 import { getLiveFirebaseUser, verifyLiveFirebaseSession } from "@/features/auth/session"
 import { hasActiveEntitlement, type AuthState } from "@/features/auth/types"
+import {
+  getSubscriberByEmail,
+  getSubscriberById,
+} from "@/features/subscribers/demo"
+import { saveSubscriber } from "@/features/subscribers/service"
+import { currentSubscriptionFor } from "@/features/subscriptions/demo"
+import { resolveEffectiveSubscriptionStatus } from "@/features/subscriptions/entitlements"
 import { getFirebaseAuth } from "@/lib/firebase/auth"
 import { can } from "@/lib/permissions/can"
 import { isAdminRole, isSubscriberRole } from "@/lib/permissions/roles"
@@ -69,6 +76,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     if (patch.displayName != null) {
       await updateProfile(current, { displayName: patch.displayName })
+    }
+
+    const matchedSub =
+      getSubscriberById(current.uid) ??
+      (current.email ? getSubscriberByEmail(current.email) : undefined)
+    if (matchedSub) {
+      await saveSubscriber({
+        ...matchedSub,
+        displayName: patch.displayName?.trim() || matchedSub.displayName,
+        phone: patch.phone?.trim() || matchedSub.phone,
+      })
     }
 
     setState((prev) => {
@@ -144,7 +162,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const value = useMemo<AuthContextValue>(() => {
     const live = getLiveFirebaseUser()
-    const user = live && state.user?.uid === live.uid ? state.user : null
+    const rawUser = live && state.user?.uid === live.uid ? state.user : null
+    const matchedSubscriber = rawUser
+      ? (getSubscriberById(rawUser.uid) ?? getSubscriberByEmail(rawUser.email))
+      : undefined
+    const user = rawUser
+      ? {
+          ...rawUser,
+          phone: rawUser.phone ?? matchedSubscriber?.phone,
+          status:
+            isSubscriberRole(rawUser.role) && matchedSubscriber
+              ? matchedSubscriber.status
+              : rawUser.status,
+        }
+      : null
     const status =
       state.status === "loading" || state.status === "idle"
         ? state.status
@@ -152,15 +183,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
           ? "authenticated"
           : "unauthenticated"
 
+    const subscriberLookupId = matchedSubscriber?.id ?? user?.uid
+    const currentSub = subscriberLookupId
+      ? currentSubscriptionFor(subscriberLookupId)
+      : null
+    const effectiveSubStatus = user
+      ? isAdminRole(user.role)
+        ? "active"
+        : user.status !== "active"
+          ? "suspended"
+          : (resolveEffectiveSubscriptionStatus(currentSub) ??
+            state.subscriptionStatus)
+      : null
+
     return {
       status,
       user,
-      subscriptionStatus: user ? state.subscriptionStatus : null,
+      subscriptionStatus: effectiveSubStatus,
       error: state.error,
       isAdmin: isAdminRole(user?.role),
       isSubscriber: isSubscriberRole(user?.role),
       hasPermission: (permission: Permission) => can(user, permission),
-      hasActiveSubscription: hasActiveEntitlement(user ? state.subscriptionStatus : null),
+      hasActiveSubscription:
+        user?.status === "active" && hasActiveEntitlement(effectiveSubStatus),
       refreshProfile,
       signIn,
       signOut,

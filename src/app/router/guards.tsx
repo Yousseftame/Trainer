@@ -1,9 +1,12 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom"
 import { useAuth } from "@/features/auth/auth-context"
 import { hasLiveFirebaseSession } from "@/features/auth/session"
+import { currentSubscriptionFor, getPackageById } from "@/features/subscriptions/demo"
+import { canAccessPackageEntitlement } from "@/features/subscriptions/entitlements"
 import { FullPageSpinner } from "@/components/feedback/FullPageSpinner"
 import { APP_ROUTES } from "@/config/constants"
 import type { Permission } from "@/lib/permissions/permissions"
+import type { PackageEntitlementKey } from "@/types/subscription"
 
 export function RequireAuth() {
   const { status, user } = useAuth()
@@ -90,6 +93,35 @@ export function RequireActiveSubscription() {
 
   if (!hasActiveSubscription) {
     return <Navigate to={APP_ROUTES.errors.subscriptionExpired} replace />
+  }
+
+  return <Outlet />
+}
+
+/**
+ * Package-level content access gate.
+ * Enforces that the subscriber's active package grants the required content entitlement.
+ */
+export function RequirePackageEntitlement({
+  entitlement,
+}: {
+  entitlement: PackageEntitlementKey
+}) {
+  const { isAdmin, user, hasActiveSubscription } = useAuth()
+
+  if (isAdmin) {
+    return <Outlet />
+  }
+
+  if (!hasActiveSubscription || !user) {
+    return <Navigate to={APP_ROUTES.errors.subscriptionExpired} replace />
+  }
+
+  const sub = currentSubscriptionFor(user.uid)
+  const pkg = getPackageById(sub?.packageId)
+
+  if (!canAccessPackageEntitlement(sub, pkg, entitlement)) {
+    return <Navigate to={APP_ROUTES.errors.unauthorized} replace />
   }
 
   return <Outlet />

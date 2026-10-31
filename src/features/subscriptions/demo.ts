@@ -1,6 +1,11 @@
-import type { SubscriptionPackage, SubscriberSubscription } from "@/types/subscription"
+import type {
+  PackageEntitlements,
+  PackageTone,
+  SubscriberSubscription,
+  SubscriptionPackage,
+} from "@/types/subscription"
 
-export type PackageTone = "light" | "dark" | "sage"
+export type { PackageTone }
 
 export type DemoPackage = SubscriptionPackage & {
   featured: boolean
@@ -8,6 +13,7 @@ export type DemoPackage = SubscriptionPackage & {
   price: { en: string; ar: string }
   period: { en: string; ar: string }
   featureList: { en: string[]; ar: string[] }
+  entitlements: PackageEntitlements
 }
 
 export const DEMO_PACKAGES: DemoPackage[] = [
@@ -38,6 +44,13 @@ export const DEMO_PACKAGES: DemoPackage[] = [
         "خارطة طريق لهدفك",
       ],
     },
+    entitlements: {
+      workoutProgram: true,
+      nutritionProgram: false,
+      exerciseVideos: true,
+      pdfDocuments: true,
+      progressTracking: true,
+    },
   },
   {
     id: "pkg-transform",
@@ -65,6 +78,13 @@ export const DEMO_PACKAGES: DemoPackage[] = [
         "دعم يومي ومكالمات أسبوعية",
         "تقارير تقدم شهرية",
       ],
+    },
+    entitlements: {
+      workoutProgram: true,
+      nutritionProgram: true,
+      exerciseVideos: true,
+      pdfDocuments: true,
+      progressTracking: true,
     },
   },
   {
@@ -94,6 +114,13 @@ export const DEMO_PACKAGES: DemoPackage[] = [
         "ملاحظات فيديو على الأداء",
       ],
     },
+    entitlements: {
+      workoutProgram: true,
+      nutritionProgram: true,
+      exerciseVideos: true,
+      pdfDocuments: true,
+      progressTracking: true,
+    },
   },
   {
     id: "pkg-foundation",
@@ -113,6 +140,13 @@ export const DEMO_PACKAGES: DemoPackage[] = [
     featureList: {
       en: ["Core workout template", "Basic nutrition PDF"],
       ar: ["قالب تمارين أساسي", "ملف تغذية مبسط"],
+    },
+    entitlements: {
+      workoutProgram: true,
+      nutritionProgram: false,
+      exerciseVideos: false,
+      pdfDocuments: true,
+      progressTracking: true,
     },
   },
 ]
@@ -235,3 +269,5 @@ export function currentSubscriptionFor(subscriberId: string) {
     null
   )
 }
+
+export const getActiveSubscriptionFor = currentSubscriptionFor

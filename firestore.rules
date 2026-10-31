@@ -1,0 +1,21 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Publicly readable packages so the landing page & registration page can display plans
+    match /packages/{packageId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Subscriptions, subscribers, registrations, programs, content, and progress
+    match /{document=**} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}
+

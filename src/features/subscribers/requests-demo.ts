@@ -3,6 +3,7 @@ export type RegistrationRequestStatus = "pending" | "approved" | "rejected"
 export type DemoRegistrationRequest = {
   id: string
   displayName: string
+  name?: { en: string; ar: string }
   email: string
   phone: string
   locale: "en" | "ar"
@@ -10,6 +11,10 @@ export type DemoRegistrationRequest = {
   goal: { en: string; ar: string }
   source: "contact" | "manual"
   status: RegistrationRequestStatus
+  subscriberId?: string
+  reviewedBy?: string
+  reviewNotes?: string
+  reviewNotesLocalized?: { en: string; ar: string }
   createdAt: string
   reviewedAt: string | null
 }
@@ -18,6 +23,7 @@ export const DEMO_REGISTRATION_REQUESTS: DemoRegistrationRequest[] = [
   {
     id: "req-layla",
     displayName: "Layla Nasser",
+    name: { en: "Layla Nasser", ar: "ليلى ناصر" },
     email: "layla@trainer.app",
     phone: "+20 155 321 0099",
     locale: "ar",
@@ -28,12 +34,14 @@ export const DEMO_REGISTRATION_REQUESTS: DemoRegistrationRequest[] = [
     },
     source: "contact",
     status: "pending",
+    subscriberId: "sub-layla",
     createdAt: "2026-10-22T09:20:00.000Z",
     reviewedAt: null,
   },
   {
     id: "req-yara",
     displayName: "Yara Selim",
+    name: { en: "Yara Selim", ar: "يارا سليم" },
     email: "yara.selim@mail.com",
     phone: "+20 100 442 1188",
     locale: "en",
@@ -50,6 +58,7 @@ export const DEMO_REGISTRATION_REQUESTS: DemoRegistrationRequest[] = [
   {
     id: "req-tamer",
     displayName: "Tamer Fouad",
+    name: { en: "Tamer Fouad", ar: "تامر فؤاد" },
     email: "tamer.f@mail.com",
     phone: "+20 122 900 3310",
     locale: "ar",
@@ -66,6 +75,7 @@ export const DEMO_REGISTRATION_REQUESTS: DemoRegistrationRequest[] = [
   {
     id: "req-alex",
     displayName: "Alex Haddad",
+    name: { en: "Alex Haddad", ar: "أليكس حداد" },
     email: "alex@trainer.app",
     phone: "+20 100 111 2233",
     locale: "en",
@@ -76,12 +86,20 @@ export const DEMO_REGISTRATION_REQUESTS: DemoRegistrationRequest[] = [
     },
     source: "contact",
     status: "approved",
+    subscriberId: "sub-alex",
+    reviewedBy: "Head Coach",
+    reviewNotes: "Approved and assigned Transform 12-week package.",
+    reviewNotesLocalized: {
+      en: "Approved and assigned Transform 12-week package.",
+      ar: "تمت الموافقة وتعيين باقة التحوّل لمدة 12 أسبوعاً.",
+    },
     createdAt: "2026-04-01T00:00:00.000Z",
     reviewedAt: "2026-04-02T10:00:00.000Z",
   },
   {
     id: "req-hassan",
     displayName: "Hassan Youssef",
+    name: { en: "Hassan Youssef", ar: "حسن يوسف" },
     email: "hassan@trainer.app",
     phone: "+20 114 222 3366",
     locale: "ar",
@@ -92,6 +110,13 @@ export const DEMO_REGISTRATION_REQUESTS: DemoRegistrationRequest[] = [
     },
     source: "contact",
     status: "rejected",
+    subscriberId: "sub-hassan",
+    reviewedBy: "Head Coach",
+    reviewNotes: "Requires clinical physical therapy clearance first.",
+    reviewNotesLocalized: {
+      en: "Requires clinical physical therapy clearance first.",
+      ar: "يتطلب تصريح علاج طبيعي سريري أولاً.",
+    },
     createdAt: "2026-05-02T00:00:00.000Z",
     reviewedAt: "2026-05-03T12:00:00.000Z",
   },

@@ -1,10 +1,11 @@
-import type { ReactNode } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import {
   Activity,
   ArrowLeft,
   CalendarDays,
+  Check,
   Dumbbell,
   Languages,
   Mail,
@@ -15,14 +16,20 @@ import {
   Target,
   UserRound,
 } from "lucide-react"
-import { DataTable } from "@/components/dashboard/DataTable"
+import { DataTable, TableAction } from "@/components/dashboard/DataTable"
 import { StatCard } from "@/components/dashboard/StatCard"
 import {
   StatusBadge,
   accountStatusTone,
   subscriptionStatusTone,
 } from "@/components/dashboard/StatusBadge"
+import { SubscriberFormDialog } from "@/components/dashboard/SubscriberFormDialog"
+import {
+  SubscriptionActionDialog,
+  type SubscriptionDialogState,
+} from "@/components/dashboard/SubscriptionActionDialog"
 import { APP_ROUTES } from "@/config/constants"
+import { useAuth } from "@/features/auth/auth-context"
 import { mealCount, type DemoNutritionProgram } from "@/features/nutrition/demo"
 import {
   DEMO_TODAY,
@@ -37,8 +44,25 @@ import {
   programsFor,
   weightDelta,
 } from "@/features/progress/demo"
-import { getSubscriberById } from "@/features/subscribers/demo"
-import { getPackageById, subscriptionsFor } from "@/features/subscriptions/demo"
+import {
+  getSubscriberById,
+  subscriberDisplayName,
+} from "@/features/subscribers/demo"
+import {
+  useSaveSubscriberMutation,
+  useSubscribersQuery,
+  useUpdateSubscriberStatusMutation,
+} from "@/features/subscribers/hooks"
+import {
+  ENTITLEMENT_KEYS,
+  normalizeEntitlements,
+} from "@/features/subscriptions/entitlements"
+import {
+  useAssignSubscriptionMutation,
+  usePackagesQuery,
+  useSubscriptionsQuery,
+  useUpdateSubscriptionLifecycleMutation,
+} from "@/features/subscriptions/hooks"
 import { trainingDayCount, type DemoWorkoutProgram } from "@/features/workouts/demo"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
@@ -47,24 +71,66 @@ import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 import type { AppLocale } from "@/i18n/rtl"
 import type { BodyMeasurement } from "@/types/progress"
+import type { PackageEntitlementKey } from "@/types/subscription"
+
+const ENTITLEMENT_LABELS: Record<
+  PackageEntitlementKey,
+  { ar: string; en: string }
+> = {
+  workoutProgram: { ar: "التمارين", en: "Workouts" },
+  nutritionProgram: { ar: "التغذية", en: "Nutrition" },
+  exerciseVideos: { ar: "الفيديوهات", en: "Videos" },
+  pdfDocuments: { ar: "ملفات PDF", en: "PDFs" },
+  progressTracking: { ar: "التقدم", en: "Progress" },
+}
 
 export function SubscriberDetailPage() {
   const { t } = useTranslation()
   const { locale, isRtl } = useLocale()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const { subscriberId = "" } = useParams()
-  const subscriber = getSubscriberById(subscriberId)
+  const { data: allSubscribers = [] } = useSubscribersQuery()
+  const subscriber =
+    allSubscribers.find((item) => item.id === subscriberId) ??
+    getSubscriberById(subscriberId)
   useDocumentTitle(subscriber?.displayName ?? t("nav.subscribers"))
+
+  const { data: allPackages = [] } = usePackagesQuery()
+  const { data: allSubscriptions = [] } = useSubscriptionsQuery()
+  const saveSubscriberMutation = useSaveSubscriberMutation()
+  const updateStatusMutation = useUpdateSubscriberStatusMutation()
+  const assignMutation = useAssignSubscriptionMutation()
+  const lifecycleMutation = useUpdateSubscriptionLifecycleMutation()
+  const [editProfileOpen, setEditProfileOpen] = useState(false)
+  const [subDialogState, setSubDialogState] =
+    useState<SubscriptionDialogState | null>(null)
+
+  const packageMap = useMemo(
+    () => new Map(allPackages.map((p) => [p.id, p])),
+    [allPackages],
+  )
+
+  const history = useMemo(
+    () =>
+      allSubscriptions
+        .filter((item) => item.subscriberId === subscriberId)
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        ),
+    [allSubscriptions, subscriberId],
+  )
 
   if (!subscriber) {
     return (
       <section className="rounded-[24px] bg-white p-8">
-        <p className="font-heading text-[20px] font-extrabold text-[var(--gym-ink,#063434)]">
+        <p className="font-heading text-[20px] font-extrabold text-[var(--gym-ink,#111111)]">
           {t("admin.subscribers.notFound")}
         </p>
         <Link
           to={APP_ROUTES.admin.subscribers}
-          className="mt-4 inline-flex text-[14px] font-bold text-[var(--gym-ink,#063434)]"
+          className="mt-4 inline-flex text-[14px] font-bold text-[var(--gym-ink,#111111)]"
         >
           {t("admin.common.back")}
         </Link>
@@ -72,9 +138,16 @@ export function SubscriberDetailPage() {
     )
   }
 
-  const history = subscriptionsFor(subscriber.id)
-  const current = history.find((item) => item.status === "active" || item.status === "suspended")
-  const currentPackage = getPackageById(current?.packageId)
+  const current =
+    history.find(
+      (item) => item.status === "active" || item.status === "suspended",
+    ) ?? history[0]
+  const currentPackage = current ? packageMap.get(current.packageId) : undefined
+  const currentEntitlements = current
+    ? normalizeEntitlements(
+        currentPackage?.entitlements ?? current.entitlementsSnapshot,
+      )
+    : null
   const programs = programsFor(subscriber.id)
   const activeWorkout = programs.workouts.find((item) => item.status === "active")
   const activeNutrition = programs.nutrition.find((item) => item.status === "active")
@@ -96,7 +169,7 @@ export function SubscriberDetailPage() {
       <button
         type="button"
         onClick={() => navigate(APP_ROUTES.admin.subscribers)}
-        className="inline-flex w-fit items-center gap-2 text-[14px] font-bold text-[var(--gym-ink,#063434)]"
+        className="inline-flex w-fit items-center gap-2 text-[14px] font-bold text-[var(--gym-ink,#111111)]"
       >
         <ArrowLeft className={cn("size-4", isRtl && "rotate-180")} strokeWidth={2} />
         {t("admin.common.back")}
@@ -105,19 +178,21 @@ export function SubscriberDetailPage() {
       <section className="rounded-[24px] bg-white p-5 sm:p-7">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-4">
-            <span className="inline-flex size-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--gym-ink,#063434)] font-heading text-[18px] font-bold text-[var(--gym-lime,#b8fe22)]">
-              {initials(subscriber.displayName)}
+            <span className="inline-flex size-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--gym-ink,#111111)] font-heading text-[18px] font-bold text-[var(--gym-lime,#fb5001)]">
+              {initials(subscriberDisplayName(subscriber, locale))}
             </span>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="font-heading text-[22px] font-extrabold tracking-tight text-[var(--gym-ink,#063434)]">
-                  {subscriber.displayName}
+                <h2 className="font-heading text-[22px] font-extrabold tracking-tight text-[var(--gym-ink,#111111)]">
+                  {subscriberDisplayName(subscriber, locale)}
                 </h2>
                 <StatusBadge
                   label={t(`admin.status.${subscriber.status}`)}
                   tone={accountStatusTone(subscriber.status)}
                 />
-                {currentPackage ? <StatusBadge label={currentPackage.name[locale]} tone="info" /> : null}
+                {currentPackage ? (
+                  <StatusBadge label={currentPackage.name[locale]} tone="info" />
+                ) : null}
                 {roster ? (
                   <StatusBadge
                     label={t(`admin.progress.filter.${roster.bucket}`)}
@@ -132,23 +207,87 @@ export function SubscriberDetailPage() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setEditProfileOpen(true)}
+              className="inline-flex h-11 items-center rounded-full bg-[#F4F4F4] px-5 text-[13px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/10"
+            >
+              {locale === "ar" ? "تعديل البيانات" : "Edit profile"}
+            </button>
+            <button
+              type="button"
+              disabled={updateStatusMutation.isPending}
+              onClick={async () => {
+                const nextStatus =
+                  subscriber.status === "active" ? "suspended" : "active"
+                await updateStatusMutation.mutateAsync({
+                  subscriberId: subscriber.id,
+                  status: nextStatus,
+                  syncSubscription: true,
+                  adminName: user?.displayName || user?.email || "Head Coach",
+                })
+                appToast.success(
+                  nextStatus === "active"
+                    ? locale === "ar"
+                      ? "تم إعادة تفعيل حساب المشترك"
+                      : "Subscriber account reactivated"
+                    : locale === "ar"
+                      ? "تم تعليق حساب المشترك"
+                      : "Subscriber account suspended",
+                )
+              }}
+              className={cn(
+                "inline-flex h-11 items-center rounded-full px-5 text-[13px] font-bold transition",
+                subscriber.status === "active"
+                  ? "bg-[#FFE8E4] text-[#C44536] hover:bg-[#ffd6cf]"
+                  : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
+              )}
+            >
+              {subscriber.status === "active"
+                ? locale === "ar"
+                  ? "تعليق الحساب"
+                  : "Suspend account"
+                : locale === "ar"
+                  ? "تفعيل الحساب"
+                  : "Activate account"}
+            </button>
             <Link
               to={`${APP_ROUTES.admin.progress}?subscriber=${subscriber.id}`}
-              className="inline-flex h-11 items-center rounded-full bg-[var(--gym-lime,#b8fe22)] px-5 text-[13px] font-bold text-[var(--gym-ink,#063434)]"
+              className="inline-flex h-11 items-center rounded-full bg-[var(--gym-lime,#fb5001)] px-5 text-[13px] font-bold text-white"
             >
               {t("admin.subscribers.viewProgress")}
             </Link>
             <button
               type="button"
-              onClick={() => appToast.success(t("admin.common.demoOnly"))}
-              className="inline-flex h-11 items-center rounded-full bg-[var(--gym-ink,#063434)] px-5 text-[13px] font-bold text-white"
+              onClick={() =>
+                setSubDialogState({
+                  mode: "assign",
+                  defaultSubscriberId: subscriber.id,
+                  defaultPackageId: current?.packageId,
+                })
+              }
+              className="inline-flex h-11 items-center rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white"
             >
               {t("admin.subscribers.assignPackage")}
             </button>
             <button
               type="button"
-              onClick={() => appToast.success(t("admin.common.demoOnly"))}
-              className="inline-flex h-11 items-center rounded-full bg-[#F4F4F4] px-5 text-[13px] font-bold text-[var(--gym-ink,#063434)]"
+              onClick={() => {
+                if (current) {
+                  setSubDialogState({
+                    mode: "manage",
+                    subscription: current,
+                    initialAction:
+                      current.status === "active" ? "renew" : "activate",
+                  })
+                } else {
+                  setSubDialogState({
+                    mode: "assign",
+                    defaultSubscriberId: subscriber.id,
+                  })
+                }
+              }}
+              className="inline-flex h-11 items-center rounded-full bg-[#F4F4F4] px-5 text-[13px] font-bold text-[var(--gym-ink,#111111)]"
             >
               {t("admin.subscribers.updateStatus")}
             </button>
@@ -193,9 +332,18 @@ export function SubscriberDetailPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-[24px] bg-white p-5 sm:p-7">
-          <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#063434)]">
-            {t("admin.subscribers.profile")}
-          </h3>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
+              {t("admin.subscribers.profile")}
+            </h3>
+            <button
+              type="button"
+              onClick={() => setEditProfileOpen(true)}
+              className="text-[12px] font-bold text-[var(--gym-lime,#fb5001)] hover:underline"
+            >
+              {locale === "ar" ? "تعديل الملف" : "Edit"}
+            </button>
+          </div>
           <dl className="mt-5 space-y-4 text-[14px]">
             <DetailRow icon={<Mail className="size-4" />} label={t("admin.subscribers.columns.email")} value={subscriber.email} />
             <DetailRow icon={<Phone className="size-4" />} label={t("admin.subscribers.columns.phone")} value={subscriber.phone} />
@@ -205,15 +353,27 @@ export function SubscriberDetailPage() {
               value={subscriber.locale.toUpperCase()}
             />
             <DetailRow
-              icon={<Ruler className="size-4" />}
-              label={t("admin.subscribers.height")}
-              value={subscriber.heightCm ? t("admin.subscribers.heightValue", { value: subscriber.heightCm }) : "—"}
-            />
-            <DetailRow
               icon={<UserRound className="size-4" />}
               label={t("admin.subscribers.sex")}
               value={subscriber.sex ? t(`admin.subscribers.sexValue.${subscriber.sex}`) : "—"}
             />
+            {subscriber.age ? (
+              <DetailRow
+                label={locale === "ar" ? "العمر" : "Age"}
+                value={`${subscriber.age}`}
+              />
+            ) : null}
+            <DetailRow
+              icon={<Ruler className="size-4" />}
+              label={t("admin.subscribers.height")}
+              value={subscriber.heightCm ? t("admin.subscribers.heightValue", { value: subscriber.heightCm }) : "—"}
+            />
+            {subscriber.startingWeightKg != null || subscriber.targetWeightKg != null ? (
+              <DetailRow
+                label={locale === "ar" ? "وزن البداية / المستهدف" : "Start / Target weight"}
+                value={`${subscriber.startingWeightKg != null ? formatKg(subscriber.startingWeightKg, locale) : "—"} → ${subscriber.targetWeightKg != null ? formatKg(subscriber.targetWeightKg, locale) : "—"}`}
+              />
+            ) : null}
             <DetailRow label={t("admin.subscribers.bmi")} value={bmi ?? "—"} />
             <DetailRow
               icon={<Target className="size-4" />}
@@ -221,16 +381,50 @@ export function SubscriberDetailPage() {
               value={subscriber.goal?.[locale] ?? "—"}
               stacked
             />
+            {subscriber.healthNotes ? (
+              <DetailRow
+                label={locale === "ar" ? "ملاحظات صحية / إصابات" : "Health & injury notes"}
+                value={subscriber.healthNotes[locale]}
+                stacked
+              />
+            ) : null}
           </dl>
         </section>
 
         <section className="rounded-[24px] bg-white p-5 sm:p-7">
-          <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#063434)]">
-            {t("admin.subscribers.currentSubscription")}
-          </h3>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
+              {t("admin.subscribers.currentSubscription")}
+            </h3>
+            {current ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setSubDialogState({
+                    mode: "manage",
+                    subscription: current,
+                    initialAction:
+                      current.status === "active" ? "renew" : "activate",
+                  })
+                }
+                className="text-[12px] font-bold text-[var(--gym-lime,#fb5001)] hover:underline"
+              >
+                {current.status === "active"
+                  ? t("admin.subscriptions.renew")
+                  : t("admin.subscriptions.activate")}
+              </button>
+            ) : null}
+          </div>
           {current ? (
             <dl className="mt-5 space-y-4 text-[14px]">
-              <DetailRow label={t("admin.subscribers.columns.package")} value={currentPackage?.name[locale] ?? "—"} />
+              <DetailRow
+                label={t("admin.subscribers.columns.package")}
+                value={
+                  currentPackage?.name[locale] ??
+                  current.packageName?.[locale] ??
+                  "—"
+                }
+              />
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-[#8c8c8c]">{t("admin.subscribers.columns.subscription")}</dt>
                 <StatusBadge
@@ -245,9 +439,36 @@ export function SubscriberDetailPage() {
                 label={t("admin.subscriptions.columns.activatedBy")}
                 value={current.activatedBy ?? "—"}
               />
+              {currentEntitlements ? (
+                <div className="flex flex-col gap-1.5 pt-1">
+                  <dt className="text-[#8c8c8c]">
+                    {locale === "ar" ? "صلاحيات المحتوى" : "Content access"}
+                  </dt>
+                  <dd className="flex flex-wrap gap-1.5">
+                    {ENTITLEMENT_KEYS.map((key) => {
+                      const allowed =
+                        current.status === "active" && currentEntitlements[key]
+                      return (
+                        <span
+                          key={key}
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold",
+                            allowed
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-black/5 text-[#8c8c8c] line-through",
+                          )}
+                        >
+                          {allowed ? <Check className="size-3" strokeWidth={2.5} /> : null}
+                          {ENTITLEMENT_LABELS[key][locale]}
+                        </span>
+                      )
+                    })}
+                  </dd>
+                </div>
+              ) : null}
               <DetailRow
                 label={t("admin.subscribers.notes")}
-                value={current.notes ?? "—"}
+                value={current.notesLocalized?.[locale] ?? current.notes ?? "—"}
                 stacked
               />
             </dl>
@@ -259,11 +480,11 @@ export function SubscriberDetailPage() {
 
       {subscriber.coachNotes ? (
         <section className="rounded-[24px] bg-white p-5 sm:p-7">
-          <h3 className="inline-flex items-center gap-2 font-heading text-[16px] font-extrabold text-[var(--gym-ink,#063434)]">
+          <h3 className="inline-flex items-center gap-2 font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
             <StickyNote className="size-4" strokeWidth={1.8} />
             {t("admin.subscribers.coachNotes")}
           </h3>
-          <p className="mt-3 text-[14px] font-medium leading-relaxed text-[var(--gym-ink,#063434)]">
+          <p className="mt-3 text-[14px] font-medium leading-relaxed text-[var(--gym-ink,#111111)]">
             {subscriber.coachNotes[locale]}
           </p>
         </section>
@@ -288,12 +509,12 @@ export function SubscriberDetailPage() {
 
       <section className="rounded-[24px] bg-white p-5 sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#063434)]">
+          <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
             {t("admin.subscribers.progressSnapshot")}
           </h3>
           <Link
             to={`${APP_ROUTES.admin.progress}?subscriber=${subscriber.id}`}
-            className="text-[13px] font-bold text-[var(--gym-ink,#063434)]"
+            className="text-[13px] font-bold text-[var(--gym-ink,#111111)]"
           >
             {t("admin.subscribers.viewProgress")}
           </Link>
@@ -347,9 +568,9 @@ export function SubscriberDetailPage() {
                 </p>
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:max-w-xl sm:grid-cols-3">
                   {latestPhotos.map((photo) => (
-                    <figure key={photo.id} className="h-fit overflow-hidden rounded-[16px] bg-[var(--gym-ink,#063434)]">
+                    <figure key={photo.id} className="h-fit overflow-hidden rounded-[16px] bg-[var(--gym-ink,#111111)]">
                       <div className="relative flex aspect-[3/4] items-center justify-center">
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(184,254,34,0.22),transparent_45%)]" />
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(251,80,1,0.22),transparent_45%)]" />
                         <span className="relative font-heading text-[22px] font-extrabold text-white/80">
                           {photo.pose ? t(`admin.progress.pose.${photo.pose}`) : "•"}
                         </span>
@@ -373,13 +594,13 @@ export function SubscriberDetailPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-[24px] bg-white p-5 sm:p-7">
-          <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#063434)]">
+          <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
             {t("admin.progress.workoutHistory")}
           </h3>
           <ProgramHistory items={programs.workouts} locale={locale} empty={t("admin.progress.noProgram")} />
         </section>
         <section className="rounded-[24px] bg-white p-5 sm:p-7">
-          <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#063434)]">
+          <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
             {t("admin.progress.nutritionHistory")}
           </h3>
           <ProgramHistory items={programs.nutrition} locale={locale} empty={t("admin.progress.noProgram")} />
@@ -390,16 +611,35 @@ export function SubscriberDetailPage() {
         rows={history}
         rowKey={(row) => row.id}
         empty={t("admin.subscriptions.empty")}
+        actionsHeader={t("admin.common.actions")}
         toolbar={
-          <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#063434)]">
-            {t("admin.subscribers.history")}
-          </h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
+              {t("admin.subscribers.history")} ({history.length})
+            </h3>
+            <button
+              type="button"
+              onClick={() =>
+                setSubDialogState({
+                  mode: "assign",
+                  defaultSubscriberId: subscriber.id,
+                  defaultPackageId: current?.packageId,
+                })
+              }
+              className="inline-flex h-9 items-center rounded-full bg-[var(--gym-ink,#111111)] px-4 text-[12px] font-bold text-white"
+            >
+              {t("admin.subscribers.assignPackage")}
+            </button>
+          </div>
         }
         columns={[
           {
             id: "package",
             header: t("admin.subscribers.columns.package"),
-            cell: (row) => getPackageById(row.packageId)?.name[locale] ?? "—",
+            cell: (row) =>
+              packageMap.get(row.packageId)?.name[locale] ??
+              row.packageName?.[locale] ??
+              "—",
           },
           {
             id: "status",
@@ -429,10 +669,83 @@ export function SubscriberDetailPage() {
           {
             id: "notes",
             header: t("admin.subscribers.notes"),
-            cell: (row) => row.notes ?? "—",
+            cell: (row) => row.notesLocalized?.[locale] ?? row.notes ?? "—",
             className: "text-[#6B7280]",
           },
         ]}
+        actions={(row) => (
+          <>
+            <TableAction
+              label={
+                row.status === "active"
+                  ? t("admin.subscriptions.renew")
+                  : t("admin.subscriptions.activate")
+              }
+              tone="primary"
+              onClick={() =>
+                setSubDialogState({
+                  mode: "manage",
+                  subscription: row,
+                  initialAction: row.status === "active" ? "renew" : "activate",
+                })
+              }
+            />
+            <TableAction
+              label={locale === "ar" ? "تعديل" : "Edit"}
+              onClick={() =>
+                setSubDialogState({
+                  mode: "manage",
+                  subscription: row,
+                  initialAction: "edit",
+                })
+              }
+            />
+          </>
+        )}
+      />
+
+      <SubscriberFormDialog
+        open={editProfileOpen}
+        subscriber={subscriber}
+        packages={allPackages}
+        busy={saveSubscriberMutation.isPending}
+        adminName={user?.displayName || user?.email || "Head Coach"}
+        onClose={() => setEditProfileOpen(false)}
+        onSave={async (payload) => {
+          await saveSubscriberMutation.mutateAsync(payload)
+          setEditProfileOpen(false)
+          appToast.success(
+            locale === "ar"
+              ? "تم تحديث بيانات المشترك بنجاح"
+              : "Subscriber profile updated successfully",
+          )
+        }}
+      />
+
+      <SubscriptionActionDialog
+        state={subDialogState}
+        packages={allPackages}
+        busy={assignMutation.isPending || lifecycleMutation.isPending}
+        adminName={user?.displayName || user?.email || "Head Coach"}
+        onClose={() => setSubDialogState(null)}
+        onAssign={async (payload) => {
+          await assignMutation.mutateAsync(payload)
+          setSubDialogState(null)
+          appToast.success(
+            locale === "ar"
+              ? "تم تعيين الاشتراك للمشترك بنجاح"
+              : "Subscription assigned successfully",
+          )
+        }}
+        onLifecycle={async (payload) => {
+          await lifecycleMutation.mutateAsync(payload)
+          setSubDialogState(null)
+          appToast.success(
+            locale === "ar"
+              ? "تم تحديث حالة الاشتراك بنجاح"
+              : "Subscription updated successfully",
+          )
+        }}
       />
     </div>
   )
@@ -483,8 +796,8 @@ function ProgramCard({
   return (
     <section className="rounded-[24px] bg-white p-5 sm:p-7">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#063434)]">{title}</h3>
-        <Link to={href} className="text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+        <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">{title}</h3>
+        <Link to={href} className="text-[12px] font-bold text-[var(--gym-ink,#111111)]">
           {t("admin.subscribers.openWorkspace")}
         </Link>
       </div>
@@ -497,7 +810,7 @@ function WorkoutSummary({ program, locale }: { program: DemoWorkoutProgram; loca
   const { t } = useTranslation()
   return (
     <div className="mt-5">
-      <p className="text-[15px] font-bold text-[var(--gym-ink,#063434)]">{program.title[locale]}</p>
+      <p className="text-[15px] font-bold text-[var(--gym-ink,#111111)]">{program.title[locale]}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <StatusBadge
           label={t(`admin.workouts.scope.${program.status}`)}
@@ -528,7 +841,7 @@ function NutritionSummary({ program, locale }: { program: DemoNutritionProgram; 
   const { t } = useTranslation()
   return (
     <div className="mt-5">
-      <p className="text-[15px] font-bold text-[var(--gym-ink,#063434)]">{program.title[locale]}</p>
+      <p className="text-[15px] font-bold text-[var(--gym-ink,#111111)]">{program.title[locale]}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <StatusBadge
           label={t(`admin.workouts.scope.${program.status}`)}
@@ -583,7 +896,7 @@ function ProgramHistory({
       {ordered.map((item) => (
         <li key={item.id} className="flex items-center justify-between gap-2 rounded-2xl bg-[#F4F4F4] px-3 py-2.5">
           <span className="min-w-0">
-            <span className="block truncate text-[13px] font-bold text-[var(--gym-ink,#063434)]">
+            <span className="block truncate text-[13px] font-bold text-[var(--gym-ink,#111111)]">
               {item.title[locale]}
             </span>
             <span className="text-[11px] font-medium text-[#8c8c8c]">
@@ -617,7 +930,7 @@ function DeltaChip({
   return (
     <div className="rounded-2xl bg-[#F4F4F4] px-3 py-2.5">
       <p className="text-[11px] font-bold text-[#8c8c8c]">{label}</p>
-      <p className="mt-1 font-heading text-[16px] font-extrabold text-[var(--gym-ink,#063434)]">
+      <p className="mt-1 font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
         {latest != null ? `${latest} ${unit}` : "—"}
       </p>
       <p className="text-[11px] font-bold text-[#6B7280]">{delta == null ? "—" : `${signed(delta)} ${unit}`}</p>
@@ -643,7 +956,7 @@ function DetailRow({
           {icon}
           {label}
         </dt>
-        <dd className="font-semibold leading-relaxed text-[var(--gym-ink,#063434)]">{value}</dd>
+        <dd className="font-semibold leading-relaxed text-[var(--gym-ink,#111111)]">{value}</dd>
       </div>
     )
   }
@@ -653,7 +966,7 @@ function DetailRow({
         {icon}
         {label}
       </dt>
-      <dd className="text-end font-semibold text-[var(--gym-ink,#063434)]">{value}</dd>
+      <dd className="text-end font-semibold text-[var(--gym-ink,#111111)]">{value}</dd>
     </div>
   )
 }

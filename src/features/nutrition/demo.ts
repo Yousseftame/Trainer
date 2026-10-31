@@ -1,33 +1,17 @@
-import type { MealItem, ProgramFormat } from "@/types/program"
+import type {
+  BilingualText,
+  MealItem,
+  MealSlot,
+  MealSlotKey,
+  NutritionAdherenceLog,
+  NutritionDay,
+  NutritionProgram,
+} from "@/types/program"
 
-export type MealSlotKey = "breakfast" | "lunch" | "snack" | "dinner"
-
-export type DemoMealSlot = {
-  id: string
-  slot: MealSlotKey
-  items: MealItem[]
-}
-
-export type DemoNutritionDay = {
-  id: string
-  weekday: number
-  meals: DemoMealSlot[]
-}
-
-export type DemoNutritionProgram = {
-  id: string
-  title: { en: string; ar: string }
-  format: ProgramFormat
-  version: number
-  days: DemoNutritionDay[]
-  pdfName?: { en: string; ar: string }
-  subscriberId?: string
-  templateId?: string
-  status: "template" | "active" | "archived"
-  updatedAt: string
-  targetCalories?: number
-  adherence?: { done: number; total: number }
-}
+export type { MealSlotKey }
+export type DemoMealSlot = MealSlot
+export type DemoNutritionDay = NutritionDay
+export type DemoNutritionProgram = NutritionProgram
 
 const BREAKFAST: MealItem[] = [
   {
@@ -111,6 +95,7 @@ export const DEMO_NUTRITION: DemoNutritionProgram[] = [
     status: "template",
     targetCalories: 1900,
     updatedAt: "2026-10-16T00:00:00.000Z",
+    createdAt: "2026-06-01T00:00:00.000Z",
     days: week([
       { id: "c-0", weekday: 0, meals: FULL_DAY },
       { id: "c-1", weekday: 1, meals: FULL_DAY },
@@ -135,6 +120,7 @@ export const DEMO_NUTRITION: DemoNutritionProgram[] = [
     version: 1,
     status: "template",
     targetCalories: 2600,
+    createdAt: "2026-05-15T00:00:00.000Z",
     updatedAt: "2026-09-28T00:00:00.000Z",
     days: week([
       { id: "b-0", weekday: 0, meals: FULL_DAY },
@@ -150,7 +136,9 @@ export const DEMO_NUTRITION: DemoNutritionProgram[] = [
     format: "pdf",
     version: 1,
     status: "template",
+    createdAt: "2026-02-20T00:00:00.000Z",
     updatedAt: "2026-03-02T00:00:00.000Z",
+    pdfContentId: "pdf-macro-guide",
     pdfName: { en: "Ramadan_Nutrition_v1.pdf", ar: "تغذية_رمضان_v1.pdf" },
     days: week([]),
   },
@@ -164,6 +152,7 @@ export const DEMO_NUTRITION: DemoNutritionProgram[] = [
     templateId: "ntpl-cut",
     targetCalories: 1900,
     adherence: { done: 18, total: 24 },
+    createdAt: "2026-06-15T00:00:00.000Z",
     updatedAt: "2026-10-21T00:00:00.000Z",
     days: week([
       { id: "na-0", weekday: 0, meals: FULL_DAY },
@@ -191,7 +180,9 @@ export const DEMO_NUTRITION: DemoNutritionProgram[] = [
     templateId: "ntpl-cut",
     targetCalories: 2100,
     adherence: { done: 16, total: 20 },
+    createdAt: "2026-01-10T00:00:00.000Z",
     updatedAt: "2026-05-01T00:00:00.000Z",
+    archivedAt: "2026-06-15T00:00:00.000Z",
     days: week([
       { id: "nas-0", weekday: 0, meals: FULL_DAY },
       { id: "nas-2", weekday: 2, meals: FULL_DAY },
@@ -208,6 +199,7 @@ export const DEMO_NUTRITION: DemoNutritionProgram[] = [
     templateId: "ntpl-build",
     targetCalories: 2400,
     adherence: { done: 12, total: 20 },
+    createdAt: "2026-08-01T00:00:00.000Z",
     updatedAt: "2026-10-14T00:00:00.000Z",
     days: week([
       { id: "nn-0", weekday: 0, meals: FULL_DAY },
@@ -223,11 +215,65 @@ export const DEMO_NUTRITION: DemoNutritionProgram[] = [
     status: "archived",
     subscriberId: "sub-omar",
     templateId: "ntpl-pdf",
+    pdfContentId: "pdf-macro-guide",
     pdfName: { en: "Ramadan_Nutrition_v1.pdf", ar: "تغذية_رمضان_v1.pdf" },
+    createdAt: "2026-07-01T00:00:00.000Z",
     updatedAt: "2026-09-19T00:00:00.000Z",
+    archivedAt: "2026-09-19T00:00:00.000Z",
     days: week([]),
   },
 ]
+
+export const NUTRITION_DISCLAIMER: BilingualText = {
+  en: "The platform delivers and tracks trainer-approved nutrition programs. It does not independently generate medical or therapeutic dietary prescriptions.",
+  ar: "توفر المنصة وتتابع خطط التغذية المعتمدة من المدرب الرياضي. ولا تصدر بشكل مستقل وصفات غذائية علاجية أو طبية.",
+}
+
+export const INITIAL_NUTRITION_LOGS: NutritionAdherenceLog[] = [
+  {
+    id: "nlog-1",
+    subscriberId: "sub-alex",
+    programId: "nasg-alex",
+    date: "2026-10-26",
+    status: "adhered",
+    caloriesActual: 1880,
+    waterLitersActual: 3.2,
+    notes: "Hit all meals, skipped late snack without issues.",
+    loggedAt: "2026-10-26T21:00:00.000Z",
+  },
+  {
+    id: "nlog-2",
+    subscriberId: "sub-alex",
+    programId: "nasg-alex",
+    date: "2026-10-27",
+    status: "mostly",
+    caloriesActual: 2050,
+    waterLitersActual: 3.0,
+    notes: "Business lunch had slightly more carbs than planned, compensated at dinner.",
+    loggedAt: "2026-10-27T21:30:00.000Z",
+  },
+  {
+    id: "nlog-3",
+    subscriberId: "sub-nina",
+    programId: "nasg-nina",
+    date: "2026-10-26",
+    status: "adhered",
+    caloriesActual: 2420,
+    waterLitersActual: 3.5,
+    notes: "Hit high protein targets easily today.",
+    loggedAt: "2026-10-26T20:45:00.000Z",
+  },
+]
+
+export function resolveBilingualText(
+  value: string | BilingualText | undefined,
+  locale: "en" | "ar",
+  fallback = "",
+): string {
+  if (!value) return fallback
+  if (typeof value === "string") return value
+  return value[locale] || value.en || value.ar || fallback
+}
 
 export function mealCount(program: DemoNutritionProgram) {
   return program.days.reduce((sum, day) => sum + day.meals.length, 0)
