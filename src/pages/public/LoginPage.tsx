@@ -13,23 +13,46 @@ import {
 import { useAuth } from "@/features/auth/auth-context"
 import { firebaseAuthErrorKey } from "@/features/auth/errors"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
+import { useLocale } from "@/hooks/useLocale"
 import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 
 export function LoginPage() {
   const { t } = useTranslation()
+  const { locale } = useLocale()
+  const isAr = locale === "ar"
   useDocumentTitle(t("auth.loginTitle"))
   const navigate = useNavigate()
   const location = useLocation()
-  const { status, user, signIn } = useAuth()
+  const { status, user, signIn, signOut } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     if (status !== "authenticated" || !user) return
+
+    // 1. Check if user is suspended/blocked
+    if (user.status === "suspended") {
+      appToast.error(
+        isAr
+          ? "تم إيقاف هذا الحساب من قبل الإدارة. يرجى مراجعة كبير المدربين."
+          : "This account has been suspended by the administrator.",
+      )
+      void signOut()
+      return
+    }
+
+    // 2. Redirect based on user role
     const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname
-    navigate(from?.startsWith("/admin") ? from : APP_ROUTES.admin.root, { replace: true })
-  }, [status, user, location.state, navigate])
+
+    if (user.role === "subscriber") {
+      const target = from?.startsWith("/app") ? from : APP_ROUTES.subscriber.root
+      navigate(target, { replace: true })
+    } else {
+      const target = from?.startsWith("/admin") ? from : APP_ROUTES.admin.root
+      navigate(target, { replace: true })
+    }
+  }, [status, user, location.state, navigate, signOut, isAr])
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

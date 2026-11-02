@@ -6,6 +6,8 @@ import {
   writeBatch,
 } from "firebase/firestore"
 import { getDb } from "@/lib/firebase/firestore"
+import { createRealFirebaseAuthAccount } from "@/lib/firebase/provisioning"
+import { saveStoredPassword } from "@/features/auth/credentials"
 import {
   DEMO_SUBSCRIBERS,
   type DemoSubscriber,
@@ -308,6 +310,7 @@ export type SaveSubscriberInput = {
   displayName: string
   name?: { en: string; ar: string }
   email: string
+  password?: string
   phone: string
   status: UserStatus
   locale: "en" | "ar"
@@ -338,11 +341,6 @@ export async function saveSubscriber(
     ? DEMO_SUBSCRIBERS.find((item) => item.id === input.id)
     : undefined
 
-  const id =
-    existing?.id ??
-    input.id ??
-    `sub-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
-
   const nameObj =
     normalizeBilingual(input.name) ??
     existing?.name ?? {
@@ -351,6 +349,20 @@ export async function saveSubscriber(
     }
   const resolvedDisplayName =
     input.displayName.trim() || nameObj.en || nameObj.ar
+
+  let id = existing?.id ?? input.id
+  if (!id) {
+    const passwordToUse = input.password?.trim() || "Member@123456"
+    saveStoredPassword(input.email, passwordToUse)
+    const authResult = await createRealFirebaseAuthAccount({
+      email: input.email,
+      password: passwordToUse,
+      displayName: resolvedDisplayName,
+    })
+    id = authResult.uid || `sub-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+  } else if (input.password?.trim()) {
+    saveStoredPassword(input.email, input.password.trim())
+  }
 
   const record: DemoSubscriber = {
     id,
@@ -412,17 +424,21 @@ export async function saveSubscriber(
     console.warn("[Firestore] Failed to write subscriber:", err)
   }
 
-  if (!existing && input.initialSubscription?.packageId) {
+  if (!existing) {
+    const pkgId =
+      input.initialSubscription?.packageId ||
+      input.preferredPackageId ||
+      "pkg-transform"
     await assignSubscription({
       subscriberId: id,
       subscriberName: record.displayName,
       subscriberEmail: record.email,
-      packageId: input.initialSubscription.packageId,
-      status: input.initialSubscription.status,
-      startsAt: input.initialSubscription.startsAt,
-      endsAt: input.initialSubscription.endsAt,
-      activatedBy: input.initialSubscription.activatedBy,
-      notes: input.initialSubscription.notes,
+      packageId: pkgId,
+      status: input.initialSubscription?.status || "active",
+      startsAt: input.initialSubscription?.startsAt || now,
+      endsAt: input.initialSubscription?.endsAt,
+      activatedBy: input.initialSubscription?.activatedBy || "Head Coach",
+      notes: input.initialSubscription?.notes || "Initial onboarding subscription",
     })
   }
 
@@ -759,4 +775,46 @@ export async function reviewRegistrationRequest(
 
   return { request: updatedReq, subscriber: matchedSub }
 }
+
+export async function updateSubscriberCoachNotes(
+  subscriberId: string,
+  coachNotes: { en: string; ar: string } | string,
+): Promise<DemoSubscriber> {
+  const existing = await fetchSubscribers()
+  const current = existing.find((s) => s.id === subscriberId)
+  if (!current) {
+    throw new Error(`Subscriber ${subscriberId} not found`)
+  }
+
+  const notesObj: { en: string; ar: string } =
+    typeof coachNotes === "string"
+      ? { en: coachNotes.trim(), ar: coachNotes.trim() }
+      : {
+          en: coachNotes.en.trim() || coachNotes.ar.trim(),
+          ar: coachNotes.ar.trim() || coachNotes.en.trim(),
+        }
+
+  const updated: DemoSubscriber = {
+    ...current,
+    coachNotes: notesObj,
+    updatedAt: new Date().toISOString(),
+  }
+
+  const nextList = existing.map((s) => (s.id === subscriberId ? updated : s))
+  syncDemoSubscribersArray(nextList)
+  writeLocalCache(SUBSCRIBERS_STORAGE_KEY, nextList)
+
+  try {
+    const db = getDb()
+    await setDoc(
+      doc(db, SUBSCRIBERS_COLLECTION, subscriberId),
+      stripUndefined({ ...updated }),
+    )
+  } catch (err) {
+    console.warn("[Firestore] Failed to persist coach notes:", err)
+  }
+
+  return updated
+}
+
 

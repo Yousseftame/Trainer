@@ -30,6 +30,7 @@
     "nutrition": "Nutrition",
     "content": "Content library",
     "progress": "Progress",
+    "physicalTherapy": "Physical therapy",
     "staff": "Staff & permissions",
     "reports": "Reports",
     "peopleSection": "People",
@@ -590,6 +591,35 @@
         "attention": "Needs attention",
         "checkIns": "Check-ins this week",
         "photos": "Photos this month"
+      }
+    },
+    "physicalTherapy": {
+      "title": "Physical Therapy & Rehabilitation",
+      "subtitle": "Track subscriber injuries, biomechanical contraindications, and prescribed rehab protocols.",
+      "search": "Search subscriber, injury, or area...",
+      "newRecord": "New Assessment",
+      "editRecord": "Edit Record",
+      "stats": {
+        "cases": "Monitored cases",
+        "active": "Active rehab",
+        "recovering": "In recovery",
+        "cleared": "Medically cleared"
+      }
+    },
+    "staff": {
+      "title": "Staff & Administrative Permissions",
+      "subtitle": "Manage administrative accounts, role assignments, and granular module permissions.",
+      "search": "Search staff name, email, or role...",
+      "add": "Add Staff Member",
+      "edit": "Edit Permissions",
+      "suspend": "Suspend Account",
+      "reactivate": "Reactivate Account",
+      "delete": "Delete Account",
+      "stats": {
+        "total": "Total Staff Members",
+        "active": "Active Staff",
+        "suspended": "Suspended Accounts",
+        "headCoach": "Head Coach Account"
       }
     },
     "reports": {

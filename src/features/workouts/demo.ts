@@ -19,6 +19,35 @@ const PUSH: WorkoutExercise[] = [
     restSeconds: 90,
     notes: "Last set RPE 8",
     videoContentId: "vid-bench",
+    equipment: "Barbell & Flat Bench",
+    alternatives: [
+      {
+        id: "alt-bp-db",
+        name: { en: "Flat Dumbbell Bench Press", ar: "بنش برس مستوي بالدمبلز" },
+        reason: {
+          en: "No bench press rack available / easier on shoulders",
+          ar: "في حال عدم توفر جهاز البنش بالبار أو لتخفيف الحمل على الكتف",
+        },
+        equipment: "Dumbbells & Flat Bench",
+        notes: {
+          en: "Tuck elbows at 45 degrees, full stretch at bottom.",
+          ar: "اضبط زاوية المرفقين 45 درجة مع تمدد كامل في الأسفل.",
+        },
+      },
+      {
+        id: "alt-bp-pushup",
+        name: { en: "Deficit Push-ups (or Weighted Push-ups)", ar: "تمرين ضغط مع رفع اليدين على أقراص أوزان" },
+        reason: {
+          en: "Home workout / machine occupied",
+          ar: "بديل بوزن الجسم عند انشغال الأجهزة في الجيم",
+        },
+        equipment: "Floor / Weight Plates",
+        notes: {
+          en: "Keep core braced, slow 3-second eccentric tempo.",
+          ar: "شد عضلات البطن مع هبوط بطيء في 3 ثوانٍ.",
+        },
+      },
+    ],
   },
   {
     id: "ex-ohp",
@@ -27,6 +56,27 @@ const PUSH: WorkoutExercise[] = [
     reps: "10",
     restSeconds: 75,
     videoContentId: "vid-ohp",
+    equipment: "Dumbbells & Incline Bench",
+    alternatives: [
+      {
+        id: "alt-ohp-landmine",
+        name: { en: "Half-Kneeling Landmine Press", ar: "دفع أمامي بجهاز اللاندمين نصف راكع" },
+        reason: {
+          en: "Shoulder impingement or no heavy dumbbells",
+          ar: "آمن للكتف في حال وجود احتكاك أو عدم توفر أوزان مناسبة",
+        },
+        equipment: "Landmine / Barbell",
+      },
+      {
+        id: "alt-ohp-machine",
+        name: { en: "Machine Shoulder Press", ar: "جهاز دفع الأكتاف جالس" },
+        reason: {
+          en: "Safe locked movement path",
+          ar: "مسار حركة آمن وثابت",
+        },
+        equipment: "Shoulder Press Machine",
+      },
+    ],
   },
   {
     id: "ex-fly",
@@ -35,6 +85,27 @@ const PUSH: WorkoutExercise[] = [
     reps: "12–15",
     restSeconds: 60,
     notes: "Pause 1s at squeeze",
+    equipment: "Dual Cable Pulley",
+    alternatives: [
+      {
+        id: "alt-fly-db",
+        name: { en: "Flat Bench Dumbbell Flyes", ar: "تفتيح صدر بالدمبلز على بنش مستوي" },
+        reason: {
+          en: "Cable station occupied",
+          ar: "في حال انشغال جهاز الكابل المزدوج",
+        },
+        equipment: "Dumbbells",
+      },
+      {
+        id: "alt-fly-band",
+        name: { en: "Resistance Band Chest Flyes", ar: "تفتيح صدر بحبال المقاومة" },
+        reason: {
+          en: "Home workout / hotel gym",
+          ar: "بديل سريع أثناء السفر أو في المنزل",
+        },
+        equipment: "Resistance Band",
+      },
+    ],
   },
 ]
 
@@ -46,6 +117,27 @@ const PULL: WorkoutExercise[] = [
     reps: "10",
     restSeconds: 90,
     videoContentId: "vid-row",
+    equipment: "Incline Bench & Dumbbells",
+    alternatives: [
+      {
+        id: "alt-row-db",
+        name: { en: "One-Arm Dumbbell Row", ar: "تجديف فردي بالدمبل على بنش مستوي" },
+        reason: {
+          en: "No chest-supported bench available",
+          ar: "في حال عدم توفر بنش مائل مدعوم بالصدر",
+        },
+        equipment: "Dumbbell & Flat Bench",
+      },
+      {
+        id: "alt-row-cable",
+        name: { en: "Seated Cable Row (Neutral Grip)", ar: "تجديف بالكابل جالس بقبضة محايدة" },
+        reason: {
+          en: "Smooth constant tension",
+          ar: "مقاومة مستمرة وسلسة على عضلات الظهر",
+        },
+        equipment: "Cable Machine",
+      },
+    ],
   },
   {
     id: "ex-lat",
@@ -53,6 +145,27 @@ const PULL: WorkoutExercise[] = [
     sets: 3,
     reps: "10–12",
     restSeconds: 75,
+    equipment: "Lat Pulldown Station",
+    alternatives: [
+      {
+        id: "alt-lat-pullup",
+        name: { en: "Pull-ups (or Band-Assisted)", ar: "عقلة حرة أو عقلة مدعومة برباط مطاطي" },
+        reason: {
+          en: "No lat pulldown machine available",
+          ar: "في حال عدم توفر جهاز سحب الظهر العالي",
+        },
+        equipment: "Pull-up Bar",
+      },
+      {
+        id: "alt-lat-kneeling",
+        name: { en: "Half-Kneeling Single-Arm Cable Pulldown", ar: "سحب كابل فردي في وضع نصف الركوع" },
+        reason: {
+          en: "Better lat isolation and stretch",
+          ar: "عزل أقوى لعضلة المجنص وتمدد ممتاز",
+        },
+        equipment: "Cable Pulley",
+      },
+    ],
   },
   {
     id: "ex-face",
@@ -62,6 +175,18 @@ const PULL: WorkoutExercise[] = [
     restSeconds: 45,
     notes: "External rotation at the end",
     videoContentId: "vid-face",
+    equipment: "Cable Pulley & Rope Attachment",
+    alternatives: [
+      {
+        id: "alt-face-rear",
+        name: { en: "Incline Bench Dumbbell Rear Delt Flyes", ar: "رفرفة كتف خلفي بالدمبلز على بنش مائل" },
+        reason: {
+          en: "Cable pulley station occupied",
+          ar: "عند انشغال أجهزة الكابل",
+        },
+        equipment: "Dumbbells",
+      },
+    ],
   },
 ]
 
@@ -74,6 +199,27 @@ const LEGS: WorkoutExercise[] = [
     reps: "6–8",
     restSeconds: 120,
     videoContentId: "vid-squat",
+    equipment: "Squat Rack & Barbell",
+    alternatives: [
+      {
+        id: "alt-squat-goblet",
+        name: { en: "Heavy Dumbbell Goblet Squat", ar: "سكوات جوبلت بالدمبل الثقيل" },
+        reason: {
+          en: "Squat rack occupied or lower back fatigue",
+          ar: "في حال انشغال راك السكوات أو إجهاد أسفل الظهر",
+        },
+        equipment: "Dumbbell / Kettlebell",
+      },
+      {
+        id: "alt-squat-legpress",
+        name: { en: "45-Degree Leg Press", ar: "جهاز ضغط الأرجل بزاوية 45 درجة" },
+        reason: {
+          en: "High quad load without spinal compression",
+          ar: "حمل عالي على عضلات الفخذ دون ضغط محوري على الظهر",
+        },
+        equipment: "Leg Press Machine",
+      },
+    ],
   },
   {
     id: "ex-rdl",
@@ -81,6 +227,27 @@ const LEGS: WorkoutExercise[] = [
     sets: 3,
     reps: "8",
     restSeconds: 90,
+    equipment: "Barbell",
+    alternatives: [
+      {
+        id: "alt-rdl-db",
+        name: { en: "Dumbbell Romanian Deadlift", ar: "رومانيان ديدليفت بالدمبلز" },
+        reason: {
+          en: "Easier bar path / no barbell available",
+          ar: "في حال عدم توفر بار حر أو لسهولة توجيه الوزن بجانب الساق",
+        },
+        equipment: "Dumbbells",
+      },
+      {
+        id: "alt-rdl-cable",
+        name: { en: "Cable Pull-Through", ar: "تمرين سحب كابل بين الساقين للألوية والخلفيات" },
+        reason: {
+          en: "Safe hip hinge without lower back shear",
+          ar: "حركة مفصلية للألوية والخلفية بأمان تام على الظهر",
+        },
+        equipment: "Low Cable & Rope",
+      },
+    ],
   },
   {
     id: "ex-lunge",
@@ -88,6 +255,18 @@ const LEGS: WorkoutExercise[] = [
     sets: 3,
     reps: "10/leg",
     restSeconds: 60,
+    equipment: "Dumbbells",
+    alternatives: [
+      {
+        id: "alt-lunge-split",
+        name: { en: "Bulgarian Split Squat", ar: "سكوات بلغاري أحادي بالدمبلز" },
+        reason: {
+          en: "Limited gym floor space / knee-friendly",
+          ar: "عند ضيق المساحة في الجيم ولتخفيف الضغط على الركبة",
+        },
+        equipment: "Bench & Dumbbells",
+      },
+    ],
   },
 ]
 

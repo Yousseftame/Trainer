@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react"
 import {
+  Activity,
   Apple,
   BarChart3,
   ClipboardList,
@@ -99,6 +100,12 @@ export const adminNav: NavItem[] = [
     permission: "progress:read",
   },
   {
+    labelKey: "nav.physicalTherapy",
+    to: APP_ROUTES.admin.physicalTherapy,
+    icon: Activity,
+    permission: "physicalTherapy:read",
+  },
+  {
     labelKey: "nav.staff",
     to: APP_ROUTES.admin.staff,
     icon: Shield,
@@ -150,6 +157,7 @@ export const subscriberNav: NavItem[] = [
   },
   { labelKey: "nav.library", to: APP_ROUTES.subscriber.library, icon: Library },
   { labelKey: "nav.progress", to: APP_ROUTES.subscriber.progress, icon: TrendingUp },
+  { labelKey: "nav.physicalTherapy", to: APP_ROUTES.subscriber.physicalTherapy, icon: Activity },
   { labelKey: "nav.history", to: APP_ROUTES.subscriber.history, icon: History },
   { labelKey: "nav.subscription", to: APP_ROUTES.subscriber.subscription, icon: CreditCard },
   { labelKey: "nav.profile", to: APP_ROUTES.subscriber.profile, icon: User },

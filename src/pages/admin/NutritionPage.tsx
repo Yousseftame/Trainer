@@ -11,6 +11,7 @@ import {
   History,
   Pencil,
   Plus,
+  Repeat,
   RotateCcw,
   Search,
   ShieldAlert,
@@ -65,6 +66,7 @@ export function NutritionPage() {
   const [query, setQuery] = useState("")
   const [selectedId, setSelectedId] = useState<string>("")
   const [weekday, setWeekday] = useState(0)
+  const [expandedFoodAltId, setExpandedFoodAltId] = useState<string | null>(null)
 
   // Dialog States
   const [formModal, setFormModal] = useState<{
@@ -229,10 +231,10 @@ export function NutritionPage() {
                     {isAr ? "كل الصيغ" : "All formats"}
                   </option>
                   <option value="interactive">
-                    {t("admin.nutrition.format.interactive")}
+                    {isAr ? "تفاعلي" : "Interactive"}
                   </option>
                   <option value="pdf">
-                    {t("admin.nutrition.format.pdf")}
+                    PDF
                   </option>
                 </select>
                 <ChevronDown className="pointer-events-none absolute end-3 size-4 text-[#8c8c8c]" />
@@ -343,21 +345,11 @@ export function NutritionPage() {
                       {selected.title[locale]}
                     </h2>
                     <StatusBadge
-                      label={t(`admin.nutrition.format.${selected.format}`, {
-                        defaultValue:
-                          selected.format === "pdf"
-                            ? "PDF"
-                            : isAr
-                              ? "تفاعلي"
-                              : "Interactive",
-                      })}
+                      label={selected.format === "pdf" ? "PDF" : (isAr ? "تفاعلي" : "Interactive")}
                       tone={selected.format === "pdf" ? "info" : "success"}
                     />
                     <StatusBadge
-                      label={t("admin.nutrition.version", {
-                        version: selected.version,
-                        defaultValue: `v${selected.version}`,
-                      })}
+                      label={`v${selected.version}`}
                       tone="muted"
                     />
                     {selected.status === "archived" ? (
@@ -366,17 +358,10 @@ export function NutritionPage() {
                   </div>
 
                   <p className="mt-1 text-[13px] font-medium text-[#8c8c8c]">
-                    {t("admin.nutrition.updated", {
-                      date: formatDate(selected.updatedAt, locale),
-                      defaultValue: `${isAr ? "تم التحديث" : "Updated"} ${formatDate(selected.updatedAt, locale)}`,
-                    })}
+                    {`${isAr ? "تم التحديث" : "Updated"} ${formatDate(selected.updatedAt, locale)}`}
                     {selected.subscriberId
                       ? ` · ${isAr ? "مخصص للمشترك: " : "Assigned to: "}${selectedSubscriber?.displayName || selected.subscriberId}`
-                      : ` · ${t("admin.nutrition.reusable", {
-                          defaultValue: isAr
-                            ? "قالب قابل لإعادة الاستخدام — التعيين ينشئ نسخة"
-                            : "Reusable template — assigning creates a copy",
-                        })}`}
+                      : ` · ${isAr ? "قالب قابل لإعادة الاستخدام — التعيين ينشئ نسخة" : "Reusable template — assigning creates a copy"}`}
                   </p>
                 </div>
 
@@ -554,9 +539,7 @@ export function NutritionPage() {
                               active ? "text-white/70" : "text-[#8c8c8c]",
                             )}
                           >
-                            {t(`admin.nutrition.weekdays.${day.weekday}`, {
-                              defaultValue: isAr ? WEEKDAY_NAMES_AR[day.weekday] : WEEKDAY_NAMES_EN[day.weekday],
-                            })}
+                            {isAr ? WEEKDAY_NAMES_AR[day.weekday] : WEEKDAY_NAMES_EN[day.weekday]}
                           </span>
                           <span
                             className={cn(
@@ -583,12 +566,9 @@ export function NutritionPage() {
                     <div className="mb-4 flex items-center justify-between gap-3">
                       <div>
                         <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#063434)]">
-                          {t(`admin.nutrition.weekdays.${selectedDay?.weekday ?? 0}`, {
-                            defaultValue:
-                              isAr
-                                ? WEEKDAY_NAMES_AR[selectedDay?.weekday ?? 0]
-                                : WEEKDAY_NAMES_EN[selectedDay?.weekday ?? 0],
-                          })}
+                          {isAr
+                            ? WEEKDAY_NAMES_AR[selectedDay?.weekday ?? 0]
+                            : WEEKDAY_NAMES_EN[selectedDay?.weekday ?? 0]}
                         </h3>
                         <p className="text-[12px] font-bold text-[#8c8c8c]">
                           {selectedDay?.meals.length ?? 0} {isAr ? "فترات وجبات" : "meal slots"}
@@ -658,6 +638,11 @@ export function NutritionPage() {
                                             {item.calories} kcal
                                           </span>
                                         ) : null}
+                                        {item.percentage ? (
+                                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">
+                                            {item.percentage}% {isAr ? "من الوجبة" : "of meal"}
+                                          </span>
+                                        ) : null}
                                         {item.protein ? (
                                           <span className="text-blue-700">P: {item.protein}g</span>
                                         ) : null}
@@ -673,6 +658,77 @@ export function NutritionPage() {
                                         <p className="text-[11px] leading-relaxed text-[#8c8c8c]">
                                           {notes}
                                         </p>
+                                      ) : null}
+
+                                      {/* Food Alternatives */}
+                                      {item.alternatives && item.alternatives.length > 0 ? (
+                                        <div className="pt-2 border-t border-black/5">
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setExpandedFoodAltId(
+                                                expandedFoodAltId === item.id ? null : item.id,
+                                              )
+                                            }
+                                            className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 hover:text-black transition"
+                                          >
+                                            <Repeat className="size-3 text-emerald-600" />
+                                            <span>
+                                              {isAr
+                                                ? `بدائل الطعام المتاحة (${item.alternatives.length})`
+                                                : `Food Alternatives (${item.alternatives.length})`}
+                                            </span>
+                                            <ChevronDown
+                                              className={cn(
+                                                "size-3 transition-transform",
+                                                expandedFoodAltId === item.id && "rotate-180",
+                                              )}
+                                            />
+                                          </button>
+
+                                          {expandedFoodAltId === item.id ? (
+                                            <div className="mt-2 space-y-2 rounded-xl bg-emerald-50/70 p-2.5 border border-emerald-200/60">
+                                              {item.alternatives.map((alt) => {
+                                                const altName = resolveBilingualText(alt.name, locale)
+                                                const altQty = resolveBilingualText(alt.quantity, locale)
+                                                const altReason = resolveBilingualText(alt.reason, locale)
+                                                return (
+                                                  <div
+                                                    key={alt.id}
+                                                    className="rounded-lg bg-white p-2.5 text-[11px] shadow-2xs border border-emerald-100 flex flex-col gap-1"
+                                                  >
+                                                    <div className="flex items-center justify-between gap-1 font-bold text-[var(--gym-ink,#063434)]">
+                                                      <span>{altName}</span>
+                                                      {altQty ? (
+                                                        <span className="rounded bg-black/5 px-1.5 py-0.5 text-[10px] text-[#555]">
+                                                          {altQty}
+                                                        </span>
+                                                      ) : null}
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 text-[10px] font-bold">
+                                                      {alt.percentage ? (
+                                                        <span className="rounded-full bg-emerald-100 px-1.5 py-0.2 text-emerald-900 font-extrabold">
+                                                          {alt.percentage}% {isAr ? "تطابق" : "match"}
+                                                        </span>
+                                                      ) : null}
+                                                      {alt.calories ? <span>{alt.calories} kcal</span> : null}
+                                                      {alt.protein ? <span className="text-blue-700">P:{alt.protein}g</span> : null}
+                                                      {alt.carbs ? <span className="text-amber-700">C:{alt.carbs}g</span> : null}
+                                                      {alt.fats ? <span className="text-purple-700">F:{alt.fats}g</span> : null}
+                                                    </div>
+
+                                                    {altReason ? (
+                                                      <p className="text-[10px] text-[#666] pt-1 border-t border-black/5">
+                                                        💡 {altReason}
+                                                      </p>
+                                                    ) : null}
+                                                  </div>
+                                                )
+                                              })}
+                                            </div>
+                                          ) : null}
+                                        </div>
                                       ) : null}
                                     </li>
                                   )

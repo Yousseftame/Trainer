@@ -35,6 +35,11 @@ const NutritionLogPage = lazy(() =>
 const ProgressPage = lazy(() =>
   import("@/pages/subscriber/ProgressPage").then((m) => ({ default: m.ProgressPage })),
 )
+const PhysicalTherapyPage = lazy(() =>
+  import("@/pages/subscriber/PhysicalTherapyPage").then((m) => ({
+    default: m.PhysicalTherapyPage,
+  })),
+)
 const HistoryPage = lazy(() =>
   import("@/pages/subscriber/HistoryPage").then((m) => ({ default: m.HistoryPage })),
 )
@@ -45,7 +50,7 @@ export const subscriberRoutes: RouteObject[] = [
     element: <RequireAuth />,
     children: [
       {
-        element: <RequireRole allowed={["subscriber"]} />,
+        element: <RequireRole allowed={["subscriber", "admin"]} />,
         children: [
           {
             element: <SubscriberLayout />,
@@ -78,6 +83,7 @@ export const subscriberRoutes: RouteObject[] = [
                     element: <RequirePackageEntitlement entitlement="progressTracking" />,
                     children: [{ path: "progress", element: <ProgressPage /> }],
                   },
+                  { path: "physical-therapy", element: <PhysicalTherapyPage /> },
                   { path: "history", element: <HistoryPage /> },
                 ],
               },

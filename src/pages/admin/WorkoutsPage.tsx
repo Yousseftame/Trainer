@@ -11,6 +11,7 @@ import {
   Pencil,
   Play,
   Plus,
+  Repeat,
   RotateCcw,
   Search,
   Trash2,
@@ -66,6 +67,7 @@ export function WorkoutsPage() {
   const [query, setQuery] = useState("")
   const [selectedId, setSelectedId] = useState<string>("")
   const [weekday, setWeekday] = useState(0)
+  const [expandedAltId, setExpandedAltId] = useState<string | null>(null)
 
   // Dialog States
   const [formModal, setFormModal] = useState<{
@@ -634,6 +636,69 @@ export function WorkoutsPage() {
                                 <p className="mt-2 text-[12px] font-medium text-[#8c8c8c]">
                                   {exNotes}
                                 </p>
+                              ) : null}
+
+                              {/* Exercise Alternatives Badge & View */}
+                              {exercise.alternatives && exercise.alternatives.length > 0 ? (
+                                <div className="mt-2.5 pt-2 border-t border-black/5">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setExpandedAltId(
+                                        expandedAltId === exercise.id ? null : exercise.id,
+                                      )
+                                    }
+                                    className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-800 hover:text-black transition"
+                                  >
+                                    <Repeat className="size-3 text-amber-600" />
+                                    <span>
+                                      {isAr
+                                        ? `بدائل التمرين المتاحة (${exercise.alternatives.length})`
+                                        : `Exercise Alternatives (${exercise.alternatives.length})`}
+                                    </span>
+                                    <ChevronDown
+                                      className={cn(
+                                        "size-3 transition-transform",
+                                        expandedAltId === exercise.id && "rotate-180",
+                                      )}
+                                    />
+                                  </button>
+
+                                  {expandedAltId === exercise.id ? (
+                                    <div className="mt-2 grid gap-2 sm:grid-cols-2 rounded-xl bg-amber-50/70 p-2.5 border border-amber-200/60">
+                                      {exercise.alternatives.map((alt) => {
+                                        const altName = resolveBilingualText(alt.name, locale)
+                                        const altReason = resolveBilingualText(alt.reason, locale)
+                                        const altNotes = resolveBilingualText(alt.notes, locale)
+                                        return (
+                                          <div
+                                            key={alt.id}
+                                            className="rounded-lg bg-white p-2 text-[11px] shadow-2xs border border-amber-100 flex flex-col justify-between gap-1"
+                                          >
+                                            <div>
+                                              <div className="flex items-center justify-between gap-1 font-bold text-[var(--gym-ink,#063434)]">
+                                                <span>{altName}</span>
+                                                {alt.equipment ? (
+                                                  <span className="rounded bg-black/5 px-1.5 py-0.5 text-[9px] font-semibold text-[#666]">
+                                                    {alt.equipment}
+                                                  </span>
+                                                ) : null}
+                                              </div>
+                                              {altReason ? (
+                                                <p className="mt-0.5 text-[#666]">💡 {altReason}</p>
+                                              ) : null}
+                                            </div>
+                                            {altNotes ? (
+                                              <p className="mt-0.5 text-[#888] italic pt-1 border-t border-black/5">
+                                                {altNotes}
+                                              </p>
+                                            ) : null}
+                                          </div>
+                                        )
+                                      })}
+                                    </div>
+                                  ) : null}
+                                </div>
                               ) : null}
                             </li>
                           )

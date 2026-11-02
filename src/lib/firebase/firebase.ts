@@ -10,7 +10,7 @@ import { getFirestore, type Firestore } from "firebase/firestore"
 import { getStorage, type FirebaseStorage } from "firebase/storage"
 import { getFunctions, type Functions } from "firebase/functions"
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyCr2NgItL0cbP0SBvL7dj_VMeWL-Sf_fDw",
   authDomain: "trainer-d4699.firebaseapp.com",
   projectId: "trainer-d4699",

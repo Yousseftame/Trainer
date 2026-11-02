@@ -5,6 +5,15 @@ export type BilingualText = {
   ar: string
 }
 
+export type ExerciseAlternative = {
+  id: string
+  name: string | BilingualText
+  reason?: string | BilingualText
+  equipment?: string
+  notes?: string | BilingualText
+  videoContentId?: string
+}
+
 export type WorkoutExercise = {
   id: string
   name: string | BilingualText
@@ -18,6 +27,8 @@ export type WorkoutExercise = {
   /** Cached video title or metadata for fast rendering */
   videoTitle?: string | BilingualText
   equipment?: string
+  /** Alternative exercises if subscriber lacks equipment or has limitations */
+  alternatives?: ExerciseAlternative[]
 }
 
 export type WorkoutDay = {
@@ -53,15 +64,32 @@ export type WorkoutProgram = {
 export type WorkoutTemplate = WorkoutProgram
 export type WorkoutAssignment = WorkoutProgram
 
+export type MealAlternative = {
+  id: string
+  name: string | BilingualText
+  quantity?: string | BilingualText
+  notes?: string | BilingualText
+  percentage?: number
+  calories?: number
+  protein?: number
+  carbs?: number
+  fats?: number
+  reason?: string | BilingualText
+}
+
 export type MealItem = {
   id: string
   name: string | BilingualText
   quantity?: string | BilingualText
   notes?: string | BilingualText
+  /** Calorie contribution percentage within the meal slot */
+  percentage?: number
   calories?: number
   protein?: number
   carbs?: number
   fats?: number
+  /** Alternative food choices with matching macronutrients */
+  alternatives?: MealAlternative[]
 }
 
 export type MealSlotKey =

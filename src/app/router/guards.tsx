@@ -29,27 +29,36 @@ type RequireRoleProps = {
 }
 
 export function RequireRole({ allowed }: RequireRoleProps) {
-  const { isAdmin, isSubscriber, user } = useAuth()
-  if (!hasLiveFirebaseSession()) {
+  const { isAdmin, isSubscriber, user, status } = useAuth()
+  const live = hasLiveFirebaseSession()
+
+  if (status === "loading" || status === "idle") {
+    return <FullPageSpinner />
+  }
+
+  if (!live || !user || status !== "authenticated") {
     return <Navigate to={APP_ROUTES.public.login} replace />
   }
 
+  // Admins are allowed to preview subscriber routes as well
   const ok =
-    (allowed.includes("admin") && isAdmin) || (allowed.includes("subscriber") && isSubscriber)
+    (allowed.includes("admin") && isAdmin) ||
+    (allowed.includes("subscriber") && (isSubscriber || isAdmin))
 
-  if (!ok || !user) {
-    if (isAdmin && allowed.includes("subscriber")) {
-      return <Navigate to={APP_ROUTES.admin.root} replace />
+  if (!ok) {
+    // If a subscriber hits an admin-only route, redirect to subscriber dashboard
+    if (isSubscriber) {
+      return <Navigate to={APP_ROUTES.subscriber.root} replace />
     }
-    return <Navigate to={APP_ROUTES.errors.unauthorized} replace />
+    return <Navigate to={APP_ROUTES.admin.root} replace />
   }
 
   return <Outlet />
 }
 
-/** Login / forgot-password: signed-in users go to the admin panel. */
+/** Login / forgot-password: signed-in users go to their appropriate panel based on role. */
 export function RequireGuest() {
-  const { status, user } = useAuth()
+  const { status, user, isAdmin, isSubscriber } = useAuth()
   const live = hasLiveFirebaseSession()
 
   if (status === "loading" || status === "idle") {
@@ -57,6 +66,9 @@ export function RequireGuest() {
   }
 
   if (status === "authenticated" && user && live) {
+    if (isSubscriber && !isAdmin) {
+      return <Navigate to={APP_ROUTES.subscriber.root} replace />
+    }
     return <Navigate to={APP_ROUTES.admin.root} replace />
   }
 
@@ -68,9 +80,14 @@ type RequirePermissionProps = {
 }
 
 export function RequirePermission({ permission }: RequirePermissionProps) {
-  const { hasPermission } = useAuth()
+  const { hasPermission, isSubscriber, isAdmin } = useAuth()
   if (!hasLiveFirebaseSession()) {
     return <Navigate to={APP_ROUTES.public.login} replace />
+  }
+
+  // If a subscriber ends up on an admin permission gate, guide to subscriber dashboard
+  if (isSubscriber && !isAdmin) {
+    return <Navigate to={APP_ROUTES.subscriber.root} replace />
   }
 
   if (!hasPermission(permission)) {
@@ -117,11 +134,13 @@ export function RequirePackageEntitlement({
     return <Navigate to={APP_ROUTES.errors.subscriptionExpired} replace />
   }
 
-  const sub = currentSubscriptionFor(user.uid)
+  const sub =
+    currentSubscriptionFor(user.uid) ||
+    (user.email ? currentSubscriptionFor(user.email) : null)
   const pkg = getPackageById(sub?.packageId)
 
   if (!canAccessPackageEntitlement(sub, pkg, entitlement)) {
-    return <Navigate to={APP_ROUTES.errors.unauthorized} replace />
+    return <Navigate to={APP_ROUTES.subscriber.subscription} replace />
   }
 
   return <Outlet />

@@ -9,6 +9,7 @@ import {
   Dumbbell,
   Languages,
   Mail,
+  Pencil,
   Phone,
   Ruler,
   Scale,
@@ -51,6 +52,7 @@ import {
 import {
   useSaveSubscriberMutation,
   useSubscribersQuery,
+  useUpdateSubscriberCoachNotesMutation,
   useUpdateSubscriberStatusMutation,
 } from "@/features/subscribers/hooks"
 import {
@@ -102,9 +104,14 @@ export function SubscriberDetailPage() {
   const updateStatusMutation = useUpdateSubscriberStatusMutation()
   const assignMutation = useAssignSubscriptionMutation()
   const lifecycleMutation = useUpdateSubscriptionLifecycleMutation()
+  const updateCoachNotesMutation = useUpdateSubscriberCoachNotesMutation()
   const [editProfileOpen, setEditProfileOpen] = useState(false)
   const [subDialogState, setSubDialogState] =
     useState<SubscriptionDialogState | null>(null)
+
+  const [editingNotes, setEditingNotes] = useState(false)
+  const [noteEn, setNoteEn] = useState("")
+  const [noteAr, setNoteAr] = useState("")
 
   const packageMap = useMemo(
     () => new Map(allPackages.map((p) => [p.id, p])),
@@ -478,17 +485,101 @@ export function SubscriberDetailPage() {
         </section>
       </div>
 
-      {subscriber.coachNotes ? (
-        <section className="rounded-[24px] bg-white p-5 sm:p-7">
+      {/* Coach Notes Card - Always available for every subscriber */}
+      <section className="rounded-[24px] bg-white p-5 sm:p-7 shadow-xs">
+        <div className="flex items-center justify-between gap-3">
           <h3 className="inline-flex items-center gap-2 font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
-            <StickyNote className="size-4" strokeWidth={1.8} />
+            <StickyNote className="size-4 text-[var(--gym-ink,#063434)]" strokeWidth={1.8} />
             {t("admin.subscribers.coachNotes")}
           </h3>
+          {!editingNotes ? (
+            <button
+              type="button"
+              onClick={() => {
+                setNoteEn(subscriber.coachNotes?.en || "")
+                setNoteAr(subscriber.coachNotes?.ar || subscriber.coachNotes?.en || "")
+                setEditingNotes(true)
+              }}
+              className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[var(--gym-ink,#063434)] hover:underline"
+            >
+              <Pencil className="size-3.5" />
+              {subscriber.coachNotes ? (locale === "ar" ? "تعديل الملاحظة" : "Edit note") : (locale === "ar" ? "+ إضافة ملاحظة" : "+ Add note")}
+            </button>
+          ) : null}
+        </div>
+
+        {editingNotes ? (
+          <div className="mt-4 flex flex-col gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-[11px] font-bold text-[#8c8c8c]">
+                  {locale === "ar" ? "الملاحظة (إنجليزي)" : "Coach Note (EN)"}
+                </label>
+                <textarea
+                  value={noteEn}
+                  onChange={(e) => setNoteEn(e.target.value)}
+                  rows={3}
+                  placeholder="Private training remarks, progression limits, biomechanics..."
+                  className="w-full rounded-xl border border-black/10 bg-[#F8F8F8] p-3 text-[13px] font-medium outline-none focus:border-[var(--gym-ink,#063434)]"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-bold text-[#8c8c8c]">
+                  {locale === "ar" ? "الملاحظة (عربي)" : "Coach Note (AR)"}
+                </label>
+                <textarea
+                  value={noteAr}
+                  onChange={(e) => setNoteAr(e.target.value)}
+                  rows={3}
+                  placeholder="ملاحظات تدريبية خاصة، توجيهات أوزان، قيود حركية..."
+                  className="w-full rounded-xl border border-black/10 bg-[#F8F8F8] p-3 text-[13px] font-medium outline-none focus:border-[var(--gym-ink,#063434)]"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setEditingNotes(false)}
+                className="h-9 rounded-full px-4 text-[12px] font-bold text-[#8c8c8c] hover:bg-black/5"
+              >
+                {locale === "ar" ? "إلغاء" : "Cancel"}
+              </button>
+              <button
+                type="button"
+                disabled={updateCoachNotesMutation.isPending}
+                onClick={async () => {
+                  await updateCoachNotesMutation.mutateAsync({
+                    subscriberId: subscriber.id,
+                    coachNotes: { en: noteEn, ar: noteAr },
+                  })
+                  setEditingNotes(false)
+                  appToast.success(locale === "ar" ? "تم حفظ ملاحظات المدرب بنجاح" : "Coach notes updated successfully")
+                }}
+                className="inline-flex h-9 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] px-5 text-[12px] font-bold text-white transition hover:opacity-95 disabled:opacity-50"
+              >
+                {updateCoachNotesMutation.isPending
+                  ? locale === "ar"
+                    ? "جارٍ الحفظ..."
+                    : "Saving..."
+                  : locale === "ar"
+                    ? "حفظ الملاحظة"
+                    : "Save Note"}
+              </button>
+            </div>
+          </div>
+        ) : subscriber.coachNotes?.[locale] || subscriber.coachNotes?.en ? (
           <p className="mt-3 text-[14px] font-medium leading-relaxed text-[var(--gym-ink,#111111)]">
-            {subscriber.coachNotes[locale]}
+            {subscriber.coachNotes[locale] || subscriber.coachNotes.en}
           </p>
-        </section>
-      ) : null}
+        ) : (
+          <p className="mt-3 text-[13px] font-medium text-[#8c8c8c]">
+            {locale === "ar"
+              ? "لا توجد ملاحظات تدريبية مسجلة لهذا المشترك حتى الآن. اضغط \"+ إضافة ملاحظة\" لتدوين الملاحظات الفنية الخاصة."
+              : "No coach notes recorded for this subscriber yet. Click \"+ Add note\" to document technical cues, limits, or observations."}
+          </p>
+        )}
+      </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <ProgramCard

@@ -16,27 +16,38 @@ import {
   Activity,
   AlertTriangle,
   Apple,
+  ArrowLeftRight,
   Camera,
   ChevronDown,
   Dumbbell,
+  Plus,
   Scale,
   Search,
   ShieldCheck,
 } from "lucide-react"
+import { AddProgressPhotoDialog } from "@/components/dashboard/AddProgressPhotoDialog"
+import { LogMeasurementDialog } from "@/components/dashboard/LogMeasurementDialog"
+import { LogPerformanceDialog } from "@/components/dashboard/LogPerformanceDialog"
+import { PhotoComparisonDialog } from "@/components/dashboard/PhotoComparisonDialog"
 import { FilterChip, StatCard } from "@/components/dashboard/StatCard"
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
 import { APP_ROUTES } from "@/config/constants"
 import {
+  useMeasurementsQuery,
+  usePerformanceQuery,
+  usePhotosQuery,
+  useSaveMeasurementMutation,
+  useSavePerformanceMutation,
+  useSavePhotoMutation,
+} from "@/features/progress/hooks"
+import {
   adherenceFor,
   daysSinceCheckIn,
-  firstMeasurement,
-  latestMeasurement,
   latestWeek,
   liftSeries,
   liftsFor,
   measurementsFor,
   photosFor,
-  previousMeasurement,
   programsFor,
   progressRoster,
   progressStats,
@@ -49,7 +60,7 @@ import { useLocale } from "@/hooks/useLocale"
 import { formatChartDate, formatDate, formatKg, initials } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { AppLocale } from "@/i18n/rtl"
-import type { BodyMeasurement, ProgressPhoto } from "@/types/progress"
+import type { BodyMeasurement, PerformanceRecord, ProgressPhoto } from "@/types/progress"
 
 type ReviewTab = "overview" | "body" | "photos" | "performance" | "history"
 
@@ -83,7 +94,23 @@ function weightDomain(values: number[]): [number, number] {
 export function ProgressPage() {
   const { t } = useTranslation()
   const { locale } = useLocale()
+  const isAr = locale === "ar"
   useDocumentTitle(t("nav.progress"))
+
+  // Real-time Queries & Mutations
+  const { data: allMeasurements = [] } = useMeasurementsQuery()
+  const { data: allPhotos = [] } = usePhotosQuery()
+  const { data: allLifts = [] } = usePerformanceQuery()
+
+  const saveMeasurementMutation = useSaveMeasurementMutation()
+  const savePhotoMutation = useSavePhotoMutation()
+  const savePerformanceMutation = useSavePerformanceMutation()
+
+  // Dialog States
+  const [measurementModalOpen, setMeasurementModalOpen] = useState(false)
+  const [photoModalOpen, setPhotoModalOpen] = useState(false)
+  const [performanceModalOpen, setPerformanceModalOpen] = useState(false)
+  const [compareModalOpen, setCompareModalOpen] = useState(false)
 
   const [filter, setFilter] = useState<ProgressFilter>("all")
   const [query, setQuery] = useState("")
@@ -117,6 +144,24 @@ export function ProgressPage() {
 
   const selected = list.find((item) => item.subscriber.id === selectedId) ?? list[0]
   const stats = useMemo(() => progressStats(roster), [roster])
+
+  // Filter live data for the currently selected subscriber
+  const selectedMeasurements = useMemo(() => {
+    if (!selected) return []
+    const live = allMeasurements.filter((m) => m.subscriberId === selected.subscriber.id)
+    return live.length ? live : measurementsFor(selected.subscriber.id)
+  }, [allMeasurements, selected])
+
+  const selectedPhotos = useMemo(() => {
+    if (!selected) return []
+    const live = allPhotos.filter((p) => p.subscriberId === selected.subscriber.id)
+    return live.length ? live : photosFor(selected.subscriber.id)
+  }, [allPhotos, selected])
+
+  const selectedLifts = useMemo(() => {
+    if (!selected) return []
+    return allLifts.filter((l) => l.subscriberId === selected.subscriber.id)
+  }, [allLifts, selected])
 
   function pickFilter(next: ProgressFilter) {
     setFilter(next)
@@ -156,7 +201,53 @@ export function ProgressPage() {
       </div>
 
       <section className="rounded-[24px] bg-white p-3.5 sm:p-6 lg:p-7">
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3.5">
+          {/* Top row: Search input + Actions */}
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <label className="relative w-full sm:max-w-[340px]">
+              <Search className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-[#8c8c8c]" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={t("admin.progress.search")}
+                className="h-11 w-full rounded-full bg-[#F4F4F4] pe-4 ps-10 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none placeholder:font-normal placeholder:text-[#8c8c8c]"
+              />
+            </label>
+
+            {/* Quick action buttons */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+              <button
+                type="button"
+                onClick={() => setMeasurementModalOpen(true)}
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#063434)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
+              >
+                <Plus className="size-4" strokeWidth={2} />
+                <span>{isAr ? "تسجيل قياسات" : "Log Check-in"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPhotoModalOpen(true)}
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[#F4F4F4] px-4 text-[13px] font-bold text-[var(--gym-ink,#063434)] transition hover:bg-black/5"
+              >
+                <Camera className="size-4" />
+                <span>{isAr ? "إضافة صورة" : "Add Photo"}</span>
+              </button>
+
+              {selectedPhotos.length >= 2 ? (
+                <button
+                  type="button"
+                  onClick={() => setCompareModalOpen(true)}
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[#F4F4F4] px-4 text-[13px] font-bold text-[var(--gym-ink,#063434)] transition hover:bg-black/5"
+                >
+                  <ArrowLeftRight className="size-4" />
+                  <span>{isAr ? "مقارنة الصور" : "Compare"}</span>
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Filter Chips */}
           <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {FILTERS.map((item) => (
               <FilterChip key={item} active={filter === item} onClick={() => pickFilter(item)}>
@@ -164,15 +255,6 @@ export function ProgressPage() {
               </FilterChip>
             ))}
           </div>
-          <label className="relative min-w-0 sm:max-w-[320px]">
-            <Search className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-[#8c8c8c]" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={t("admin.progress.search")}
-              className="h-11 w-full rounded-full bg-[#F4F4F4] pe-4 ps-10 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none placeholder:font-normal placeholder:text-[#8c8c8c]"
-            />
-          </label>
         </div>
 
         {list.length === 0 || !selected ? (
@@ -196,10 +278,64 @@ export function ProgressPage() {
               ))}
             </div>
 
-            <ReviewPanel person={selected} tab={tab} onTab={setTab} locale={locale} />
+            <ReviewPanel
+              person={selected}
+              tab={tab}
+              onTab={setTab}
+              locale={locale}
+              liveMeasurements={selectedMeasurements}
+              livePhotos={selectedPhotos}
+              liveLifts={selectedLifts}
+              onOpenMeasurementModal={() => setMeasurementModalOpen(true)}
+              onOpenPhotoModal={() => setPhotoModalOpen(true)}
+              onOpenPerformanceModal={() => setPerformanceModalOpen(true)}
+              onOpenCompareModal={() => setCompareModalOpen(true)}
+            />
           </div>
         )}
       </section>
+
+      {/* Dialog Modals */}
+      {selected ? (
+        <>
+          <LogMeasurementDialog
+            open={measurementModalOpen}
+            subscriberId={selected.subscriber.id}
+            subscriberName={selected.subscriber.displayName}
+            onClose={() => setMeasurementModalOpen(false)}
+            onSave={async (input) => {
+              await saveMeasurementMutation.mutateAsync(input)
+            }}
+          />
+
+          <AddProgressPhotoDialog
+            open={photoModalOpen}
+            subscriberId={selected.subscriber.id}
+            subscriberName={selected.subscriber.displayName}
+            onClose={() => setPhotoModalOpen(false)}
+            onSave={async (input) => {
+              await savePhotoMutation.mutateAsync(input)
+            }}
+          />
+
+          <LogPerformanceDialog
+            open={performanceModalOpen}
+            subscriberId={selected.subscriber.id}
+            subscriberName={selected.subscriber.displayName}
+            onClose={() => setPerformanceModalOpen(false)}
+            onSave={async (input) => {
+              await savePerformanceMutation.mutateAsync(input)
+            }}
+          />
+
+          <PhotoComparisonDialog
+            open={compareModalOpen}
+            photos={selectedPhotos}
+            subscriberName={selected.subscriber.displayName}
+            onClose={() => setCompareModalOpen(false)}
+          />
+        </>
+      ) : null}
     </div>
   )
 }
@@ -340,25 +476,66 @@ function ReviewPanel({
   tab,
   onTab,
   locale,
+  liveMeasurements,
+  livePhotos,
+  liveLifts,
+  onOpenMeasurementModal,
+  onOpenPhotoModal,
+  onOpenPerformanceModal,
+  onOpenCompareModal,
 }: {
   person: RosterPerson
   tab: ReviewTab
   onTab: (tab: ReviewTab) => void
   locale: AppLocale
+  liveMeasurements?: BodyMeasurement[]
+  livePhotos?: ProgressPhoto[]
+  liveLifts?: PerformanceRecord[]
+  onOpenMeasurementModal: () => void
+  onOpenPhotoModal: () => void
+  onOpenPerformanceModal: () => void
+  onOpenCompareModal: () => void
 }) {
   const { t } = useTranslation()
   const { subscriber } = person
   const subscription = currentSubscriptionFor(subscriber.id)
   const pkg = getPackageById(subscription?.packageId)
   const days = daysSinceCheckIn(subscriber.id)
-  const measurements = measurementsFor(subscriber.id)
-  const photos = photosFor(subscriber.id)
+
+  const measurements =
+    liveMeasurements && liveMeasurements.length ? liveMeasurements : measurementsFor(subscriber.id)
+  const photos =
+    livePhotos && livePhotos.length ? livePhotos : photosFor(subscriber.id)
   const programs = programsFor(subscriber.id)
   const week = latestWeek(subscriber.id)
-  const lifts = liftSeries(subscriber.id)
-  const first = firstMeasurement(subscriber.id)
-  const previous = previousMeasurement(subscriber.id)
-  const latest = latestMeasurement(subscriber.id)
+
+  const lifts = useMemo(() => {
+    if (liveLifts && liveLifts.length) {
+      const grouped = new Map<string, PerformanceRecord[]>()
+      for (const record of liveLifts) {
+        const list = grouped.get(record.name) ?? []
+        list.push(record)
+        grouped.set(record.name, list)
+      }
+      return [...grouped.entries()].map(([name, records]) => {
+        const first = records[0]
+        const latest = records[records.length - 1]
+        return {
+          name,
+          records,
+          first: first.value,
+          latest: latest.value,
+          delta: Math.round((latest.value - first.value) * 10) / 10,
+          unit: latest.unit,
+        }
+      })
+    }
+    return liftSeries(subscriber.id)
+  }, [liveLifts, subscriber.id])
+
+  const first = measurements[0]
+  const previous = measurements.length >= 2 ? measurements[measurements.length - 2] : undefined
+  const latest = measurements[measurements.length - 1]
 
   return (
     <div className="min-w-0 rounded-[22px] bg-[#F4F4F4] p-3.5 sm:p-5">
@@ -372,20 +549,22 @@ function ReviewPanel({
             {pkg ? <StatusBadge label={pkg.name[locale]} tone="info" /> : null}
           </div>
           <p className="mt-1 text-[12px] font-medium text-[#8c8c8c] sm:text-[13px]">
-            {person.lastCheckIn
+            {latest?.recordedAt
               ? t("admin.progress.lastCheckIn", {
-                  date: formatDate(person.lastCheckIn, locale),
+                  date: formatDate(latest.recordedAt, locale),
                   days: days ?? 0,
                 })
               : t("admin.progress.noLogs")}
           </p>
         </div>
-        <Link
-          to={APP_ROUTES.admin.subscriberDetail(subscriber.id)}
-          className="inline-flex h-9 shrink-0 items-center rounded-full bg-white px-3.5 text-[12px] font-bold text-[var(--gym-ink,#063434)]"
-        >
-          {t("admin.progress.profile")}
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            to={APP_ROUTES.admin.subscriberDetail(subscriber.id)}
+            className="inline-flex h-9 shrink-0 items-center rounded-full bg-white px-3.5 text-[12px] font-bold text-[var(--gym-ink,#063434)] shadow-2xs hover:bg-[#ececec]"
+          >
+            {t("admin.progress.profile")}
+          </Link>
+        </div>
       </div>
 
       <p className="mt-3 flex items-start gap-2 text-[12px] font-medium leading-relaxed text-[#6B7280]">
@@ -414,10 +593,27 @@ function ReviewPanel({
             locale={locale}
           />
         ) : null}
-        {tab === "body" ? <BodyTab measurements={measurements} locale={locale} /> : null}
-        {tab === "photos" ? <PhotosTab photos={photos} /> : null}
+        {tab === "body" ? (
+          <BodyTab
+            measurements={measurements}
+            locale={locale}
+            onAddMeasurement={onOpenMeasurementModal}
+          />
+        ) : null}
+        {tab === "photos" ? (
+          <PhotosTab
+            photos={photos}
+            onAddPhoto={onOpenPhotoModal}
+            onCompare={onOpenCompareModal}
+          />
+        ) : null}
         {tab === "performance" ? (
-          <PerformanceTab subscriberId={subscriber.id} lifts={lifts} locale={locale} />
+          <PerformanceTab
+            subscriberId={subscriber.id}
+            lifts={lifts}
+            locale={locale}
+            onAddLift={onOpenPerformanceModal}
+          />
         ) : null}
         {tab === "history" ? <HistoryTab programs={programs} locale={locale} /> : null}
       </div>
@@ -579,8 +775,17 @@ function OverviewTab({
   )
 }
 
-function BodyTab({ measurements, locale }: { measurements: BodyMeasurement[]; locale: AppLocale }) {
+function BodyTab({
+  measurements,
+  locale,
+  onAddMeasurement,
+}: {
+  measurements: BodyMeasurement[]
+  locale: AppLocale
+  onAddMeasurement?: () => void
+}) {
   const { t } = useTranslation()
+  const isAr = locale === "ar"
   if (!measurements.length) return <EmptyNote>{t("admin.progress.emptyBody")}</EmptyNote>
   const latest = measurements[measurements.length - 1]
   const first = measurements[0]
@@ -631,9 +836,21 @@ function BodyTab({ measurements, locale }: { measurements: BodyMeasurement[]; lo
         ) : null}
       </div>
       <Panel>
-        <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#8c8c8c]">
-          {t("admin.progress.measurements")}
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#8c8c8c]">
+            {t("admin.progress.measurements")}
+          </p>
+          {onAddMeasurement ? (
+            <button
+              type="button"
+              onClick={onAddMeasurement}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--gym-ink,#063434)] px-3.5 text-[11px] font-bold text-white transition hover:opacity-90"
+            >
+              <Plus className="size-3.5" />
+              <span>{isAr ? "تسجيل قياسات جديدة" : "Log Measurement"}</span>
+            </button>
+          ) : null}
+        </div>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[720px] text-start text-[12px] sm:text-[13px]">
             <thead>
@@ -673,8 +890,18 @@ function BodyTab({ measurements, locale }: { measurements: BodyMeasurement[]; lo
   )
 }
 
-function PhotosTab({ photos }: { photos: ProgressPhoto[] }) {
+function PhotosTab({
+  photos,
+  onAddPhoto,
+  onCompare,
+}: {
+  photos: ProgressPhoto[]
+  onAddPhoto?: () => void
+  onCompare?: () => void
+}) {
   const { t } = useTranslation()
+  const { locale } = useLocale()
+  const isAr = locale === "ar"
   if (!photos.length) return <EmptyNote>{t("admin.progress.emptyPhotos")}</EmptyNote>
 
   const firstDate = photos[0]?.takenAt
@@ -684,6 +911,35 @@ function PhotosTab({ photos }: { photos: ProgressPhoto[] }) {
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Header controls inside tab */}
+      <div className="flex items-center justify-between rounded-[18px] bg-white px-4 py-3">
+        <p className="text-[12px] font-bold text-[#8c8c8c]">
+          {photos.length} {isAr ? "صور مسجلة في هذا الملف" : "photos on this profile"}
+        </p>
+        <div className="flex items-center gap-2">
+          {photos.length >= 2 && onCompare ? (
+            <button
+              type="button"
+              onClick={onCompare}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[#F4F4F4] px-3.5 text-[11px] font-bold text-[var(--gym-ink,#063434)] hover:bg-[#ececec]"
+            >
+              <ArrowLeftRight className="size-3.5" />
+              <span>{isAr ? "مقارنة جنباً إلى جنب" : "Side-by-Side"}</span>
+            </button>
+          ) : null}
+          {onAddPhoto ? (
+            <button
+              type="button"
+              onClick={onAddPhoto}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--gym-ink,#063434)] px-3.5 text-[11px] font-bold text-white hover:opacity-90"
+            >
+              <Plus className="size-3.5" />
+              <span>{isAr ? "إضافة صورة" : "Add Photo"}</span>
+            </button>
+          ) : null}
+        </div>
+      </div>
+
       {latest.length ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Panel>
@@ -726,12 +982,15 @@ function PerformanceTab({
   subscriberId,
   lifts,
   locale,
+  onAddLift,
 }: {
   subscriberId: string
   lifts: ReturnType<typeof liftSeries>
   locale: AppLocale
+  onAddLift?: () => void
 }) {
   const { t } = useTranslation()
+  const isAr = locale === "ar"
   const weeks = adherenceFor(subscriberId)
   const log = [...liftsFor(subscriberId)].reverse()
   const hasWorkout = weeks.some((week) => week.workoutTotal > 0)
@@ -742,12 +1001,24 @@ function PerformanceTab({
     nutrition: week.nutritionTotal ? percent(week.nutritionDone, week.nutritionTotal) : null,
   }))
 
-  if (!lifts.length && !weeks.length) {
-    return <EmptyNote>{t("admin.progress.emptyPerformance")}</EmptyNote>
-  }
-
   return (
     <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between rounded-[18px] bg-white px-4 py-3">
+        <p className="text-[12px] font-bold text-[#8c8c8c]">
+          {isAr ? "الأرقام القياسية والتطور الرياضي" : "Athletic Performance & PR Records"}
+        </p>
+        {onAddLift ? (
+          <button
+            type="button"
+            onClick={onAddLift}
+            className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--gym-ink,#063434)] px-3.5 text-[11px] font-bold text-white hover:opacity-90"
+          >
+            <Plus className="size-3.5" />
+            <span>{isAr ? "تسجيل رقم جديد" : "Log PR"}</span>
+          </button>
+        ) : null}
+      </div>
+
       {lifts.length ? (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {lifts.map((item) => (
@@ -756,7 +1027,7 @@ function PerformanceTab({
               <p className="mt-1 font-heading text-[22px] font-extrabold text-[var(--gym-ink,#063434)]">
                 {item.latest} {item.unit}
               </p>
-              <p className="mt-1 text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+              <p className="mt-1 text-[12px] font-bold text-emerald-600">
                 {signed(item.delta)} {item.unit}
               </p>
             </div>
@@ -1064,17 +1335,32 @@ function DeltaStat({
 function PhotoCard({ photo }: { photo: ProgressPhoto }) {
   const { t } = useTranslation()
   const { locale } = useLocale()
+  const hasImage = photo.storagePath?.startsWith("data:") || photo.storagePath?.startsWith("http")
+
   return (
-    <figure className="h-fit overflow-hidden rounded-[16px] bg-[var(--gym-ink,#063434)]">
-      <div className="relative flex aspect-[3/4] items-center justify-center">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(184,254,34,0.22),transparent_45%)]" />
-        <span className="relative font-heading text-[22px] font-extrabold text-white/80">
-          {photo.pose ? t(`admin.progress.pose.${photo.pose}`) : "•"}
+    <figure className="h-fit overflow-hidden rounded-[16px] bg-[var(--gym-ink,#063434)] text-white shadow-2xs">
+      <div className="relative flex aspect-[3/4] items-center justify-center overflow-hidden bg-black/40">
+        {hasImage ? (
+          <img
+            src={photo.storagePath}
+            alt={photo.caption || "Progress photo"}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="relative flex size-full items-center justify-center">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(184,254,34,0.22),transparent_45%)]" />
+            <span className="relative font-heading text-[22px] font-extrabold text-white/80">
+              {photo.pose ? t(`admin.progress.pose.${photo.pose}`) : "•"}
+            </span>
+          </div>
+        )}
+        <span className="absolute bottom-2 start-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-bold uppercase backdrop-blur-xs">
+          {photo.pose ? t(`admin.progress.pose.${photo.pose}`) : "Photo"}
         </span>
       </div>
       <figcaption className="px-2.5 py-2 text-[11px] font-bold text-white/80">
         <span className="block">{formatDate(photo.takenAt, locale)}</span>
-        {photo.caption ? <span className="mt-0.5 block font-medium text-white/55">{photo.caption}</span> : null}
+        {photo.caption ? <span className="mt-0.5 block truncate font-medium text-white/55">{photo.caption}</span> : null}
       </figcaption>
     </figure>
   )

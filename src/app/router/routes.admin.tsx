@@ -35,6 +35,11 @@ const ContentLibraryPage = lazy(() =>
 const ProgressPage = lazy(() =>
   import("@/pages/admin/ProgressPage").then((m) => ({ default: m.ProgressPage })),
 )
+const PhysicalTherapyPage = lazy(() =>
+  import("@/pages/admin/PhysicalTherapyPage").then((m) => ({
+    default: m.PhysicalTherapyPage,
+  })),
+)
 const StaffPage = lazy(() =>
   import("@/pages/admin/StaffPage").then((m) => ({ default: m.StaffPage })),
 )
@@ -93,6 +98,10 @@ export const adminRoutes: RouteObject[] = [
               {
                 element: <RequirePermission permission="progress:read" />,
                 children: [{ path: "progress", element: <ProgressPage /> }],
+              },
+              {
+                element: <RequirePermission permission="physicalTherapy:read" />,
+                children: [{ path: "physical-therapy", element: <PhysicalTherapyPage /> }],
               },
               {
                 element: <RequirePermission permission="staff:manage" />,

@@ -178,16 +178,48 @@ export const DEMO_SUBSCRIBERS: DemoSubscriber[] = [
   },
 ]
 
-export function getSubscriberById(id: string) {
-  return DEMO_SUBSCRIBERS.find((item) => item.id === id)
+function readCachedSubscribers(): DemoSubscriber[] {
+  if (typeof window === "undefined" || !window.localStorage) return []
+  try {
+    const raw =
+      window.localStorage.getItem("derpyfit_subscribers_v1") ||
+      window.localStorage.getItem("derpyfit_subscribers_cache")
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed as DemoSubscriber[]
+    }
+  } catch (err) {
+    console.warn("Could not read subscribers from localStorage:", err)
+  }
+  return []
 }
 
-export function getSubscriberByEmail(email: string) {
+export function getSubscriberById(id: string): DemoSubscriber | undefined {
+  const fromMemory = DEMO_SUBSCRIBERS.find((item) => item.id === id)
+  if (fromMemory) return fromMemory
+  const cached = readCachedSubscribers()
+  const found = cached.find((item) => item.id === id)
+  if (found && !DEMO_SUBSCRIBERS.some((s) => s.id === found.id)) {
+    DEMO_SUBSCRIBERS.unshift(found)
+  }
+  return found
+}
+
+export function getSubscriberByEmail(email: string): DemoSubscriber | undefined {
   const normalized = email.trim().toLowerCase()
   if (!normalized) return undefined
-  return DEMO_SUBSCRIBERS.find(
+  const fromMemory = DEMO_SUBSCRIBERS.find(
     (item) => item.email.trim().toLowerCase() === normalized,
   )
+  if (fromMemory) return fromMemory
+  const cached = readCachedSubscribers()
+  const found = cached.find(
+    (item) => item.email.trim().toLowerCase() === normalized,
+  )
+  if (found && !DEMO_SUBSCRIBERS.some((s) => s.id === found.id)) {
+    DEMO_SUBSCRIBERS.unshift(found)
+  }
+  return found
 }
 
 export function subscriberRow(subscriber: DemoSubscriber) {

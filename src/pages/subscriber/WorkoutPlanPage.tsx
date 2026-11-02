@@ -3,9 +3,11 @@ import { useTranslation } from "react-i18next"
 import {
   Check,
   CheckCircle2,
+  ChevronDown,
   Dumbbell,
   FileText,
   Play,
+  Repeat,
 } from "lucide-react"
 import { ContentPreviewDialog } from "@/components/dashboard/ContentPreviewDialog"
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
@@ -68,6 +70,7 @@ export function WorkoutPlanPage() {
   const [weekday, setWeekday] = useState(0)
   const [previewAsset, setPreviewAsset] = useState<ContentAsset | null>(null)
   const [logging, setLogging] = useState(false)
+  const [expandedAlternatives, setExpandedAlternatives] = useState<Record<string, boolean>>({})
 
   const selectedDay =
     activeProgram?.days.find((d) => d.weekday === weekday) ??
@@ -328,6 +331,79 @@ export function WorkoutPlanPage() {
                             <p className="text-[12px] font-medium text-[#8c8c8c]">
                               {notes}
                             </p>
+                          ) : null}
+
+                          {/* Exercise Alternatives (بدائل التمرين) */}
+                          {exercise.alternatives && exercise.alternatives.length > 0 ? (
+                            <div className="mt-2 pt-2 border-t border-[#ECECEC]">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setExpandedAlternatives((prev) => ({
+                                    ...prev,
+                                    [exercise.id]: !prev[exercise.id],
+                                  }))
+                                }
+                                className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[var(--gym-ink,#063434)] hover:text-black"
+                              >
+                                <Repeat className="size-3.5 text-amber-600" />
+                                <span>
+                                  {isAr
+                                    ? `الجهاز غير متوفر أو مشغول؟ (${exercise.alternatives.length} بدائل)`
+                                    : `Equipment busy or unavailable? (${exercise.alternatives.length} alternatives)`}
+                                </span>
+                                <ChevronDown
+                                  className={cn(
+                                    "size-3.5 transition-transform",
+                                    expandedAlternatives[exercise.id] && "rotate-180",
+                                  )}
+                                />
+                              </button>
+
+                              {expandedAlternatives[exercise.id] ? (
+                                <div className="mt-2 space-y-2 rounded-xl bg-amber-50/50 p-3 border border-amber-200/60">
+                                  <p className="text-[11px] font-bold uppercase tracking-wider text-amber-900">
+                                    {isAr ? "بدائل معتمدة من المدرب:" : "Coach-Approved Substitutes:"}
+                                  </p>
+                                  <div className="grid gap-2 sm:grid-cols-2">
+                                    {exercise.alternatives.map((alt) => {
+                                      const altName = resolveBilingualText(alt.name, locale)
+                                      const altReason = resolveBilingualText(alt.reason, locale)
+                                      const altNotes = resolveBilingualText(alt.notes, locale)
+                                      return (
+                                        <div
+                                          key={alt.id}
+                                          className="rounded-lg bg-white p-2.5 shadow-2xs border border-amber-100 flex flex-col justify-between gap-1"
+                                        >
+                                          <div>
+                                            <div className="flex items-center justify-between gap-1">
+                                              <p className="font-heading text-[13px] font-bold text-[var(--gym-ink,#063434)]">
+                                                {altName}
+                                              </p>
+                                              {alt.equipment ? (
+                                                <span className="rounded bg-black/5 px-1.5 py-0.5 text-[10px] font-semibold text-[#666]">
+                                                  {alt.equipment}
+                                                </span>
+                                              ) : null}
+                                            </div>
+                                            {altReason ? (
+                                              <p className="mt-0.5 text-[11px] text-[#666]">
+                                                💡 {altReason}
+                                              </p>
+                                            ) : null}
+                                          </div>
+                                          {altNotes ? (
+                                            <p className="text-[10px] text-[#888] italic pt-1 border-t border-black/5">
+                                              {altNotes}
+                                            </p>
+                                          ) : null}
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
                           ) : null}
                         </div>
                       )

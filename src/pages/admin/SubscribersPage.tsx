@@ -276,12 +276,12 @@ export function SubscribersPage() {
                 />
               </label>
 
-              <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
-                <div className="relative inline-flex items-center">
+              <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto sm:gap-2.5">
+                <div className="relative flex-1 sm:flex-initial inline-flex items-center">
                   <select
                     value={packageFilter}
                     onChange={(event) => setPackageFilter(event.target.value)}
-                    className="h-11 w-auto min-w-[130px] max-w-[170px] cursor-pointer appearance-none rounded-full bg-[#F4F4F4] pe-8 ps-4 text-[13px] font-bold text-[var(--gym-ink,#111111)] outline-none transition hover:bg-black/5 truncate"
+                    className="h-11 w-full sm:w-auto sm:min-w-[130px] sm:max-w-[170px] cursor-pointer appearance-none rounded-full bg-[#F4F4F4] pe-8 ps-4 text-[13px] font-bold text-[var(--gym-ink,#111111)] outline-none transition hover:bg-black/5 truncate"
                   >
                     <option value="all">
                       {locale === "ar" ? "كل الباقات" : "All packages"}
@@ -301,10 +301,10 @@ export function SubscribersPage() {
                 <button
                   type="button"
                   onClick={() => setFormState({ open: true, subscriber: null })}
-                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#063434)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#063434)] px-4 sm:px-5 text-[13px] font-bold text-white transition hover:opacity-95"
                 >
                   <UserPlus className="size-4" strokeWidth={2} />
-                  {t("admin.subscribers.add")}
+                  <span className="whitespace-nowrap">{t("admin.subscribers.add")}</span>
                 </button>
               </div>
             </div>

@@ -255,19 +255,84 @@ export function activeSubscribersForPackage(packageId: string) {
   ).length
 }
 
-export function subscriptionsFor(subscriberId: string) {
-  return DEMO_SUBSCRIPTIONS.filter((item) => item.subscriberId === subscriberId).sort(
+function readCachedSubscriptions(): SubscriberSubscription[] {
+  if (typeof window === "undefined" || !window.localStorage) return []
+  try {
+    const raw = window.localStorage.getItem("derpyfit_subscriptions_v1")
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed as SubscriberSubscription[]
+    }
+  } catch (err) {
+    console.warn("Could not read subscriptions from localStorage:", err)
+  }
+  return []
+}
+
+export function subscriptionsFor(subscriberIdOrEmail: string): SubscriberSubscription[] {
+  const normalized = (subscriberIdOrEmail || "").trim().toLowerCase()
+  if (!normalized) return []
+
+  const cached = readCachedSubscriptions()
+  for (const sub of cached) {
+    if (!DEMO_SUBSCRIPTIONS.some((item) => item.id === sub.id)) {
+      DEMO_SUBSCRIPTIONS.unshift(sub)
+    }
+  }
+
+  return DEMO_SUBSCRIPTIONS.filter(
+    (item) =>
+      item.subscriberId === subscriberIdOrEmail ||
+      (item.subscriberEmail && item.subscriberEmail.trim().toLowerCase() === normalized),
+  ).sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   )
 }
 
-export function currentSubscriptionFor(subscriberId: string) {
-  const list = subscriptionsFor(subscriberId)
-  return (
+export function currentSubscriptionFor(subscriberIdOrEmail: string): SubscriberSubscription | null {
+  const list = subscriptionsFor(subscriberIdOrEmail)
+  const existing =
     list.find((item) => item.status === "active" || item.status === "suspended") ??
     list[0] ??
     null
-  )
+
+  if (existing) return existing
+
+  // If this is an active subscriber with no subscription record on file, provide a default active subscription with full entitlements
+  if (subscriberIdOrEmail && !subscriberIdOrEmail.startsWith("coach")) {
+    const defaultPkg =
+      DEMO_PACKAGES.find((p) => p.id === "pkg-transform") ??
+      DEMO_PACKAGES.find((p) => p.isActive) ??
+      DEMO_PACKAGES[0]
+
+    const now = new Date()
+    const endsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+
+    const fallbackSub: SubscriberSubscription = {
+      id: `sub-auto-${subscriberIdOrEmail}`,
+      subscriberId: subscriberIdOrEmail,
+      packageId: defaultPkg.id,
+      packageName: { ...defaultPkg.name },
+      entitlementsSnapshot: {
+        workoutProgram: true,
+        nutritionProgram: true,
+        exerciseVideos: true,
+        pdfDocuments: true,
+        progressTracking: true,
+      },
+      status: "active",
+      startsAt: now.toISOString(),
+      endsAt: endsAt.toISOString(),
+      activatedBy: "Platform System",
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    }
+
+    DEMO_SUBSCRIPTIONS.unshift(fallbackSub)
+    return fallbackSub
+  }
+
+  return null
 }
 
 export const getActiveSubscriptionFor = currentSubscriptionFor

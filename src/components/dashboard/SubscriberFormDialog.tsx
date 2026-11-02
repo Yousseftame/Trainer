@@ -49,6 +49,7 @@ export function SubscriberFormDialog({
   const [nameAr, setNameAr] = useState("")
   const [nameEn, setNameEn] = useState("")
   const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [phone, setPhone] = useState("")
   const [status, setStatus] = useState<UserStatus>("active")
   const [subLocale, setSubLocale] = useState<"ar" | "en">("ar")
@@ -121,15 +122,15 @@ export function SubscriberFormDialog({
       const defaultPkg =
         packages.find((p) => p.isActive && p.featured) ??
         packages.find((p) => p.isActive) ??
-        packages[0]
-      setAssignInitialPackage(Boolean(defaultPkg))
-      setInitialPackageId(defaultPkg?.id ?? "")
+        packages[0] ?? { id: "pkg-transform", durationDays: 30 }
+      setAssignInitialPackage(true)
+      setInitialPackageId(defaultPkg.id)
       setInitialSubStatus("active")
       const todayIso = new Date().toISOString()
       setStartsDate(toDateInputValue(todayIso))
       setEndsDate(
         toDateInputValue(
-          computeEndsAtIso(todayIso, defaultPkg?.durationDays ?? 30),
+          computeEndsAtIso(todayIso, defaultPkg.durationDays ?? 30),
         ),
       )
     }
@@ -190,6 +191,14 @@ export function SubscriberFormDialog({
       )
       return
     }
+    if (password.trim() && password.trim().length < 6) {
+      setError(
+        isAr
+          ? "كلمة المرور يجب أن لا تقل عن 6 خانات."
+          : "Password must be at least 6 characters.",
+      )
+      return
+    }
 
     setError(null)
     await onSave({
@@ -200,6 +209,7 @@ export function SubscriberFormDialog({
         en: cleanNameEn,
       },
       email: email.trim(),
+      password: password.trim() || undefined,
       phone: phone.trim(),
       status,
       locale: subLocale,
@@ -368,6 +378,25 @@ export function SubscriberFormDialog({
                 />
               </label>
             </div>
+
+            {!isEditing ? (
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[12px] font-bold text-[#6B7280]">
+                  {isAr
+                    ? "كلمة المرور للحساب (اختياري، الافتراضي: Member@123456)"
+                    : "Account login password (optional, default: Member@123456)"}
+                </span>
+                <input
+                  dir="ltr"
+                  type="password"
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Member@123456"
+                  className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none focus:ring-2 focus:ring-[var(--gym-lime,#fb5001)]"
+                />
+              </label>
+            ) : null}
 
             {/* Account Status & Preferred Language */}
             <div className="grid gap-4 sm:grid-cols-2">

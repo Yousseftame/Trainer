@@ -8,6 +8,7 @@ import {
   reviewRegistrationRequest,
   saveSubscriber,
   updateSubscriberAccountStatus,
+  updateSubscriberCoachNotes,
   type CreateRegistrationRequestInput,
   type ReviewRegistrationRequestInput,
   type SaveSubscriberInput,
@@ -98,6 +99,22 @@ export function useReviewRegistrationRequestMutation() {
       void queryClient.invalidateQueries({
         queryKey: SUBSCRIPTION_QUERY_KEYS.subscriptions,
       })
+    },
+  })
+}
+
+export function useUpdateSubscriberCoachNotesMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      subscriberId,
+      coachNotes,
+    }: {
+      subscriberId: string
+      coachNotes: { en: string; ar: string } | string
+    }) => updateSubscriberCoachNotes(subscriberId, coachNotes),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: subscriberKeys.subscribers })
     },
   })
 }

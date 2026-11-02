@@ -22,6 +22,7 @@ export const APP_ROUTES = {
     nutrition: "/admin/nutrition",
     content: "/admin/content",
     progress: "/admin/progress",
+    physicalTherapy: "/admin/physical-therapy",
     staff: "/admin/staff",
     reports: "/admin/reports",
   },
@@ -36,6 +37,7 @@ export const APP_ROUTES = {
     workoutLog: "/app/workout-log",
     nutritionLog: "/app/nutrition-log",
     progress: "/app/progress",
+    physicalTherapy: "/app/physical-therapy",
     history: "/app/history",
   },
   errors: {

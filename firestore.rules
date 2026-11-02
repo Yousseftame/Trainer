@@ -2,20 +2,74 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // -------------------------------------------------------------
+    // Security & Authorization Helpers (Backend Security Boundary)
+    // -------------------------------------------------------------
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Publicly readable packages so the landing page & registration page can display plans
-    match /packages/{packageId} {
-      allow read: if true;
-      allow write: if isSignedIn();
+    function isNotSuspended() {
+      return isSignedIn() && request.auth.token.status != 'suspended';
     }
 
-    // Subscriptions, subscribers, registrations, programs, content, and progress
+    function isHeadCoach() {
+      return isSignedIn() && request.auth.token.role == 'head_coach';
+    }
+
+    function isStaff() {
+      return isSignedIn() && isNotSuspended() && (
+        request.auth.token.role in ['head_coach', 'assistant', 'trainer', 'nutritionist', 'physiotherapist']
+      );
+    }
+
+    function hasPermission(perm) {
+      return isHeadCoach() || (
+        isStaff() && (perm in request.auth.token.permissions)
+      );
+    }
+
+    // -------------------------------------------------------------
+    // Public Collections
+    // -------------------------------------------------------------
+    // Publicly readable packages so landing page & registration modal can display plans
+    match /packages/{packageId} {
+      allow read: if true;
+      allow write: if hasPermission('packages:manage');
+    }
+
+    // -------------------------------------------------------------
+    // Staff & Administrative Team Accounts
+    // -------------------------------------------------------------
+    // Staff directory can only be read by staff, and modified by Head Coach or staff:manage
+    match /staff/{staffId} {
+      allow read: if isStaff();
+      allow write: if hasPermission('staff:manage');
+    }
+
+    // -------------------------------------------------------------
+    // Subscribers & Sensitive Data Access
+    // -------------------------------------------------------------
+    match /subscribers/{subscriberId} {
+      allow read: if hasPermission('subscribers:read') || (isSignedIn() && request.auth.uid == subscriberId);
+      allow write: if hasPermission('subscribers:write');
+    }
+
+    match /registration_requests/{requestId} {
+      allow create: if true; // Public prospects can register
+      allow read: if hasPermission('subscribers:read') || hasPermission('subscribers:approve');
+      allow update, delete: if hasPermission('subscribers:approve');
+    }
+
+    // Physical therapy & medical restrictions
+    match /physical_therapy/{recordId} {
+      allow read: if hasPermission('physicalTherapy:read') || (isSignedIn() && request.auth.uid == resource.data.subscriberId);
+      allow write: if hasPermission('physicalTherapy:manage');
+    }
+
+    // Workouts, Nutrition, Content, Subscriptions, Progress
     match /{document=**} {
       allow read, write: if isSignedIn();
     }
   }
 }
-
