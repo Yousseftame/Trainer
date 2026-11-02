@@ -32,6 +32,7 @@ export const APP_ROUTES = {
     profile: "/app/profile",
     subscription: "/app/subscription",
     workout: "/app/workout",
+    community: "/app/community",
     nutrition: "/app/nutrition",
     library: "/app/library",
     workoutLog: "/app/workout-log",

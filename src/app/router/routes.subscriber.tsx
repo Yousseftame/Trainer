@@ -43,6 +43,9 @@ const PhysicalTherapyPage = lazy(() =>
 const HistoryPage = lazy(() =>
   import("@/pages/subscriber/HistoryPage").then((m) => ({ default: m.HistoryPage })),
 )
+const CommunityPage = lazy(() =>
+  import("@/pages/subscriber/CommunityPage").then((m) => ({ default: m.CommunityPage })),
+)
 
 export const subscriberRoutes: RouteObject[] = [
   {
@@ -56,6 +59,7 @@ export const subscriberRoutes: RouteObject[] = [
             element: <SubscriberLayout />,
             children: [
               { index: true, element: <OverviewPage /> },
+              { path: "community", element: <CommunityPage /> },
               { path: "profile", element: <ProfilePage /> },
               { path: "subscription", element: <SubscriptionPage /> },
               {

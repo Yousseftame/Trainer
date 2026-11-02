@@ -162,6 +162,44 @@
   }
 }
 
+/* Arabic Typography Priority: Guarantee Cairo across all headings, portals, and UI components */
+html[lang="ar"],
+html[dir="rtl"],
+[dir="rtl"] {
+  --font-heading: var(--font-arabic) !important;
+  --font-sans: var(--font-arabic) !important;
+  --font-public: var(--font-arabic) !important;
+  font-family: var(--font-arabic) !important;
+}
+
+html[lang="ar"] h1,
+html[lang="ar"] h2,
+html[lang="ar"] h3,
+html[lang="ar"] h4,
+html[lang="ar"] h5,
+html[lang="ar"] h6,
+html[lang="ar"] .font-heading,
+html[lang="ar"] .font-sans,
+html[dir="rtl"] h1,
+html[dir="rtl"] h2,
+html[dir="rtl"] h3,
+html[dir="rtl"] h4,
+html[dir="rtl"] h5,
+html[dir="rtl"] h6,
+html[dir="rtl"] .font-heading,
+html[dir="rtl"] .font-sans,
+[dir="rtl"] h1,
+[dir="rtl"] h2,
+[dir="rtl"] h3,
+[dir="rtl"] h4,
+[dir="rtl"] h5,
+[dir="rtl"] h6,
+[dir="rtl"] .font-heading,
+[dir="rtl"] .font-sans,
+.font-arabic {
+  font-family: "Cairo Variable", "Cairo", sans-serif !important;
+}
+
 /* Public marketing site — GymTrainer-inspired tokens */
 .public-site {
   --gym-ink: #111111;

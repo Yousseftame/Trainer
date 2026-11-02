@@ -6,6 +6,7 @@ import { PanelLeft, Search } from "lucide-react"
 import { ProfileMenu } from "@/components/dashboard/ProfileMenu"
 import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher"
 import { APP_ROUTES } from "@/config/constants"
+import { useLocale } from "@/hooks/useLocale"
 import { cn } from "@/lib/utils"
 
 type DashboardTopbarProps = {
@@ -24,49 +25,54 @@ export function DashboardTopbar({
   className,
 }: DashboardTopbarProps) {
   const { t } = useTranslation()
+  const { isRtl } = useLocale()
   const [query, setQuery] = useState("")
 
   return (
     <header
       className={cn(
-        "z-50 shrink-0 bg-[#F4F4F4] px-4 pt-4 pb-3 sm:px-6 sm:pt-5 sm:pb-3.5 lg:px-7",
+        "relative z-40 w-full max-w-full shrink-0 bg-[#F4F4F4] px-3.5 pt-3.5 pb-2.5 sm:px-6 sm:pt-5 sm:pb-3.5 lg:px-7",
         className,
       )}
     >
-      <div className="flex items-center gap-3 sm:gap-4">
-        {/* Left: toggle + title + badge */}
-        <div className="flex min-w-0 shrink-0 items-center gap-3">
+      <div className="flex items-center justify-between gap-2 sm:gap-4 min-w-0">
+        {/* Leading Side: toggle button + title + badge */}
+        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
           <button
             type="button"
             onClick={onSidebarToggle}
-            className="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#063434)] shadow-[0_8px_24px_rgba(6,52,52,0.08)] transition-transform active:scale-[0.97]"
+            className="inline-flex size-9 sm:size-11 shrink-0 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#063434)] shadow-[0_4px_16px_rgba(6,52,52,0.06)] transition-transform active:scale-[0.97]"
             aria-label={t("nav.openMenu")}
           >
-            <PanelLeft className="size-5 rtl:-scale-x-100" strokeWidth={1.8} />
+            <PanelLeft className="size-4 sm:size-5 rtl:-scale-x-100" strokeWidth={1.8} />
           </button>
 
-          <div className="flex min-w-0 items-center gap-2.5">
+          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
             <AnimatePresence mode="wait" initial={false}>
               <motion.h1
                 key={title}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                className="min-w-0 truncate font-heading text-[20px] font-extrabold leading-[1.35] tracking-tight text-[var(--gym-ink,#063434)] sm:text-[22px]"
+                transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
+                className={cn(
+                  "min-w-0 max-w-full truncate text-[15px] sm:text-[20px] lg:text-[22px] font-extrabold leading-[1.3] tracking-tight text-[var(--gym-ink,#063434)]",
+                  isRtl ? "font-arabic" : "font-heading",
+                )}
+                title={title}
               >
                 {title}
               </motion.h1>
             </AnimatePresence>
 
-            <span className="hidden shrink-0 items-center rounded-full bg-[var(--gym-lime,#b8fe22)]/35 px-3 py-1 text-[12px] font-semibold leading-none text-[var(--gym-ink,#063434)] sm:inline-flex">
+            <span className="hidden shrink-0 items-center rounded-full bg-[var(--gym-lime,#fb5001)]/20 px-2.5 py-0.5 text-[11px] font-bold leading-none text-[var(--gym-ink,#063434)] md:inline-flex">
               {areaLabel}
             </span>
           </div>
         </div>
 
-        {/* Center: search */}
-        <label className="relative mx-auto hidden min-w-0 max-w-[520px] flex-1 md:block">
+        {/* Center: Search (Desktop only) */}
+        <label className="relative mx-auto hidden min-w-0 max-w-[480px] flex-1 md:block">
           <span className="pointer-events-none absolute inset-y-0 start-4 inline-flex items-center text-[var(--gym-muted,#4e5151)]/55">
             <Search className="size-[18px]" strokeWidth={1.8} />
           </span>
@@ -85,11 +91,11 @@ export function DashboardTopbar({
           />
         </label>
 
-        {/* Right: website + language + profile */}
-        <div className="ms-auto flex shrink-0 items-center gap-2 sm:gap-2.5">
+        {/* Trailing Side: website + language switcher + profile */}
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
           <Link
             to={APP_ROUTES.public.home}
-            className="hidden h-11 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] px-5 text-[13px] font-bold text-white transition-opacity hover:opacity-90 sm:inline-flex"
+            className="hidden h-10 lg:h-11 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] px-4 lg:px-5 text-[12.5px] lg:text-[13px] font-bold text-white transition-opacity hover:opacity-90 xl:inline-flex"
           >
             {t("dashboard.website")}
           </Link>
@@ -101,9 +107,9 @@ export function DashboardTopbar({
       </div>
 
       {/* Mobile search */}
-      <label className="relative mt-3 block md:hidden">
-        <span className="pointer-events-none absolute inset-y-0 start-4 inline-flex items-center text-[var(--gym-muted,#4e5151)]/55">
-          <Search className="size-[18px]" strokeWidth={1.8} />
+      <label className="relative mt-2.5 block md:hidden">
+        <span className="pointer-events-none absolute inset-y-0 start-3.5 inline-flex items-center text-[var(--gym-muted,#4e5151)]/55">
+          <Search className="size-[17px]" strokeWidth={1.8} />
         </span>
         <input
           type="search"
@@ -111,10 +117,11 @@ export function DashboardTopbar({
           onChange={(event) => setQuery(event.target.value)}
           placeholder={t("dashboard.searchPlaceholder")}
           className={cn(
-            "h-11 w-full rounded-full border-0 bg-white pe-4 ps-11",
-            "font-heading text-[14px] font-medium text-[var(--gym-ink,#063434)]",
-            "shadow-[0_8px_24px_rgba(6,52,52,0.06)] outline-none",
+            "h-10 w-full rounded-full border-0 bg-white pe-4 ps-10",
+            "text-[13.5px] font-medium text-[var(--gym-ink,#063434)]",
+            "shadow-[0_4px_16px_rgba(6,52,52,0.05)] outline-none",
             "placeholder:font-normal placeholder:text-[var(--gym-muted,#4e5151)]/55",
+            isRtl ? "font-arabic" : "font-heading",
           )}
         />
       </label>

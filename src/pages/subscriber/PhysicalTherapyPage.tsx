@@ -14,6 +14,7 @@ import { useSubscribersQuery } from "@/features/subscribers/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatDate } from "@/lib/format"
+import { cn } from "@/lib/utils"
 import type { PTAffectedArea } from "@/types/physicalTherapy"
 
 const AREA_LABELS: Record<PTAffectedArea, { en: string; ar: string }> = {
@@ -49,17 +50,17 @@ export function PhysicalTherapyPage() {
   return (
     <div className="flex flex-col gap-5 pb-10">
       {/* Hero Banner */}
-      <div className="relative overflow-hidden rounded-[26px] bg-[var(--gym-ink,#063434)] p-6 sm:p-8 text-white shadow-md">
-        <div className="relative z-10 flex flex-col gap-2 max-w-2xl">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1 text-[12px] font-bold text-[var(--gym-lime,#b8fe22)]">
+      <div className="relative overflow-hidden rounded-[26px] bg-[var(--gym-ink,#063434)] p-5 sm:p-8 text-white shadow-md">
+        <div className="relative z-10 flex flex-col gap-2.5 max-w-2xl">
+          <div className="inline-flex self-start items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] sm:text-[12px] font-bold text-[var(--gym-lime,#fb5001)]">
             <HeartPulse className="size-3.5" />
             <span>{isAr ? "الرعاية الحركية والتأهيل الوقائي" : "Preventative Care & Rehab Protocol"}</span>
           </div>
 
-          <h1 className="font-heading text-[24px] font-extrabold tracking-tight sm:text-[30px]">
+          <h1 className={cn("text-[20px] sm:text-[28px] lg:text-[30px] font-extrabold tracking-tight leading-[1.3]", isAr ? "font-arabic" : "font-heading")}>
             {isAr ? "خطة العلاج الطبيعي والتأهيل الحركي" : "My Physical Therapy & Rehab"}
           </h1>
-          <p className="text-[13px] sm:text-[14px] leading-relaxed text-white/80">
+          <p className={cn("text-[13px] sm:text-[14px] leading-relaxed text-white/80", isAr && "font-arabic")}>
             {isAr
               ? "بروتوكول موجه لحمايتك من الإصابات، مع بدائل ذكية للتمارين لتستمر في التدريب بأمان وفاعلية تامة."
               : "Trainer-approved injury recovery and movement guidance with safe exercise alternatives so you stay strong without pain."}

@@ -9,6 +9,7 @@ import { useAuth } from "@/features/auth/auth-context"
 import { firebaseAuthErrorKey } from "@/features/auth/errors"
 import { initials } from "@/lib/format"
 import { appToast } from "@/lib/toast"
+import { useLocale } from "@/hooks/useLocale"
 import { cn } from "@/lib/utils"
 import type { Role } from "@/lib/permissions/roles"
 
@@ -22,6 +23,7 @@ type ProfileMenuProps = {
 
 export function ProfileMenu({ onRequestSignOut }: ProfileMenuProps) {
   const { t } = useTranslation()
+  const { isRtl } = useLocale()
   const navigate = useNavigate()
   const { user, signOut, updateAccount, changePassword } = useAuth()
   const menuId = useId()
@@ -108,8 +110,8 @@ export function ProfileMenu({ onRequestSignOut }: ProfileMenuProps) {
         aria-controls={menuId}
         aria-label={t("nav.profile")}
         className={cn(
-          "inline-flex size-11 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] text-[13px] font-bold text-white transition-[opacity,box-shadow] hover:opacity-90",
-          open && "shadow-[0_0_0_3px_rgba(184,254,34,0.55)]",
+          "inline-flex size-9 sm:size-11 shrink-0 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] text-[12px] sm:text-[13px] font-bold text-white transition-all hover:opacity-90",
+          open && "ring-2 ring-[var(--gym-lime,#fb5001)] ring-offset-2 ring-offset-[#F4F4F4] shadow-md",
         )}
       >
         {initials(name)}
@@ -124,7 +126,7 @@ export function ProfileMenu({ onRequestSignOut }: ProfileMenuProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.18 }}
-              className="fixed inset-0 z-[70] bg-[var(--gym-ink,#063434)]/30 sm:bg-transparent"
+              className="fixed inset-0 z-[70] bg-black/20 sm:bg-transparent"
               onClick={closeMenu}
             />
             <motion.div
@@ -132,22 +134,20 @@ export function ProfileMenu({ onRequestSignOut }: ProfileMenuProps) {
               id={menuId}
               role="menu"
               aria-label={t("nav.profile")}
-              initial={{ opacity: 0, y: 16, scale: 0.98 }}
+              initial={{ opacity: 0, y: -8, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 12, scale: 0.98 }}
-              transition={{ duration: 0.22, ease: EASE }}
+              exit={{ opacity: 0, y: -8, scale: 0.95 }}
+              transition={{ duration: 0.2, ease: EASE }}
               className={cn(
-                "z-[80] overflow-hidden bg-white shadow-[0_22px_60px_rgba(6,52,52,0.16)]",
-                "fixed inset-x-3 bottom-[max(12px,env(safe-area-inset-bottom))] rounded-[24px] p-2",
-                "sm:absolute sm:inset-x-auto sm:bottom-auto sm:end-0 sm:top-[calc(100%+10px)] sm:w-[300px] sm:rounded-[22px]",
+                "z-[80] overflow-hidden rounded-[24px] bg-white p-2",
+                "shadow-[0_20px_60px_rgba(0,0,0,0.18)] border border-black/8",
+                "absolute end-0 top-[calc(100%+10px)] w-[290px] max-w-[calc(100vw-24px)]",
+                isRtl ? "font-arabic" : "font-heading",
               )}
             >
-              <div className="mb-1 flex justify-center sm:hidden">
-                <span className="mt-1 mb-2 h-1 w-10 rounded-full bg-[#E5E7EB]" />
-              </div>
 
               <div className="flex items-center gap-3 rounded-[18px] px-3 py-3">
-                <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] text-[13px] font-bold text-[var(--gym-lime,#b8fe22)]">
+                <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] text-[13px] font-bold text-[var(--gym-lime,#fb5001)]">
                   {initials(name)}
                 </span>
                 <span className="min-w-0">

@@ -216,7 +216,7 @@ export function OverviewPage() {
           {data.queue > 0 && hasPermission("subscribers:approve") ? (
             <Link
               to={APP_ROUTES.admin.registrationRequests}
-              className="inline-flex h-10 w-fit shrink-0 items-center justify-center gap-1.5 self-start rounded-full bg-[var(--gym-lime,#b8fe22)] px-4 text-[12.5px] font-bold text-[var(--gym-ink,#063434)] shadow-[0_10px_28px_rgba(184,254,34,0.28)] rtl:self-end sm:h-11 sm:gap-2 sm:self-auto sm:px-5 sm:text-[13px] sm:rtl:self-auto"
+              className="inline-flex h-10 w-fit shrink-0 items-center justify-center gap-1.5 self-start rounded-full bg-[var(--gym-lime,#fb5001)] px-4 text-[12.5px] font-bold text-white rtl:self-end sm:h-11 sm:gap-2 sm:self-auto sm:px-5 sm:text-[13px] sm:rtl:self-auto shadow-sm transition-opacity hover:opacity-90 active:scale-[0.98]"
             >
               {t("admin.overview.queueCta", { count: data.queue })}
               <Chevron className="size-3.5 sm:size-4" strokeWidth={2} />

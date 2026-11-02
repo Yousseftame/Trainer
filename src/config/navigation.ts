@@ -121,6 +121,7 @@ export const adminNav: NavItem[] = [
 
 export const subscriberNav: NavItem[] = [
   { labelKey: "nav.overview", to: APP_ROUTES.subscriber.overview, icon: LayoutDashboard },
+  { labelKey: "nav.community", to: APP_ROUTES.subscriber.community, icon: Users },
   {
     labelKey: "nav.workoutSection",
     to: APP_ROUTES.subscriber.workout,

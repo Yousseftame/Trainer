@@ -26,10 +26,10 @@ export function LanguageSwitcher({
       role="group"
       aria-label={t("nav.language")}
       className={cn(
-        "inline-flex items-center rounded-full p-1",
+        "inline-flex shrink-0 items-center rounded-full p-0.5 sm:p-1",
         isDashboard
-          ? "h-11 bg-[var(--gym-ink,#111111)]"
-          : "h-10 border border-[var(--gym-ink,#111111)] bg-white",
+          ? "h-9 sm:h-11 bg-[var(--gym-ink,#111111)]"
+          : "h-9 sm:h-10 border border-[var(--gym-ink,#111111)] bg-white",
         className,
       )}
     >
@@ -43,16 +43,16 @@ export function LanguageSwitcher({
             onClick={() => setLocale(option.value)}
             aria-pressed={active}
             className={cn(
-              "inline-flex items-center justify-center rounded-full text-[12px] font-bold tracking-wide transition-colors duration-200 ease-out",
+              "inline-flex items-center justify-center rounded-full font-bold tracking-wide transition-colors duration-200 ease-out",
               isDashboard
                 ? cn(
-                    "h-9 min-w-9 px-3",
+                    "h-8 sm:h-9 min-w-7 sm:min-w-9 px-2 sm:px-3 text-[11px] sm:text-[12px]",
                     active
                       ? "bg-[var(--gym-lime,#fb5001)] text-white"
                       : "text-white/70 hover:text-white",
                   )
                 : cn(
-                    "h-8 min-w-10 px-3 text-[13px] font-semibold",
+                    "h-8 min-w-8 sm:min-w-10 px-2.5 sm:px-3 text-[12px] sm:text-[13px] font-semibold",
                     active
                       ? "bg-[var(--gym-ink,#111111)] text-white"
                       : "text-[var(--gym-ink,#111111)] hover:bg-[var(--gym-ink,#111111)]/5",
