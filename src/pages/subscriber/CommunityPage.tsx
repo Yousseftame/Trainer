@@ -1,5 +1,6 @@
 import { useState } from "react"
 import {
+  Clock,
   Flame,
   Heart,
   MessageCircle,
@@ -143,7 +144,38 @@ export function CommunityPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 sm:gap-6 pb-28">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 sm:gap-5 pb-28">
+      {/* 1. Under Development & On Hold Notice Banner */}
+      <div className="relative overflow-hidden rounded-[24px] border border-amber-300/70 bg-gradient-to-r from-amber-50/95 via-[#fffdf8] to-amber-50/90 p-4 sm:p-5 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-900 shadow-2xs">
+              <Clock className="size-5" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-heading text-[14.5px] sm:text-[15.5px] font-black text-amber-950">
+                  {isAr ? "ميزة مجتمع المشتركين قيد التطوير والتجهيز" : "Community Hub Under Development"}
+                </h3>
+                <span className="inline-flex items-center rounded-full bg-amber-200/80 px-2.5 py-0.5 text-[11px] font-extrabold text-amber-950">
+                  {isAr ? "معلّق مؤقتاً · قريباً" : "On Hold · Coming Soon"}
+                </span>
+              </div>
+              <p className="mt-1 text-[12px] sm:text-[12.5px] font-medium leading-relaxed text-amber-900/85">
+                {isAr
+                  ? "يجري حالياً تجهيز وتطوير نظام المشاركات والتفاعل وتحديات المشتركين. هذه الصفحة للمعاينة التجريبية وسيتم إطلاقها قريباً بكامل الميزات."
+                  : "We are currently finalizing the group discussions, challenges, and social hub. This section is currently on hold for beta preview and will be fully unlocked soon."}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 self-start sm:self-center shrink-0 rounded-full bg-white px-3 py-1 text-[11.5px] font-bold text-amber-900 border border-amber-200/70 shadow-2xs">
+            <span className="size-2 rounded-full bg-amber-500 animate-pulse" />
+            <span>{isAr ? "نسخة تجريبية (Preview)" : "Beta Preview Mode"}</span>
+          </div>
+        </div>
+      </div>
+
       {/* Community Header Banner */}
       <div className="relative overflow-hidden rounded-[28px] bg-[var(--gym-ink,#111111)] p-6 text-white sm:p-7 shadow-lg">
         <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -170,7 +202,7 @@ export function CommunityPage() {
               <span className="inline-flex size-8 items-center justify-center rounded-full bg-[#3b82f6] text-[10px] font-bold text-white ring-2 ring-[var(--gym-ink,#111111)]">
                 AH
               </span>
-              <span className="inline-flex size-8 items-center justify-center rounded-full bg-[#10b981] text-[10px] font-bold text-white ring-2 ring-[var(--gym-ink,#111111)]">
+              <span className="inline-flex size-8 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] text-[10px] font-bold text-[var(--gym-lime,#fb5001)] ring-2 ring-[var(--gym-ink,#111111)]">
                 SM
               </span>
             </div>

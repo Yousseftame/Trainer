@@ -1,4 +1,4 @@
-import { useState } from "react"
+﻿import { useState } from "react"
 import { createPortal } from "react-dom"
 import {
   Check,
@@ -213,11 +213,11 @@ export function StaffMemberFormDialog({
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-black/5 px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-2xl bg-[var(--gym-ink,#063434)] text-white shadow-xs">
+            <div className="flex size-10 items-center justify-center rounded-2xl bg-[var(--gym-ink,#111111)] text-white shadow-xs">
               <Shield className="size-5" />
             </div>
             <div>
-              <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#063434)]">
+              <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#111111)]">
                 {initialMember
                   ? isAr
                     ? "تعديل حساب وصلاحيات الموظف الإداري"
@@ -247,7 +247,7 @@ export function StaffMemberFormDialog({
           {/* Section 1: Basic Information */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
                 {isAr ? "الاسم الكامل" : "Full Name"} *
               </label>
               <input
@@ -256,12 +256,12 @@ export function StaffMemberFormDialog({
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="e.g. Captain Youssef Nabil"
-                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none focus:border-[var(--gym-ink,#063434)]"
+                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none focus:border-[var(--gym-ink,#111111)]"
               />
             </div>
 
             <div>
-              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
                 {isAr ? "البريد الإلكتروني" : "Email Address"} *
               </label>
               <input
@@ -270,12 +270,12 @@ export function StaffMemberFormDialog({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="staff@derpyfit.com"
-                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none focus:border-[var(--gym-ink,#063434)]"
+                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none focus:border-[var(--gym-ink,#111111)]"
               />
             </div>
 
             <div>
-              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
                 {isAr ? "كلمة المرور (تسجيل الدخول)" : "Password (Login)"} {!initialMember ? "*" : ""}
               </label>
               <div className="relative">
@@ -291,7 +291,7 @@ export function StaffMemberFormDialog({
                       : "•••••••• (min 6)"
                   }
                   minLength={initialMember ? undefined : 6}
-                  className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] pe-10 ps-3.5 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none focus:border-[var(--gym-ink,#063434)]"
+                  className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] pe-10 ps-3.5 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none focus:border-[var(--gym-ink,#111111)]"
                 />
                 <button
                   type="button"
@@ -304,7 +304,7 @@ export function StaffMemberFormDialog({
             </div>
 
             <div>
-              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
                 {isAr ? "رقم الهاتف" : "Phone Number"}
               </label>
               <input
@@ -312,7 +312,7 @@ export function StaffMemberFormDialog({
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+20 100 000 0000"
-                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none focus:border-[var(--gym-ink,#063434)]"
+                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none focus:border-[var(--gym-ink,#111111)]"
               />
             </div>
           </div>
@@ -320,14 +320,14 @@ export function StaffMemberFormDialog({
           {/* Section 2: Administrative Role & Status */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
                 {isAr ? "الدور الإداري (Administrative Role)" : "Administrative Role"} *
               </label>
               <select
                 value={role}
                 onChange={(e) => handleRoleChange(e.target.value as StaffRole)}
                 disabled={initialMember?.role === "head_coach"}
-                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-bold text-[var(--gym-ink,#063434)] outline-none focus:border-[var(--gym-ink,#063434)]"
+                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-bold text-[var(--gym-ink,#111111)] outline-none focus:border-[var(--gym-ink,#111111)]"
               >
                 {ROLES_LIST.map((r) => (
                   <option key={r.key} value={r.key}>
@@ -343,14 +343,14 @@ export function StaffMemberFormDialog({
             </div>
 
             <div>
-              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
                 {isAr ? "حالة الحساب (Account Status)" : "Account Status"}
               </label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as StaffStatus)}
                 disabled={isHeadCoach}
-                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-bold text-[var(--gym-ink,#063434)] outline-none focus:border-[var(--gym-ink,#063434)]"
+                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-bold text-[var(--gym-ink,#111111)] outline-none focus:border-[var(--gym-ink,#111111)]"
               >
                 <option value="active">{isAr ? "نشط ومفعل (Active)" : "Active (Full access permitted)"}</option>
                 <option value="suspended">{isAr ? "محظور / معلق (Suspended)" : "Suspended (Access blocked)"}</option>
@@ -372,7 +372,7 @@ export function StaffMemberFormDialog({
           {/* Section 3: Custom Job Title (Optional) */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
                 {isAr ? "المسمى الوظيفي المخصص (إنجليزي)" : "Custom Job Title (EN)"}
               </label>
               <input
@@ -380,11 +380,11 @@ export function StaffMemberFormDialog({
                 value={titleEn}
                 onChange={(e) => setTitleEn(e.target.value)}
                 placeholder="e.g. Senior Strength Coach"
-                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[13px] font-medium text-[var(--gym-ink,#063434)] outline-none"
+                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[13px] font-medium text-[var(--gym-ink,#111111)] outline-none"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
                 {isAr ? "المسمى الوظيفي المخصص (عربي)" : "Custom Job Title (AR)"}
               </label>
               <input
@@ -392,7 +392,7 @@ export function StaffMemberFormDialog({
                 value={titleAr}
                 onChange={(e) => setTitleAr(e.target.value)}
                 placeholder="مثال: كبير مدربي القوة واللياقة"
-                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[13px] font-medium text-[var(--gym-ink,#063434)] outline-none"
+                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[13px] font-medium text-[var(--gym-ink,#111111)] outline-none"
               />
             </div>
           </div>
@@ -402,8 +402,8 @@ export function StaffMemberFormDialog({
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-black/5 pb-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <KeyRound className="size-4 text-[var(--gym-ink,#063434)]" />
-                  <h3 className="font-heading text-[15px] font-extrabold text-[var(--gym-ink,#063434)]">
+                  <KeyRound className="size-4 text-[var(--gym-ink,#111111)]" />
+                  <h3 className="font-heading text-[15px] font-extrabold text-[var(--gym-ink,#111111)]">
                     {isAr ? "مصفوفة صلاحيات الأقسام والصفحات (Module Permissions)" : "Module & Page Permissions Matrix"}
                   </h3>
                 </div>
@@ -423,7 +423,7 @@ export function StaffMemberFormDialog({
                   <button
                     type="button"
                     onClick={selectAll}
-                    className="inline-flex items-center gap-1 rounded-lg bg-white px-3 py-1.5 text-[11px] font-bold text-[var(--gym-ink,#063434)] shadow-2xs hover:bg-[#F0F0F0]"
+                    className="inline-flex items-center gap-1 rounded-lg bg-white px-3 py-1.5 text-[11px] font-bold text-[var(--gym-ink,#111111)] shadow-2xs hover:bg-[#F0F0F0]"
                   >
                     <CheckSquare className="size-3.5" />
                     {isAr ? "تحديد الكل" : "Select All"}
@@ -459,7 +459,7 @@ export function StaffMemberFormDialog({
                     <div className="flex items-center justify-between gap-2 border-b border-black/5 pb-2.5">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-heading text-[13px] font-bold text-[var(--gym-ink,#063434)]">
+                          <span className="font-heading text-[13px] font-bold text-[var(--gym-ink,#111111)]">
                             {isAr ? mod.title.ar : mod.title.en}
                           </span>
                           <span className="rounded bg-black/5 px-2 py-0.5 text-[10px] font-mono text-[#666]">
@@ -521,10 +521,10 @@ export function StaffMemberFormDialog({
                               checked={checked}
                               disabled={isHeadCoach}
                               onChange={() => togglePermission(perm.key)}
-                              className="size-4 shrink-0 mt-0.5 rounded text-[var(--gym-ink,#063434)] focus:ring-0"
+                              className="size-4 shrink-0 mt-0.5 rounded text-[var(--gym-ink,#111111)] focus:ring-0"
                             />
                             <div className="min-w-0">
-                              <p className="text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+                              <p className="text-[12px] font-bold text-[var(--gym-ink,#111111)]">
                                 {isAr ? perm.label.ar : perm.label.en}
                               </p>
                               <p className="text-[10px] leading-relaxed text-[#777]">
@@ -543,7 +543,7 @@ export function StaffMemberFormDialog({
 
           {/* Section 5: Administrative Notes */}
           <div>
-            <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+            <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
               {isAr ? "ملاحظات إدارية خاصة بالحساب" : "Administrative Notes (Internal)"}
             </label>
             <textarea
@@ -551,7 +551,7 @@ export function StaffMemberFormDialog({
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
               placeholder={isAr ? "ملاحظات داخلية حول مسؤوليات الموظف أو أيام العمل..." : "Internal notes regarding roles, shifts, or responsibilities..."}
-              className="w-full rounded-xl border border-black/10 bg-[#F8F8F8] p-3 text-[13px] font-medium outline-none focus:border-[var(--gym-ink,#063434)]"
+              className="w-full rounded-xl border border-black/10 bg-[#F8F8F8] p-3 text-[13px] font-medium outline-none focus:border-[var(--gym-ink,#111111)]"
             />
           </div>
 
@@ -568,7 +568,7 @@ export function StaffMemberFormDialog({
             <button
               type="submit"
               disabled={saving}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#063434)] px-6 text-[13px] font-bold text-white transition hover:opacity-95 disabled:opacity-50"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-6 text-[13px] font-bold text-white transition hover:opacity-95 disabled:opacity-50"
             >
               <Check className="size-4" />
               {saving

@@ -181,9 +181,9 @@ export function SubscriberMobileMenuDrawer({
         </div>
 
         {/* Scrollable Content */}
-        <div className="no-scrollbar flex-1 overflow-y-auto px-5 py-4 sm:px-6 space-y-5 pb-28">
+        <div className="no-scrollbar flex-1 overflow-y-auto px-5 py-4 sm:px-6 space-y-5 pb-[max(7rem,calc(6rem+env(safe-area-inset-bottom,0px)))]">
           {/* Subscriber Profile Snippet */}
-          <div className="flex items-center gap-3.5 rounded-2xl bg-[var(--gym-ink,#063434)] p-4 text-white shadow-md">
+          <div className="flex items-center gap-3.5 rounded-2xl bg-[var(--gym-ink,#111111)] p-4 text-white shadow-md">
             <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--gym-lime,#fb5001)] font-heading text-[15px] font-bold text-white shadow-inner">
               {initials(user?.displayName || "Subscriber")}
             </span>
@@ -239,7 +239,7 @@ export function SubscriberMobileMenuDrawer({
                             "inline-flex size-10 shrink-0 items-center justify-center rounded-2xl transition-all duration-200",
                             isActive
                               ? "bg-[var(--gym-lime,#fb5001)] text-white shadow-sm"
-                              : "bg-[var(--gym-ink,#063434)] text-white group-hover:bg-[var(--gym-lime,#fb5001)]",
+                              : "bg-[var(--gym-ink,#111111)] text-white group-hover:bg-[var(--gym-lime,#fb5001)]",
                           )}
                         >
                           <Icon className="size-[18px]" strokeWidth={1.9} />
@@ -250,7 +250,7 @@ export function SubscriberMobileMenuDrawer({
                               "truncate text-[13.5px] font-bold transition-colors",
                               isActive
                                 ? "text-[var(--gym-lime,#fb5001)]"
-                                : "text-[var(--gym-ink,#111111)] group-hover:text-[var(--gym-ink,#063434)]",
+                                : "text-[var(--gym-ink,#111111)] group-hover:text-[var(--gym-ink,#111111)]",
                             )}
                           >
                             {item.label}

@@ -17,7 +17,7 @@ export function SubscriberProgressHeroBanner() {
     <section
       dir={isRtl ? "rtl" : "ltr"}
       aria-label={isAr ? "تابع تقدمك" : "Track your progress"}
-      className="relative isolate overflow-hidden rounded-[22px] bg-[var(--gym-ink,#063434)] sm:rounded-[28px] shadow-[0_12px_36px_rgba(6,52,52,0.22)] select-none"
+      className="relative isolate overflow-hidden rounded-[22px] bg-[var(--gym-ink,#111111)] sm:rounded-[28px] shadow-[0_12px_36px_rgba(0,0,0,0.18)] select-none"
     >
       {/* Background Athlete Image */}
       <img
@@ -27,30 +27,30 @@ export function SubscriberProgressHeroBanner() {
         draggable={false}
       />
 
-      {/* Mobile Teal Overlay */}
+      {/* Mobile Dark Overlay */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 sm:hidden"
         style={{
           background:
-            "linear-gradient(180deg, rgba(6,52,52,0.28) 0%, rgba(6,52,52,0.48) 40%, rgba(6,52,52,0.88) 100%)",
+            "linear-gradient(180deg, rgba(17,17,17,0.3) 0%, rgba(17,17,17,0.55) 40%, rgba(17,17,17,0.92) 100%)",
         }}
       />
 
-      {/* Desktop Horizontal Teal Overlay */}
+      {/* Desktop Horizontal Dark Overlay */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 hidden sm:block rtl:-scale-x-100"
         style={{
           background:
-            "linear-gradient(90deg, #063434 0%, rgba(6,52,52,0.92) 36%, rgba(6,52,52,0.45) 62%, rgba(6,52,52,0.12) 100%)",
+            "linear-gradient(90deg, #111111 0%, rgba(17,17,17,0.92) 36%, rgba(17,17,17,0.45) 62%, rgba(17,17,17,0.12) 100%)",
         }}
       />
 
-      {/* Desktop Vertical Teal Tint */}
+      {/* Desktop Vertical Dark Tint */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 hidden sm:block bg-[linear-gradient(180deg,rgba(6,52,52,0.15)_0%,rgba(6,52,52,0.55)_100%)]"
+        className="pointer-events-none absolute inset-0 hidden sm:block bg-[linear-gradient(180deg,rgba(17,17,17,0.15)_0%,rgba(17,17,17,0.55)_100%)]"
       />
 
       {/* Foreground Content Row */}

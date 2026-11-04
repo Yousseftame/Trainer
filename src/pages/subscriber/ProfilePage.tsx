@@ -28,7 +28,7 @@ import { appToast } from "@/lib/toast"
 export function ProfilePage() {
   const { t } = useTranslation()
   const { locale, setLocale } = useLocale()
-  const { user, updateAccount, changePassword } = useAuth()
+  const { user, updateAccount, changePassword, sendPasswordResetLink } = useAuth()
   useDocumentTitle(t("nav.profile"))
 
   const isAr = locale === "ar"
@@ -68,6 +68,27 @@ export function ProfilePage() {
   const [currentPassword, setCurrentPassword] = useState("")
   const [nextPassword, setNextPassword] = useState("")
   const [savingPassword, setSavingPassword] = useState(false)
+  const [sendingReset, setSendingReset] = useState(false)
+
+  async function handleSendResetEmail() {
+    const targetEmail = user?.email || subscriberRecord?.email
+    if (!targetEmail) return
+    setSendingReset(true)
+    try {
+      await sendPasswordResetLink?.(targetEmail)
+      appToast.success(
+        isAr
+          ? `تم إرسال رابط إعادة تعيين كلمة المرور إلى ${targetEmail}`
+          : `Password reset link sent to ${targetEmail}`,
+      )
+    } catch {
+      appToast.error(
+        isAr ? "تعذر إرسال رابط إعادة التعيين" : "Could not send reset link",
+      )
+    } finally {
+      setSendingReset(false)
+    }
+  }
 
   useEffect(() => {
     setDisplayName(
@@ -182,42 +203,42 @@ export function ProfilePage() {
   const accountStatus = subscriberRecord?.status ?? user?.status ?? "active"
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-5">
+    <div className="flex flex-col gap-4 sm:gap-5 pb-10">
       {/* Identity Header Card */}
-      <section className="rounded-[24px] bg-white p-5 sm:p-7">
+      <section className="rounded-[24px] bg-white p-5 sm:p-7 border border-black/5 shadow-xs">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <span className="inline-flex size-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--gym-ink,#111111)] font-heading text-[18px] font-bold text-[var(--gym-lime,#fb5001)]">
+          <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
+            <span className="inline-flex size-13 sm:size-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--gym-ink,#111111)] font-heading text-[17px] sm:text-[18px] font-bold text-[var(--gym-lime,#fb5001)] shadow-xs">
               {initials(displayName || user?.email || "DF")}
             </span>
-            <div>
+            <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="font-heading text-[20px] font-extrabold text-[var(--gym-ink,#111111)]">
+                <h2 className="font-heading text-[18px] sm:text-[20px] font-extrabold text-[var(--gym-ink,#111111)] truncate">
                   {displayName || user?.email}
                 </h2>
                 <StatusBadge
                   label={t(`admin.status.${accountStatus}`)}
                   tone={accountStatusTone(accountStatus)}
                 />
-                {currentSub ? (
+                {currentSub && currentSub.status !== accountStatus ? (
                   <StatusBadge
-                    label={t(`admin.status.${currentSub.status}`)}
+                    label={`${isAr ? "الاشتراك: " : "Sub: "}${t(`admin.status.${currentSub.status}`)}`}
                     tone={subscriptionStatusTone(currentSub.status)}
                   />
                 ) : null}
               </div>
-              <p className="mt-1 text-[13px] font-medium text-[#8c8c8c]">
+              <p className="mt-1 text-[12.5px] sm:text-[13px] font-medium text-[#8c8c8c] truncate">
                 {user?.email || subscriberRecord?.email}
                 {currentPkg ? ` · ${currentPkg.name[locale]}` : ""}
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
             <button
               type="button"
               onClick={() => setLocale(locale === "ar" ? "en" : "ar")}
-              className="inline-flex h-10 items-center rounded-full bg-[#F4F4F4] px-4 text-[12px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/10"
+              className="inline-flex h-9.5 sm:h-10 items-center rounded-full bg-[#F4F4F4] hover:bg-[#ECECEC] px-4 text-[12px] font-bold text-[var(--gym-ink,#111111)] transition shadow-2xs"
             >
               {isAr ? "Switch to English" : "التبديل إلى العربية"}
             </button>
@@ -227,7 +248,7 @@ export function ProfilePage() {
 
       <div className="grid gap-4 lg:grid-cols-[1.35fr_1fr]">
         {/* Personal & Training Details Form */}
-        <section className="rounded-[24px] bg-white p-5 sm:p-7">
+        <section className="rounded-[24px] bg-white p-5 sm:p-7 border border-black/5 shadow-xs">
           <div className="flex items-center gap-2.5">
             <UserRound className="size-5 text-[var(--gym-lime,#fb5001)]" strokeWidth={2} />
             <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
@@ -244,7 +265,7 @@ export function ProfilePage() {
                 <input
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none"
+                  className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none border border-transparent focus:border-black/20 focus:bg-white focus:ring-2 focus:ring-[var(--gym-lime,#fb5001)]/30 transition-all"
                 />
               </label>
               <label className="flex flex-col gap-1.5">
@@ -254,36 +275,36 @@ export function ProfilePage() {
                 <input
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none"
+                  className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none border border-transparent focus:border-black/20 focus:bg-white focus:ring-2 focus:ring-[var(--gym-lime,#fb5001)]/30 transition-all"
                 />
               </label>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 xs:grid-cols-3 gap-3">
               <label className="flex flex-col gap-1.5">
-                <span className="text-[12px] font-bold text-[#6B7280]">
+                <span className="text-[12px] font-bold text-[#6B7280] truncate">
                   {isAr ? "العمر" : "Age"}
                 </span>
                 <input
                   type="number"
                   value={age}
                   onChange={(e) => setAge(e.target.value)}
-                  className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none"
+                  className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none border border-transparent focus:border-black/20 focus:bg-white focus:ring-2 focus:ring-[var(--gym-lime,#fb5001)]/30 transition-all"
                 />
               </label>
               <label className="flex flex-col gap-1.5">
-                <span className="text-[12px] font-bold text-[#6B7280]">
+                <span className="text-[12px] font-bold text-[#6B7280] truncate">
                   {isAr ? "الطول (سم)" : "Height (cm)"}
                 </span>
                 <input
                   type="number"
                   value={heightCm}
                   onChange={(e) => setHeightCm(e.target.value)}
-                  className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none"
+                  className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none border border-transparent focus:border-black/20 focus:bg-white focus:ring-2 focus:ring-[var(--gym-lime,#fb5001)]/30 transition-all"
                 />
               </label>
               <label className="flex flex-col gap-1.5">
-                <span className="text-[12px] font-bold text-[#6B7280]">
+                <span className="text-[12px] font-bold text-[#6B7280] truncate">
                   {isAr ? "الوزن المستهدف (كجم)" : "Target wt (kg)"}
                 </span>
                 <input
@@ -291,7 +312,7 @@ export function ProfilePage() {
                   step="0.1"
                   value={targetWeightKg}
                   onChange={(e) => setTargetWeightKg(e.target.value)}
-                  className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none"
+                  className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none border border-transparent focus:border-black/20 focus:bg-white focus:ring-2 focus:ring-[var(--gym-lime,#fb5001)]/30 transition-all"
                 />
               </label>
             </div>
@@ -303,7 +324,7 @@ export function ProfilePage() {
               <input
                 value={goalText}
                 onChange={(e) => setGoalText(e.target.value)}
-                className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none"
+                className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none border border-transparent focus:border-black/20 focus:bg-white focus:ring-2 focus:ring-[var(--gym-lime,#fb5001)]/30 transition-all"
               />
             </label>
 
@@ -317,7 +338,7 @@ export function ProfilePage() {
                 rows={2}
                 value={healthText}
                 onChange={(e) => setHealthText(e.target.value)}
-                className="rounded-2xl bg-[#F4F4F4] p-3 text-[13px] font-medium text-[var(--gym-ink,#111111)] outline-none"
+                className="rounded-2xl bg-[#F4F4F4] p-3 text-[13px] font-medium text-[var(--gym-ink,#111111)] outline-none border border-transparent focus:border-black/20 focus:bg-white focus:ring-2 focus:ring-[var(--gym-lime,#fb5001)]/30 transition-all"
               />
             </label>
 
@@ -325,7 +346,7 @@ export function ProfilePage() {
               <button
                 type="submit"
                 disabled={savingProfile}
-                className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] px-6 text-[13px] font-bold text-white transition hover:opacity-95 disabled:opacity-50"
+                className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] hover:bg-[var(--gym-lime,#fb5001)] px-6 text-[13px] font-bold text-white transition hover:opacity-95 disabled:opacity-50 shadow-2xs active:scale-95"
               >
                 {savingProfile
                   ? isAr
@@ -339,9 +360,9 @@ export function ProfilePage() {
           </form>
         </section>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 h-full">
           {/* Account & Subscription Summary */}
-          <section className="rounded-[24px] bg-white p-5 sm:p-7">
+          <section className="rounded-[24px] bg-white p-5 sm:p-7 border border-black/5 shadow-xs">
             <div className="flex items-center gap-2.5">
               <ShieldCheck
                 className="size-5 text-[var(--gym-lime,#fb5001)]"
@@ -357,7 +378,7 @@ export function ProfilePage() {
                   <Mail className="size-3.5" />
                   {t("admin.subscribers.columns.email")}
                 </dt>
-                <dd className="font-bold text-[var(--gym-ink,#111111)]">
+                <dd className="font-bold text-[var(--gym-ink,#111111)] truncate max-w-[200px]">
                   {user?.email || subscriberRecord?.email || "—"}
                 </dd>
               </div>
@@ -391,56 +412,86 @@ export function ProfilePage() {
             </dl>
           </section>
 
-          {/* Security & Password Change */}
-          <section className="rounded-[24px] bg-white p-5 sm:p-7">
-            <div className="flex items-center gap-2.5">
-              <KeyRound
-                className="size-5 text-[var(--gym-lime,#fb5001)]"
-                strokeWidth={2}
-              />
-              <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
-                {isAr ? "تغيير كلمة المرور" : "Change password"}
-              </h3>
+          {/* Security & Password Change (Stretches to align seamlessly with Personal Information on desktop) */}
+          <section className="flex-1 flex flex-col justify-between rounded-[24px] bg-white p-5 sm:p-7 border border-black/5 shadow-xs">
+            <div>
+              <div className="flex items-center gap-2.5">
+                <KeyRound
+                  className="size-5 text-[var(--gym-lime,#fb5001)]"
+                  strokeWidth={2}
+                />
+                <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
+                  {isAr ? "تغيير كلمة المرور" : "Change password"}
+                </h3>
+              </div>
+              <form onSubmit={handlePasswordSubmit} className="mt-4 space-y-3.5">
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-[12px] font-bold text-[#6B7280]">
+                    {isAr ? "كلمة المرور الحالية" : "Current password"}
+                  </span>
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[13.5px] font-medium text-[var(--gym-ink,#111111)] outline-none border border-transparent focus:border-black/20 focus:bg-white focus:ring-2 focus:ring-[var(--gym-lime,#fb5001)]/30 transition-all"
+                  />
+                </label>
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-[12px] font-bold text-[#6B7280]">
+                    {isAr ? "كلمة المرور الجديدة" : "New password"}
+                  </span>
+                  <input
+                    type="password"
+                    value={nextPassword}
+                    onChange={(e) => setNextPassword(e.target.value)}
+                    className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[13.5px] font-medium text-[var(--gym-ink,#111111)] outline-none border border-transparent focus:border-black/20 focus:bg-white focus:ring-2 focus:ring-[var(--gym-lime,#fb5001)]/30 transition-all"
+                  />
+                </label>
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="submit"
+                    disabled={savingPassword}
+                    className="inline-flex h-10.5 items-center justify-center rounded-full bg-[#F4F4F4] hover:bg-[var(--gym-ink,#111111)] hover:text-white px-5 text-[12px] font-bold text-[var(--gym-ink,#111111)] transition-all disabled:opacity-50 active:scale-95 shadow-2xs"
+                  >
+                    {savingPassword
+                      ? isAr
+                        ? "جارٍ التحديث..."
+                        : "Updating..."
+                      : isAr
+                        ? "تحديث كلمة المرور"
+                        : "Update password"}
+                  </button>
+                </div>
+              </form>
             </div>
-            <form onSubmit={handlePasswordSubmit} className="mt-4 space-y-3">
-              <label className="flex flex-col gap-1">
-                <span className="text-[12px] font-bold text-[#6B7280]">
-                  {isAr ? "كلمة المرور الحالية" : "Current password"}
+
+            {/* Supported Password Reset Flow & Security Notice */}
+            <div className="mt-5 pt-3.5 border-t border-black/5 flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[12px] text-[#8c8c8c]">
+                  {isAr ? "هل نسيت كلمة المرور؟" : "Forgot your password?"}
                 </span>
-                <input
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="h-10 rounded-xl bg-[#F4F4F4] px-3.5 text-[13px] font-medium text-[var(--gym-ink,#111111)] outline-none"
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[12px] font-bold text-[#6B7280]">
-                  {isAr ? "كلمة المرور الجديدة" : "New password"}
-                </span>
-                <input
-                  type="password"
-                  value={nextPassword}
-                  onChange={(e) => setNextPassword(e.target.value)}
-                  className="h-10 rounded-xl bg-[#F4F4F4] px-3.5 text-[13px] font-medium text-[var(--gym-ink,#111111)] outline-none"
-                />
-              </label>
-              <div className="flex justify-end pt-1">
                 <button
-                  type="submit"
-                  disabled={savingPassword}
-                  className="inline-flex h-10 items-center justify-center rounded-full bg-[#F4F4F4] px-5 text-[12px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/10 disabled:opacity-50"
+                  type="button"
+                  onClick={handleSendResetEmail}
+                  disabled={sendingReset}
+                  className="text-[12px] font-bold text-[var(--gym-lime,#fb5001)] hover:underline disabled:opacity-50"
                 >
-                  {savingPassword
+                  {sendingReset
                     ? isAr
-                      ? "جارٍ التحديث..."
-                      : "Updating..."
+                      ? "جارٍ الإرسال..."
+                      : "Sending..."
                     : isAr
-                      ? "تحديث كلمة المرور"
-                      : "Update password"}
+                      ? "إرسال رابط إعادة التعيين"
+                      : "Send reset link"}
                 </button>
               </div>
-            </form>
+              <p className="text-[11px] text-[#8c8c8c] leading-relaxed">
+                🔒 {isAr
+                  ? "العمليات الحساسة تتطلب التحقق من الهوية وكلمة المرور الحالية لحماية خصوصية بياناتك."
+                  : "Sensitive account operations require credential verification to safeguard your account."}
+              </p>
+            </div>
           </section>
         </div>
       </div>

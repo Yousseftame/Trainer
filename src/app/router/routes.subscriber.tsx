@@ -80,7 +80,16 @@ export const subscriberRoutes: RouteObject[] = [
                     ],
                   },
                   {
-                    element: <RequirePackageEntitlement entitlement="pdfDocuments" />,
+                    element: (
+                      <RequirePackageEntitlement
+                        entitlement={[
+                          "pdfDocuments",
+                          "exerciseVideos",
+                          "workoutProgram",
+                          "nutritionProgram",
+                        ]}
+                      />
+                    ),
                     children: [{ path: "library", element: <LibraryPage /> }],
                   },
                   {

@@ -3,6 +3,7 @@ import {
   deletePTRecord,
   fetchPTRecords,
   fetchSubscriberPTRecord,
+  fetchSubscriberPTRecords,
   savePTRecord,
 } from "@/features/physicalTherapy/service"
 import type { PhysicalTherapyRecord } from "@/types/physicalTherapy"
@@ -21,6 +22,15 @@ export function useSubscriberPTQuery(subscriberId?: string) {
   return useQuery({
     queryKey: [...PT_QUERY_KEY, "subscriber", subscriberId],
     queryFn: () => (subscriberId ? fetchSubscriberPTRecord(subscriberId) : null),
+    enabled: Boolean(subscriberId),
+    staleTime: 30_000,
+  })
+}
+
+export function useSubscriberPTRecordsQuery(subscriberId?: string) {
+  return useQuery({
+    queryKey: [...PT_QUERY_KEY, "subscriber_records", subscriberId],
+    queryFn: () => (subscriberId ? fetchSubscriberPTRecords(subscriberId) : []),
     enabled: Boolean(subscriberId),
     staleTime: 30_000,
   })

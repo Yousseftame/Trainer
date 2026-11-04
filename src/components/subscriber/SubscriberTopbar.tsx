@@ -38,7 +38,7 @@ export function SubscriberTopbar({
   return (
     <header
       className={cn(
-        "z-30 shrink-0 bg-[#F4F4F4] px-4 pt-3.5 pb-2.5 sm:px-6 sm:pt-4 sm:pb-3 lg:px-7",
+        "z-30 shrink-0 bg-[#F4F4F4] px-4 pt-[max(0.875rem,calc(0.5rem+env(safe-area-inset-top,0px)))] pb-2.5 sm:px-6 sm:pt-4 sm:pb-3 lg:px-7",
         className,
       )}
     >
@@ -48,12 +48,12 @@ export function SubscriberTopbar({
           to={APP_ROUTES.subscriber.root}
           className="flex items-center gap-2.5 group"
         >
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--gym-ink,#063434)] text-[var(--gym-lime,#fb5001)] shadow-md transition-transform group-active:scale-95">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--gym-ink,#111111)] text-[var(--gym-lime,#fb5001)] shadow-md transition-transform group-active:scale-95">
             <Dumbbell className="size-5" />
           </span>
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
-              <span className="font-heading text-[16px] font-extrabold tracking-tight text-[var(--gym-ink,#063434)]">
+              <span className="font-heading text-[16px] font-extrabold tracking-tight text-[var(--gym-ink,#111111)]">
                 DERPYFIT
               </span>
               <span className="size-1.5 rounded-full bg-[var(--gym-lime,#fb5001)]" />
@@ -83,7 +83,7 @@ export function SubscriberTopbar({
           <button
             type="button"
             onClick={onSidebarToggle}
-            className="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#063434)] shadow-[0_8px_24px_rgba(6,52,52,0.08)] transition-transform active:scale-[0.97]"
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-transform active:scale-[0.97]"
             aria-label={t("nav.openMenu")}
           >
             <PanelLeft className="size-5 rtl:-scale-x-100" strokeWidth={1.8} />
@@ -97,13 +97,13 @@ export function SubscriberTopbar({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                className="min-w-0 truncate font-heading text-[22px] font-extrabold leading-[1.35] tracking-tight text-[var(--gym-ink,#063434)]"
+                className="min-w-0 truncate font-heading text-[22px] font-extrabold leading-[1.35] tracking-tight text-[var(--gym-ink,#111111)]"
               >
                 {title}
               </motion.h1>
             </AnimatePresence>
 
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--gym-lime,#fb5001)]/20 px-3 py-1 text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--gym-lime,#fb5001)]/20 px-3 py-1 text-[12px] font-bold text-[var(--gym-ink,#111111)]">
               <Sparkles className="size-3 text-[var(--gym-lime,#fb5001)]" />
               <span>{areaLabel}</span>
             </span>
@@ -122,10 +122,10 @@ export function SubscriberTopbar({
             placeholder={isAr ? "بحث في التمارين، الوجبات، والمكتبة..." : "Search workouts, meals, library..."}
             className={cn(
               "h-11 w-full rounded-full border-0 bg-white pe-4 ps-11",
-              "font-heading text-[14px] font-medium text-[var(--gym-ink,#063434)]",
-              "shadow-[0_8px_24px_rgba(6,52,52,0.06)] outline-none",
+              "font-heading text-[14px] font-medium text-[var(--gym-ink,#111111)]",
+              "shadow-[0_8px_24px_rgba(0,0,0,0.06)] outline-none",
               "placeholder:font-normal placeholder:text-[var(--gym-muted,#4e5151)]/55",
-              "transition-[box-shadow] focus:shadow-[0_10px_28px_rgba(6,52,52,0.1)]",
+              "transition-[box-shadow] focus:shadow-[0_10px_28px_rgba(0,0,0,0.1)]",
             )}
           />
         </label>
@@ -134,7 +134,7 @@ export function SubscriberTopbar({
         <div className="ms-auto flex shrink-0 items-center gap-2.5">
           <Link
             to={APP_ROUTES.public.home}
-            className="hidden h-11 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] px-5 text-[13px] font-bold text-white transition-opacity hover:opacity-90 sm:inline-flex"
+            className="hidden h-11 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition-opacity hover:opacity-90 sm:inline-flex"
           >
             {t("dashboard.website")}
           </Link>

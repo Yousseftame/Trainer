@@ -95,7 +95,7 @@ export function LogMeasurementDialog({
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       {/* Overlay Backdrop covering whole screen and sidebar */}
       <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-black/50"
         onClick={onClose}
         aria-hidden
       />
@@ -104,11 +104,11 @@ export function LogMeasurementDialog({
       <div className="relative z-10 w-full max-w-lg overflow-hidden rounded-[28px] bg-white p-5 sm:p-7 shadow-2xl">
         <div className="flex items-center justify-between border-b border-[#F0F0F0] pb-4">
           <div className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-2xl bg-[var(--gym-ink,#063434)] text-[var(--gym-lime,#b8fe22)]">
+            <span className="flex size-10 items-center justify-center rounded-2xl bg-[var(--gym-ink,#111111)] text-[var(--gym-lime,#fb5001)]">
               <Scale className="size-5" />
             </span>
             <div>
-              <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#063434)] sm:text-[20px]">
+              <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#111111)] sm:text-[20px]">
                 {initialData
                   ? (isAr ? "تعديل القياسات" : "Edit Measurements")
                   : (isAr ? "تسجيل وزن وقياسات جديدة" : "Log Weight & Measurements")}
@@ -116,7 +116,7 @@ export function LogMeasurementDialog({
               {subscriberName ? (
                 <p className="text-[12px] font-bold text-[#8c8c8c]">
                   {isAr ? "المشترك: " : "Subscriber: "}
-                  <span className="text-[var(--gym-ink,#063434)]">{subscriberName}</span>
+                  <span className="text-[var(--gym-ink,#111111)]">{subscriberName}</span>
                 </p>
               ) : null}
             </div>
@@ -133,7 +133,7 @@ export function LogMeasurementDialog({
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           {/* Date Picker */}
           <div>
-            <label className="mb-1.5 flex items-center gap-1.5 text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+            <label className="mb-1.5 flex items-center gap-1.5 text-[12px] font-bold text-[var(--gym-ink,#111111)]">
               <Calendar className="size-3.5 text-[#8c8c8c]" />
               {isAr ? "تاريخ التسجيل" : "Date recorded"}
             </label>
@@ -142,13 +142,13 @@ export function LogMeasurementDialog({
               required
               value={recordedAt}
               onChange={(e) => setRecordedAt(e.target.value)}
-              className="h-11 w-full rounded-2xl bg-[#F4F4F4] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none focus:ring-2 focus:ring-[var(--gym-ink,#063434)]"
+              className="h-11 w-full rounded-2xl bg-[#F4F4F4] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none focus:ring-2 focus:ring-[var(--gym-ink,#111111)]"
             />
           </div>
 
           {/* Primary Metric: Body Weight */}
-          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-3.5">
-            <label className="mb-1 block text-[12px] font-extrabold text-emerald-950">
+          <div className="rounded-2xl border border-[var(--gym-lime,#fb5001)]/20 bg-[var(--gym-lime,#fb5001)]/5 p-3.5">
+            <label className="mb-1 block text-[12px] font-extrabold text-[var(--gym-ink,#111111)]">
               {isAr ? "وزن الجسم (كجم)" : "Body Weight (kg)"} *
             </label>
             <div className="relative">
@@ -158,7 +158,7 @@ export function LogMeasurementDialog({
                 placeholder="e.g. 82.5"
                 value={weightKg}
                 onChange={(e) => setWeightKg(e.target.value)}
-                className="h-11 w-full rounded-xl bg-white px-3.5 text-[15px] font-bold text-[var(--gym-ink,#063434)] shadow-2xs outline-none focus:ring-2 focus:ring-emerald-500"
+                className="h-11 w-full rounded-xl bg-white px-3.5 text-[15px] font-bold text-[var(--gym-ink,#111111)] shadow-2xs outline-none focus:ring-2 focus:ring-[var(--gym-lime,#fb5001)]/40"
               />
               <span className="pointer-events-none absolute end-3.5 top-1/2 -translate-y-1/2 text-[12px] font-extrabold text-[#8c8c8c]">
                 kg
@@ -168,7 +168,7 @@ export function LogMeasurementDialog({
 
           {/* Body Circumferences 2x2 or 3x2 Grid */}
           <div>
-            <p className="mb-2 text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+            <p className="mb-2 text-[12px] font-bold text-[var(--gym-ink,#111111)]">
               {isAr ? "محيط أجزاء الجسم (سم) - اختياري" : "Body Circumferences (cm) - Optional"}
             </p>
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
@@ -182,7 +182,7 @@ export function LogMeasurementDialog({
                   placeholder="cm"
                   value={waistCm}
                   onChange={(e) => setWaistCm(e.target.value)}
-                  className="h-10 w-full rounded-xl bg-[#F4F4F4] px-3 text-[13px] font-bold text-[var(--gym-ink,#063434)] outline-none"
+                  className="h-10 w-full rounded-xl bg-[#F4F4F4] px-3 text-[13px] font-bold text-[var(--gym-ink,#111111)] outline-none"
                 />
               </div>
 
@@ -196,7 +196,7 @@ export function LogMeasurementDialog({
                   placeholder="cm"
                   value={chestCm}
                   onChange={(e) => setChestCm(e.target.value)}
-                  className="h-10 w-full rounded-xl bg-[#F4F4F4] px-3 text-[13px] font-bold text-[var(--gym-ink,#063434)] outline-none"
+                  className="h-10 w-full rounded-xl bg-[#F4F4F4] px-3 text-[13px] font-bold text-[var(--gym-ink,#111111)] outline-none"
                 />
               </div>
 
@@ -210,7 +210,7 @@ export function LogMeasurementDialog({
                   placeholder="cm"
                   value={hipsCm}
                   onChange={(e) => setHipsCm(e.target.value)}
-                  className="h-10 w-full rounded-xl bg-[#F4F4F4] px-3 text-[13px] font-bold text-[var(--gym-ink,#063434)] outline-none"
+                  className="h-10 w-full rounded-xl bg-[#F4F4F4] px-3 text-[13px] font-bold text-[var(--gym-ink,#111111)] outline-none"
                 />
               </div>
 
@@ -224,7 +224,7 @@ export function LogMeasurementDialog({
                   placeholder="cm"
                   value={armsCm}
                   onChange={(e) => setArmsCm(e.target.value)}
-                  className="h-10 w-full rounded-xl bg-[#F4F4F4] px-3 text-[13px] font-bold text-[var(--gym-ink,#063434)] outline-none"
+                  className="h-10 w-full rounded-xl bg-[#F4F4F4] px-3 text-[13px] font-bold text-[var(--gym-ink,#111111)] outline-none"
                 />
               </div>
 
@@ -238,7 +238,7 @@ export function LogMeasurementDialog({
                   placeholder="cm"
                   value={thighsCm}
                   onChange={(e) => setThighsCm(e.target.value)}
-                  className="h-10 w-full rounded-xl bg-[#F4F4F4] px-3 text-[13px] font-bold text-[var(--gym-ink,#063434)] outline-none"
+                  className="h-10 w-full rounded-xl bg-[#F4F4F4] px-3 text-[13px] font-bold text-[var(--gym-ink,#111111)] outline-none"
                 />
               </div>
             </div>
@@ -246,7 +246,7 @@ export function LogMeasurementDialog({
 
           {/* Notes */}
           <div>
-            <label className="mb-1 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+            <label className="mb-1 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
               {isAr ? "ملاحظات وتفاصيل الفحص" : "Notes & Check-in Details"}
             </label>
             <textarea
@@ -254,7 +254,7 @@ export function LogMeasurementDialog({
               placeholder={isAr ? "ملاحظات حول النوم، الطاقة، أو الالتزام..." : "Notes on sleep, energy, diet compliance..."}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-2xl bg-[#F4F4F4] p-3 text-[13px] font-medium text-[var(--gym-ink,#063434)] outline-none"
+              className="w-full rounded-2xl bg-[#F4F4F4] p-3 text-[13px] font-medium text-[var(--gym-ink,#111111)] outline-none"
             />
           </div>
 
@@ -271,7 +271,7 @@ export function LogMeasurementDialog({
             <button
               type="submit"
               disabled={saving}
-              className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] px-6 text-[13px] font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
+              className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] px-6 text-[13px] font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
             >
               {saving ? (isAr ? "جاري الحفظ..." : "Saving...") : (isAr ? "حفظ القياسات" : "Save Measurements")}
             </button>

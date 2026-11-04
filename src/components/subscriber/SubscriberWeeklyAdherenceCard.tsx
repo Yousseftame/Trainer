@@ -22,7 +22,7 @@ export function SubscriberWeeklyAdherenceCard({ className }: SubscriberWeeklyAdh
       label: isAr ? "تمارين مكتملة" : "Completed Workouts",
       value: 4,
       share: "4 / 5",
-      color: "#063434", // Deep Gym Ink
+      color: "#111111", // Brand Charcoal Ink
     },
     {
       key: "nutrition",
@@ -47,7 +47,7 @@ export function SubscriberWeeklyAdherenceCard({ className }: SubscriberWeeklyAdh
       label: isAr ? "حصص منجزة" : "Completed Sessions",
       value: 4,
       share: "4",
-      color: "#063434",
+      color: "#111111",
     },
     {
       key: "pending",
@@ -74,12 +74,12 @@ export function SubscriberWeeklyAdherenceCard({ className }: SubscriberWeeklyAdh
       <div>
         <div className="flex items-center justify-between gap-2 mb-1">
           <div className="flex items-center gap-2">
-            <span className="flex size-7 items-center justify-center rounded-lg bg-[var(--gym-ink,#063434)]/5 text-[var(--gym-ink,#063434)]">
+            <span className="flex size-7 items-center justify-center rounded-lg bg-[var(--gym-ink,#111111)]/5 text-[var(--gym-ink,#111111)]">
               <Activity className="size-4" strokeWidth={2.2} />
             </span>
             <h3
               className={cn(
-                "text-[14.5px] sm:text-[15.5px] font-extrabold text-[var(--gym-ink,#063434)] tracking-tight",
+                "text-[14.5px] sm:text-[15.5px] font-extrabold text-[var(--gym-ink,#111111)] tracking-tight",
                 isAr ? "font-arabic" : "font-heading",
               )}
             >
@@ -105,7 +105,7 @@ export function SubscriberWeeklyAdherenceCard({ className }: SubscriberWeeklyAdh
             className={cn(
               "rounded-full px-3 py-1 text-[11px] font-bold transition-all duration-200",
               view === "overall"
-                ? "bg-white text-[var(--gym-ink,#063434)] shadow-xs"
+                ? "bg-white text-[var(--gym-ink,#111111)] shadow-xs"
                 : "text-[#777] hover:text-[#111]",
               isAr ? "font-arabic" : "font-heading",
             )}
@@ -118,7 +118,7 @@ export function SubscriberWeeklyAdherenceCard({ className }: SubscriberWeeklyAdh
             className={cn(
               "rounded-full px-3 py-1 text-[11px] font-bold transition-all duration-200",
               view === "workouts"
-                ? "bg-white text-[var(--gym-ink,#063434)] shadow-xs"
+                ? "bg-white text-[var(--gym-ink,#111111)] shadow-xs"
                 : "text-[#777] hover:text-[#111]",
               isAr ? "font-arabic" : "font-heading",
             )}
@@ -149,13 +149,13 @@ export function SubscriberWeeklyAdherenceCard({ className }: SubscriberWeeklyAdh
             </Pie>
             <Tooltip
               contentStyle={{
-                backgroundColor: "#063434",
+                backgroundColor: "#111111",
                 border: "none",
                 borderRadius: "14px",
                 color: "#ffffff",
                 fontSize: "12px",
                 fontWeight: 700,
-                boxShadow: "0 8px 24px rgba(6,52,52,0.2)",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
               }}
               formatter={(value, name) => [value ?? 0, String(name)]}
             />
@@ -166,7 +166,7 @@ export function SubscriberWeeklyAdherenceCard({ className }: SubscriberWeeklyAdh
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
           <p
             className={cn(
-              "text-[32px] sm:text-[36px] font-black leading-none text-[var(--gym-ink,#063434)] tracking-tight",
+              "text-[32px] sm:text-[36px] font-black leading-none text-[var(--gym-ink,#111111)] tracking-tight",
               isAr ? "font-arabic" : "font-heading",
             )}
           >
@@ -197,14 +197,14 @@ export function SubscriberWeeklyAdherenceCard({ className }: SubscriberWeeklyAdh
               />
               <span
                 className={cn(
-                  "truncate font-bold text-[var(--gym-ink,#063434)] text-[12.5px]",
+                  "truncate font-bold text-[var(--gym-ink,#111111)] text-[12.5px]",
                   isAr ? "font-arabic" : "font-sans",
                 )}
               >
                 {item.label}
               </span>
             </div>
-            <span className="font-extrabold text-[12.5px] text-[var(--gym-ink,#063434)] shrink-0 ps-2">
+            <span className="font-extrabold text-[12.5px] text-[var(--gym-ink,#111111)] shrink-0 ps-2">
               {item.share}
             </span>
           </li>

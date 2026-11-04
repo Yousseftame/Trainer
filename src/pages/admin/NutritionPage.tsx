@@ -9,6 +9,7 @@ import {
   FileText,
   Flame,
   History,
+  Info,
   Pencil,
   Plus,
   Repeat,
@@ -23,6 +24,7 @@ import {
   NutritionProgramFormDialog,
   type NutritionDialogMode,
 } from "@/components/dashboard/NutritionProgramFormDialog"
+import { ConfirmActionDialog } from "@/components/dashboard/ConfirmActionDialog"
 import { ProgramHistoryDialog } from "@/components/dashboard/ProgramHistoryDialog"
 import { ProgramLogsDialog } from "@/components/dashboard/ProgramLogsDialog"
 import { FilterChip, StatCard } from "@/components/dashboard/StatCard"
@@ -84,6 +86,15 @@ export function NutritionPage() {
     subscriberId?: string
     subscriberName?: string
   }>({ open: false })
+
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    title: string
+    description?: string
+    confirmLabel?: string
+    tone?: "danger" | "primary" | "warning"
+    onConfirm: () => Promise<void> | void
+  } | null>(null)
 
   // React Query Hooks
   const { data: allPrograms = [] } = useNutritionProgramsQuery()
@@ -156,14 +167,20 @@ export function NutritionPage() {
     }
   }
 
-  async function handleDelete(program: NutritionProgram) {
-    const confirmText = isAr
-      ? `هل أنت متأكد من حذف "${program.title[locale]}" نهائياً؟`
-      : `Are you sure you want to permanently delete "${program.title[locale]}"?`
-    if (!window.confirm(confirmText)) return
-
-    await deleteMutation.mutateAsync(program.id)
-    appToast.success(isAr ? "تم حذف الخطة" : "Plan deleted")
+  function handleDelete(program: NutritionProgram) {
+    setConfirmDialog({
+      open: true,
+      title: isAr ? "حذف خطة التغذية" : "Delete Nutrition Plan",
+      description: isAr
+        ? `هل أنت متأكد من حذف "${program.title[locale]}" نهائياً؟ هذا الإجراء لا يمكن التراجع عنه.`
+        : `Are you sure you want to permanently delete "${program.title[locale]}"? This action cannot be undone.`,
+      confirmLabel: isAr ? "تأكيد الحذف" : "Delete Plan",
+      tone: "danger",
+      onConfirm: async () => {
+        await deleteMutation.mutateAsync(program.id)
+        appToast.success(isAr ? "تم حذف الخطة" : "Plan deleted")
+      },
+    })
   }
 
   const selectedSubscriber = selected?.subscriberId
@@ -216,7 +233,7 @@ export function NutritionPage() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={t("admin.nutrition.search")}
-                className="h-11 w-full rounded-full bg-[#F4F4F4] pe-4 ps-10 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none placeholder:font-normal placeholder:text-[#8c8c8c]"
+                className="h-11 w-full rounded-full bg-[#F4F4F4] pe-4 ps-10 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none placeholder:font-normal placeholder:text-[#8c8c8c]"
               />
             </label>
 
@@ -249,7 +266,7 @@ export function NutritionPage() {
                       mode: { type: "create-template" },
                     })
                   }
-                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#063434)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
                 >
                   <Plus className="size-4" strokeWidth={2} />
                   {t("admin.nutrition.newTemplate")}
@@ -263,7 +280,7 @@ export function NutritionPage() {
                       mode: { type: "assign" },
                     })
                   }
-                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#063434)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
                 >
                   <UserPlus className="size-4" strokeWidth={2} />
                   {t("admin.nutrition.assign")}
@@ -303,8 +320,8 @@ export function NutritionPage() {
                     className={cn(
                       "rounded-2xl p-3.5 text-start transition-colors",
                       active
-                        ? "bg-[var(--gym-ink,#063434)] text-white shadow-sm"
-                        : "bg-[#F4F4F4] text-[var(--gym-ink,#063434)] hover:bg-[#ececec]",
+                        ? "bg-[var(--gym-ink,#111111)] text-white shadow-sm"
+                        : "bg-[#F4F4F4] text-[var(--gym-ink,#111111)] hover:bg-[#ececec]",
                     )}
                   >
                     <div className="flex items-center justify-between gap-1">
@@ -325,7 +342,7 @@ export function NutritionPage() {
                         {subscriber ? subscriber.displayName : `${mealCount(program)} ${isAr ? "وجبات" : "meals"}`}
                       </span>
                       {program.targetCalories ? (
-                        <span className={cn("font-bold", active ? "text-[var(--gym-lime,#b8fe22)]" : "text-[var(--gym-ink,#063434)]")}>
+                        <span className={cn("font-bold", active ? "text-[var(--gym-lime,#fb5001)]" : "text-[var(--gym-ink,#111111)]")}>
                           {program.targetCalories} kcal
                         </span>
                       ) : null}
@@ -341,7 +358,7 @@ export function NutritionPage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="font-heading text-[20px] font-extrabold tracking-tight text-[var(--gym-ink,#063434)]">
+                    <h2 className="font-heading text-[20px] font-extrabold tracking-tight text-[var(--gym-ink,#111111)]">
                       {selected.title[locale]}
                     </h2>
                     <StatusBadge
@@ -383,7 +400,7 @@ export function NutritionPage() {
                       <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#8c8c8c]">
                         {t("admin.nutrition.thisWeek")}
                       </p>
-                      <p className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#063434)]">
+                      <p className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
                         {selected.adherence.done}/{selected.adherence.total}
                       </p>
                     </button>
@@ -401,7 +418,7 @@ export function NutritionPage() {
                             : { type: "edit-assignment", program: selected },
                       })
                     }
-                    className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#063434)] shadow-sm hover:bg-black/5"
+                    className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5"
                     title={isAr ? "تعديل الخطة" : "Edit plan"}
                   >
                     <Pencil className="size-4" />
@@ -417,7 +434,7 @@ export function NutritionPage() {
                           program: selected,
                         })
                       }
-                      className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#063434)] shadow-sm hover:bg-black/5"
+                      className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5"
                       title={isAr ? "سجل الإصدارات السابقة" : "Version history"}
                     >
                       <History className="size-4" />
@@ -428,7 +445,7 @@ export function NutritionPage() {
                   <button
                     type="button"
                     onClick={() => handleArchiveToggle(selected)}
-                    className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#063434)] shadow-sm hover:bg-black/5"
+                    className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5"
                     title={
                       selected.status === "archived"
                         ? isAr
@@ -440,7 +457,7 @@ export function NutritionPage() {
                     }
                   >
                     {selected.status === "archived" ? (
-                      <RotateCcw className="size-4 text-emerald-600" />
+                      <RotateCcw className="size-4 text-[var(--gym-orange,#fb5001)]" />
                     ) : (
                       <Archive className="size-4" />
                     )}
@@ -475,7 +492,7 @@ export function NutritionPage() {
                   <span className="text-[12px] font-bold text-[#8c8c8c]">
                     {isAr ? "السعرات المستهدفة:" : "Target Calories:"}
                   </span>
-                  <span className="font-heading text-[15px] font-extrabold text-[var(--gym-ink,#063434)]">
+                  <span className="font-heading text-[15px] font-extrabold text-[var(--gym-ink,#111111)]">
                     {selected.targetCalories ?? 2000} kcal
                   </span>
                 </div>
@@ -505,8 +522,8 @@ export function NutritionPage() {
               {/* PDF Format Display */}
               {selected.format === "pdf" ? (
                 <div className="flex min-h-40 flex-col items-start justify-center rounded-[20px] bg-white p-5 shadow-sm">
-                  <FileText className="size-8 text-[var(--gym-ink,#063434)]" strokeWidth={1.6} />
-                  <p className="mt-3 font-heading text-[16px] font-bold text-[var(--gym-ink,#063434)]">
+                  <FileText className="size-8 text-[var(--gym-ink,#111111)]" strokeWidth={1.6} />
+                  <p className="mt-3 font-heading text-[16px] font-bold text-[var(--gym-ink,#111111)]">
                     {selected.pdfName?.[locale] || (isAr ? "مستند الخطة الغذائية PDF" : "Nutrition Plan PDF")}
                   </p>
                   <p className="mt-1 max-w-md text-[13px] text-[#8c8c8c]">
@@ -529,8 +546,8 @@ export function NutritionPage() {
                           className={cn(
                             "flex min-h-[72px] flex-col items-center justify-center rounded-2xl px-1 py-2 text-center transition-colors sm:min-h-[84px] overflow-hidden",
                             active
-                              ? "bg-[var(--gym-ink,#063434)] text-white shadow-sm"
-                              : "bg-white text-[var(--gym-ink,#063434)] hover:bg-white/80",
+                              ? "bg-[var(--gym-ink,#111111)] text-white shadow-sm"
+                              : "bg-white text-[var(--gym-ink,#111111)] hover:bg-white/80",
                           )}
                         >
                           <span
@@ -546,8 +563,8 @@ export function NutritionPage() {
                               "mt-1 size-2 rounded-full",
                               count > 0
                                 ? active
-                                  ? "bg-[var(--gym-lime,#b8fe22)]"
-                                  : "bg-[var(--gym-ink,#063434)]"
+                                  ? "bg-[var(--gym-lime,#fb5001)]"
+                                  : "bg-[var(--gym-ink,#111111)]"
                                 : active
                                   ? "bg-white/30"
                                   : "bg-[#D9D9D9]",
@@ -565,7 +582,7 @@ export function NutritionPage() {
                   <div className="rounded-[20px] bg-white p-4 sm:p-5 shadow-sm">
                     <div className="mb-4 flex items-center justify-between gap-3">
                       <div>
-                        <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#063434)]">
+                        <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
                           {isAr
                             ? WEEKDAY_NAMES_AR[selectedDay?.weekday ?? 0]
                             : WEEKDAY_NAMES_EN[selectedDay?.weekday ?? 0]}
@@ -577,7 +594,7 @@ export function NutritionPage() {
 
                       {dayMacroSummary ? (
                         <div className="flex items-center gap-2 text-[11px] font-bold">
-                          <span className="rounded-full bg-[#F4F4F4] px-2.5 py-1 text-[var(--gym-ink,#063434)]">
+                          <span className="rounded-full bg-[#F4F4F4] px-2.5 py-1 text-[var(--gym-ink,#111111)]">
                             {dayMacroSummary.calories} kcal
                           </span>
                           <span className="text-blue-700">P: {dayMacroSummary.protein}g</span>
@@ -600,7 +617,7 @@ export function NutritionPage() {
                               className="rounded-2xl bg-[#F4F4F4] p-3.5 sm:p-4 space-y-2.5"
                             >
                               <div className="flex items-center justify-between">
-                                <span className="font-heading text-[14px] font-extrabold text-[var(--gym-ink,#063434)]">
+                                <span className="font-heading text-[14px] font-extrabold text-[var(--gym-ink,#111111)]">
                                   {t(`admin.nutrition.slots.${slot.slot}`, {
                                     defaultValue: slot.slot.replace("_", " "),
                                   })}
@@ -609,6 +626,17 @@ export function NutritionPage() {
                                   {slot.items.length} {isAr ? "أصناف" : "foods"}
                                 </span>
                               </div>
+
+                              {/* Slot Coaching Note Banner (Reflecting Subscriber View Instructions) */}
+                              {slot.coachingNote ? (
+                                <div className="rounded-xl bg-amber-50/80 p-2.5 border border-amber-200/70 text-amber-950 text-[11.5px] flex items-start gap-2">
+                                  <Info className="size-3.5 text-amber-700 shrink-0 mt-0.5" />
+                                  <p className="leading-relaxed">
+                                    <strong className="font-extrabold">{isAr ? "تعليمات وتوجيهات الوجبة: " : "Meal Instructions: "}</strong>
+                                    {resolveBilingualText(slot.coachingNote, locale)}
+                                  </p>
+                                </div>
+                              ) : null}
 
                               <ul className="space-y-2">
                                 {slot.items.map((item) => {
@@ -622,11 +650,20 @@ export function NutritionPage() {
                                       className="rounded-xl bg-white p-3 shadow-2xs space-y-1.5"
                                     >
                                       <div className="flex items-center justify-between gap-2">
-                                        <p className="font-heading text-[13px] font-bold text-[var(--gym-ink,#063434)]">
-                                          {name}
-                                        </p>
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          {item.thumbnailUrl ? (
+                                            <img
+                                              src={item.thumbnailUrl}
+                                              alt={name}
+                                              className="size-8 rounded-lg object-cover border border-black/10 shrink-0"
+                                            />
+                                          ) : null}
+                                          <p className="font-heading text-[13px] font-bold text-[var(--gym-ink,#111111)] truncate">
+                                            {name}
+                                          </p>
+                                        </div>
                                         {qty ? (
-                                          <span className="rounded-full bg-[#F4F4F4] px-2 py-0.5 text-[11px] font-bold text-[#6B7280]">
+                                          <span className="rounded-full bg-[#F4F4F4] px-2 py-0.5 text-[11px] font-bold text-[#6B7280] shrink-0">
                                             {qty}
                                           </span>
                                         ) : null}
@@ -634,12 +671,12 @@ export function NutritionPage() {
 
                                       <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold">
                                         {item.calories ? (
-                                          <span className="text-[var(--gym-ink,#063434)]">
+                                          <span className="text-[var(--gym-ink,#111111)]">
                                             {item.calories} kcal
                                           </span>
                                         ) : null}
                                         {item.percentage ? (
-                                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">
+                                          <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-extrabold text-[#111111]">
                                             {item.percentage}% {isAr ? "من الوجبة" : "of meal"}
                                           </span>
                                         ) : null}
@@ -670,9 +707,9 @@ export function NutritionPage() {
                                                 expandedFoodAltId === item.id ? null : item.id,
                                               )
                                             }
-                                            className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 hover:text-black transition"
+                                            className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[var(--gym-ink,#111111)] hover:text-[var(--gym-orange,#fb5001)] transition"
                                           >
-                                            <Repeat className="size-3 text-emerald-600" />
+                                            <Repeat className="size-3 text-[var(--gym-orange,#fb5001)]" />
                                             <span>
                                               {isAr
                                                 ? `بدائل الطعام المتاحة (${item.alternatives.length})`
@@ -687,7 +724,7 @@ export function NutritionPage() {
                                           </button>
 
                                           {expandedFoodAltId === item.id ? (
-                                            <div className="mt-2 space-y-2 rounded-xl bg-emerald-50/70 p-2.5 border border-emerald-200/60">
+                                            <div className="mt-2 space-y-2 rounded-xl bg-neutral-50 p-2.5 border border-black/10">
                                               {item.alternatives.map((alt) => {
                                                 const altName = resolveBilingualText(alt.name, locale)
                                                 const altQty = resolveBilingualText(alt.quantity, locale)
@@ -695,9 +732,9 @@ export function NutritionPage() {
                                                 return (
                                                   <div
                                                     key={alt.id}
-                                                    className="rounded-lg bg-white p-2.5 text-[11px] shadow-2xs border border-emerald-100 flex flex-col gap-1"
+                                                    className="rounded-lg bg-white p-2.5 text-[11px] shadow-2xs border border-black/5 flex flex-col gap-1"
                                                   >
-                                                    <div className="flex items-center justify-between gap-1 font-bold text-[var(--gym-ink,#063434)]">
+                                                    <div className="flex items-center justify-between gap-1 font-bold text-[var(--gym-ink,#111111)]">
                                                       <span>{altName}</span>
                                                       {altQty ? (
                                                         <span className="rounded bg-black/5 px-1.5 py-0.5 text-[10px] text-[#555]">
@@ -708,7 +745,7 @@ export function NutritionPage() {
 
                                                     <div className="flex items-center gap-2 text-[10px] font-bold">
                                                       {alt.percentage ? (
-                                                        <span className="rounded-full bg-emerald-100 px-1.5 py-0.2 text-emerald-900 font-extrabold">
+                                                        <span className="rounded-full bg-orange-50 px-1.5 py-0.2 text-orange-950 font-extrabold">
                                                           {alt.percentage}% {isAr ? "تطابق" : "match"}
                                                         </span>
                                                       ) : null}
@@ -790,6 +827,19 @@ export function NutritionPage() {
           nutritionLogs={subscriberLogs}
           type="nutrition"
           onClose={() => setLogsModal({ open: false })}
+        />
+      ) : null}
+
+      {/* Confirm Action Dialog */}
+      {confirmDialog ? (
+        <ConfirmActionDialog
+          open={confirmDialog.open}
+          title={confirmDialog.title}
+          description={confirmDialog.description}
+          confirmLabel={confirmDialog.confirmLabel}
+          tone={confirmDialog.tone}
+          onCancel={() => setConfirmDialog(null)}
+          onConfirm={confirmDialog.onConfirm}
         />
       ) : null}
     </div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar"
@@ -43,6 +43,14 @@ export function DashboardShell({ area, items, homeTo }: DashboardShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)
+  const mainRef = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    if (mainRef.current) {
+      mainRef.current.scrollTo({ top: 0, left: 0, behavior: "instant" })
+      mainRef.current.scrollTop = 0
+    }
+  }, [location.pathname])
 
   useEffect(() => {
     setCollapsed(readCollapsed())
@@ -131,7 +139,10 @@ export function DashboardShell({ area, items, homeTo }: DashboardShellProps) {
             setMobileOpen(true)
           }}
         />
-        <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-6 pt-3 sm:px-6 sm:pb-8 lg:px-7 lg:pb-10">
+        <main
+          ref={mainRef}
+          className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-6 pt-3 sm:px-6 sm:pb-8 lg:px-7 lg:pb-10"
+        >
           <Outlet />
         </main>
       </div>

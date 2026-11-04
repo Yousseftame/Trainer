@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+﻿import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { AnimatePresence, motion } from "motion/react"
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react"
 import { useLocale } from "@/hooks/useLocale"
@@ -89,13 +89,13 @@ export function DataTable<T>({
               <thead>
                 <tr>
                   {renderExpandedRow ? (
-                    <th className="w-10 border-b border-[var(--gym-ink,#063434)]/8 px-4 py-3" />
+                    <th className="w-10 border-b border-[var(--gym-ink,#111111)]/8 px-4 py-3" />
                   ) : null}
                   {columns.map((column) => (
                     <th
                       key={column.id}
                       className={cn(
-                        "border-b border-[var(--gym-ink,#063434)]/8 px-4 py-3 text-start text-[13px] font-semibold whitespace-nowrap text-[#8c8c8c]",
+                        "border-b border-[var(--gym-ink,#111111)]/8 px-4 py-3 text-start text-[13px] font-semibold whitespace-nowrap text-[#8c8c8c]",
                         column.headerClassName,
                       )}
                     >
@@ -103,7 +103,7 @@ export function DataTable<T>({
                     </th>
                   ))}
                   {actions ? (
-                    <th className="border-b border-[var(--gym-ink,#063434)]/8 px-4 py-3 text-end text-[13px] font-semibold whitespace-nowrap text-[#8c8c8c]">
+                    <th className="border-b border-[var(--gym-ink,#111111)]/8 px-4 py-3 text-end text-[13px] font-semibold whitespace-nowrap text-[#8c8c8c]">
                       {actionsHeader}
                     </th>
                   ) : null}
@@ -127,7 +127,7 @@ export function DataTable<T>({
                         {renderExpandedRow ? (
                           <td
                             className={cn(
-                              "border-b border-[var(--gym-ink,#063434)]/6 px-4 py-4 text-[#8c8c8c] group-hover:bg-[#F4F4F4]/80",
+                              "border-b border-[var(--gym-ink,#111111)]/6 px-4 py-4 text-[#8c8c8c] group-hover:bg-[#F4F4F4]/80",
                               isLast && !isExpanded && "border-b-0",
                             )}
                           >
@@ -143,7 +143,7 @@ export function DataTable<T>({
                           <td
                             key={column.id}
                             className={cn(
-                              "border-b border-[var(--gym-ink,#063434)]/6 px-4 py-4 text-sm font-medium whitespace-nowrap text-[var(--gym-ink,#063434)] group-hover:bg-[#F4F4F4]/80",
+                              "border-b border-[var(--gym-ink,#111111)]/6 px-4 py-4 text-sm font-medium whitespace-nowrap text-[var(--gym-ink,#111111)] group-hover:bg-[#F4F4F4]/80",
                               isLast && !isExpanded && "border-b-0",
                               column.className,
                             )}
@@ -154,7 +154,7 @@ export function DataTable<T>({
                         {actions ? (
                           <td
                             className={cn(
-                              "border-b border-[var(--gym-ink,#063434)]/6 px-4 py-4 group-hover:bg-[#F4F4F4]/80",
+                              "border-b border-[var(--gym-ink,#111111)]/6 px-4 py-4 group-hover:bg-[#F4F4F4]/80",
                               isLast && !isExpanded && "border-b-0",
                             )}
                           >
@@ -175,7 +175,7 @@ export function DataTable<T>({
                             colSpan={columns.length + (actions ? 1 : 0) + 1}
                             className={cn(
                               "overflow-hidden p-0",
-                              isExpanded && "border-b border-[var(--gym-ink,#063434)]/6",
+                              isExpanded && "border-b border-[var(--gym-ink,#111111)]/6",
                               isLast && !isExpanded && "border-b-0",
                             )}
                           >
@@ -189,7 +189,7 @@ export function DataTable<T>({
                                   transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
                                   className="overflow-hidden bg-[#F8F9FA]"
                                 >
-                                  <div className="mx-4 my-4 rounded-lg border-s-4 border-[var(--gym-ink,#063434)] bg-white p-5 shadow-sm">
+                                  <div className="mx-4 my-4 rounded-lg border-s-4 border-[var(--gym-ink,#111111)] bg-white p-5 shadow-sm">
                                     {renderExpandedRow(row)}
                                   </div>
                                 </motion.div>
@@ -206,7 +206,7 @@ export function DataTable<T>({
           </div>
 
           {paginated && totalRows > 5 ? (
-            <div className="mt-4 flex flex-col gap-3 border-t border-[var(--gym-ink,#063434)]/8 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mt-4 flex flex-col gap-3 border-t border-[var(--gym-ink,#111111)]/8 pt-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap items-center gap-3 text-[12px] font-medium text-[#8c8c8c]">
                 <span>
                   {locale === "ar"
@@ -295,8 +295,8 @@ export function TableAction({
         tone === "danger"
           ? "text-[#FF6A55] hover:bg-[#FFE8E4]"
           : tone === "primary"
-            ? "bg-[var(--gym-ink,#063434)] text-white hover:bg-[#0a4540]"
-            : "text-[var(--gym-ink,#063434)] hover:bg-white",
+            ? "bg-[var(--gym-ink,#111111)] text-white hover:bg-[#0a4540]"
+            : "text-[var(--gym-ink,#111111)] hover:bg-white",
       )}
     >
       {label}

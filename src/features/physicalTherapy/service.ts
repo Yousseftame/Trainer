@@ -62,16 +62,25 @@ export async function fetchPTRecords(): Promise<PhysicalTherapyRecord[]> {
   }
 }
 
+export async function fetchSubscriberPTRecords(
+  subscriberId: string,
+): Promise<PhysicalTherapyRecord[]> {
+  const all = await fetchPTRecords()
+  return all.filter(
+    (r) =>
+      r.subscriberId === subscriberId ||
+      r.subscriberId.toLowerCase() === subscriberId.toLowerCase(),
+  )
+}
+
 export async function fetchSubscriberPTRecord(
   subscriberId: string,
 ): Promise<PhysicalTherapyRecord | null> {
-  const all = await fetchPTRecords()
+  const list = await fetchSubscriberPTRecords(subscriberId)
+  if (!list.length) return null
   return (
-    all.find(
-      (r) =>
-        r.subscriberId === subscriberId ||
-        r.subscriberId.toLowerCase() === subscriberId.toLowerCase(),
-    ) ?? null
+    list.find((r) => r.status === "active" || r.status === "recovering") ??
+    list[0]
   )
 }
 

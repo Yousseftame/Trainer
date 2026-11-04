@@ -11,6 +11,7 @@ import {
   UserX,
   Users,
 } from "lucide-react"
+import { ConfirmActionDialog } from "@/components/dashboard/ConfirmActionDialog"
 import { DataTable, TableAction } from "@/components/dashboard/DataTable"
 import { FilterChip, StatCard } from "@/components/dashboard/StatCard"
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
@@ -58,6 +59,14 @@ export function StaffPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [editingMember, setEditingMember] = useState<StaffMember | null>(null)
   const [detailMember, setDetailMember] = useState<StaffMember | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    title: string
+    description?: string
+    confirmLabel?: string
+    tone?: "danger" | "primary" | "warning"
+    onConfirm: () => Promise<void> | void
+  } | null>(null)
 
   const { data: staff = [] } = useStaffMembersQuery()
   const saveMutation = useSaveStaffMemberMutation()
@@ -95,7 +104,7 @@ export function StaffPage() {
     })
   }, [staff, statusFilter, roleFilter, query, locale])
 
-  async function handleToggleStatus(member: StaffMember) {
+  function handleToggleStatus(member: StaffMember) {
     if (member.role === "head_coach") {
       appToast.error(
         isAr
@@ -106,40 +115,58 @@ export function StaffPage() {
     }
 
     const nextStatus = member.status === "active" ? "suspended" : "active"
-    const confirmMsg =
-      nextStatus === "suspended"
+    const isSuspending = nextStatus === "suspended"
+
+    setConfirmDialog({
+      open: true,
+      title: isSuspending
         ? isAr
-          ? `هل أنت متأكد من حظر حساب "${member.displayName}"؟ سيتم منعه من تسجيل الدخول فوراً.`
+          ? "حظر حساب موظف"
+          : "Suspend Staff Account"
+        : isAr
+          ? "تفعيل حساب موظف"
+          : "Reactivate Staff Account",
+      description: isSuspending
+        ? isAr
+          ? `هل أنت متأكد من حظر حساب "${member.displayName}"؟ سيتم منعه من تسجيل الدخول إلى المنصة فوراً.`
           : `Are you sure you want to suspend "${member.displayName}"? They will be immediately blocked from dashboard access.`
         : isAr
-          ? `هل أنت متأكد من إعادة تفعيل حساب "${member.displayName}"؟`
-          : `Reactivate "${member.displayName}" account?`
-
-    if (!window.confirm(confirmMsg)) return
-
-    try {
-      await toggleStatusMutation.mutateAsync(member.id)
-      appToast.success(
-        nextStatus === "suspended"
-          ? isAr
-            ? "تم حظر الحساب بنجاح"
-            : "Staff account suspended successfully"
-          : isAr
-            ? "تمت استعادة وتفعيل الحساب"
-            : "Staff account reactivated successfully",
-      )
-    } catch (err) {
-      appToast.error(
-        err instanceof Error
-          ? err.message
-          : isAr
-            ? "فشل تحديث حالة الحساب"
-            : "Failed to update account status",
-      )
-    }
+          ? `هل أنت متأكد من إعادة تفعيل حساب "${member.displayName}"؟ سيتمكن من تسجيل الدخول مجدداً.`
+          : `Reactivate "${member.displayName}" account? They will regain access to their assigned modules.`,
+      confirmLabel: isSuspending
+        ? isAr
+          ? "حظر الحساب"
+          : "Suspend Account"
+        : isAr
+          ? "تفعيل الحساب"
+          : "Activate Account",
+      tone: isSuspending ? "warning" : "primary",
+      onConfirm: async () => {
+        try {
+          await toggleStatusMutation.mutateAsync(member.id)
+          appToast.success(
+            isSuspending
+              ? isAr
+                ? "تم حظر الحساب بنجاح"
+                : "Staff account suspended successfully"
+              : isAr
+                ? "تمت استعادة وتفعيل الحساب"
+                : "Staff account reactivated successfully",
+          )
+        } catch (err) {
+          appToast.error(
+            err instanceof Error
+              ? err.message
+              : isAr
+                ? "فشل تحديث حالة الحساب"
+                : "Failed to update account status",
+          )
+        }
+      },
+    })
   }
 
-  async function handleDelete(member: StaffMember) {
+  function handleDelete(member: StaffMember) {
     if (member.role === "head_coach") {
       appToast.error(
         isAr
@@ -149,24 +176,33 @@ export function StaffPage() {
       return
     }
 
-    const confirmMsg = isAr
-      ? `هل أنت متأكد تماماً من حذف حساب "${member.displayName}" نهائياً؟ هذا الإجراء لا يمكن التراجع عنه.`
-      : `Are you sure you want to permanently delete "${member.displayName}"? This action cannot be undone.`
-
-    if (!window.confirm(confirmMsg)) return
-
-    try {
-      await deleteMutation.mutateAsync(member.id)
-      appToast.success(isAr ? "تم حذف حساب الموظف بنجاح" : "Staff account deleted successfully")
-    } catch (err) {
-      appToast.error(
-        err instanceof Error
-          ? err.message
-          : isAr
-            ? "فشل حذف الحساب"
-            : "Failed to delete account",
-      )
-    }
+    setConfirmDialog({
+      open: true,
+      title: isAr ? "حذف حساب الموظف نهائياً" : "Delete Staff Account Permanently",
+      description: isAr
+        ? `هل أنت متأكد تماماً من حذف حساب "${member.displayName}" نهائياً؟ هذا الإجراء لا يمكن التراجع عنه وسيتم إزالة صلاحياته فوراً.`
+        : `Are you sure you want to permanently delete "${member.displayName}"? This action cannot be undone and will revoke all access immediately.`,
+      confirmLabel: isAr ? "تأكيد الحذف النهائي" : "Delete Permanently",
+      tone: "danger",
+      onConfirm: async () => {
+        try {
+          await deleteMutation.mutateAsync(member.id)
+          appToast.success(
+            isAr
+              ? "تم حذف حساب الموظف بنجاح"
+              : "Staff account deleted successfully",
+          )
+        } catch (err) {
+          appToast.error(
+            err instanceof Error
+              ? err.message
+              : isAr
+                ? "فشل حذف الحساب"
+                : "Failed to delete account",
+          )
+        }
+      },
+    })
   }
 
   return (
@@ -191,7 +227,7 @@ export function StaffPage() {
         <StatCard
           label={isAr ? "كبير المدربين (المؤسس)" : "Head Coach Account"}
           value={stats.headCoach ? (isAr ? "مفعل ودائم" : "Protected") : "—"}
-          icon={<ShieldCheck className="size-4 text-[var(--gym-ink,#063434)]" strokeWidth={1.8} />}
+          icon={<ShieldCheck className="size-4 text-[var(--gym-ink,#111111)]" strokeWidth={1.8} />}
         />
       </div>
 
@@ -232,7 +268,7 @@ export function StaffPage() {
                       ? "بحث بالاسم أو البريد أو المسمى..."
                       : "Search staff name, email, or role..."
                   }
-                  className="h-11 w-full rounded-full bg-[#F4F4F4] pe-4 ps-10 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none placeholder:font-normal placeholder:text-[#8c8c8c]"
+                  className="h-11 w-full rounded-full bg-[#F4F4F4] pe-4 ps-10 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none placeholder:font-normal placeholder:text-[#8c8c8c]"
                 />
               </label>
 
@@ -263,7 +299,7 @@ export function StaffPage() {
                     setEditingMember(null)
                     setFormOpen(true)
                   }}
-                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#063434)] px-4 sm:px-5 text-[13px] font-bold text-white transition hover:opacity-95"
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-4 sm:px-5 text-[13px] font-bold text-white transition hover:opacity-95"
                 >
                   <Plus className="size-4" strokeWidth={2} />
                   <span className="whitespace-nowrap">
@@ -299,7 +335,7 @@ export function StaffPage() {
         empty={
           <div className="flex flex-col items-center justify-center py-6 text-center">
             <Shield className="size-8 text-[#8c8c8c] mb-2" strokeWidth={1.5} />
-            <p className="text-[14px] font-bold text-[var(--gym-ink,#063434)]">
+            <p className="text-[14px] font-bold text-[var(--gym-ink,#111111)]">
               {isAr ? "لا يوجد موظفون يطابقون هذا البحث" : "No staff members match this filter"}
             </p>
             <p className="mt-1 text-[12px] text-[#8c8c8c]">
@@ -325,16 +361,16 @@ export function StaffPage() {
                     className={cn(
                       "flex size-10 shrink-0 items-center justify-center rounded-2xl font-heading text-[13px] font-extrabold text-white shadow-2xs transition group-hover:scale-105",
                       isHead
-                        ? "bg-[var(--gym-ink,#063434)] text-[var(--gym-lime,#b8fe22)]"
+                        ? "bg-[var(--gym-ink,#111111)] text-[var(--gym-lime,#fb5001)]"
                         : isSuspended
                           ? "bg-red-700 text-white"
-                          : "bg-[var(--gym-ink,#063434)] text-white",
+                          : "bg-[var(--gym-ink,#111111)] text-white",
                     )}
                   >
                     {initials(row.displayName)}
                   </div>
                   <div className="min-w-0">
-                    <p className="font-heading text-[14px] font-extrabold text-[var(--gym-ink,#063434)] group-hover:text-[var(--gym-lime,#fb5001)] transition truncate">
+                    <p className="font-heading text-[14px] font-extrabold text-[var(--gym-ink,#111111)] group-hover:text-[var(--gym-lime,#fb5001)] transition truncate">
                       {row.displayName}
                     </p>
                     <p className="text-[12px] text-[#8c8c8c] truncate">
@@ -395,7 +431,7 @@ export function StaffPage() {
 
               if (isHead) {
                 return (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--gym-ink,#063434)] px-3 py-1 text-[11px] font-bold text-[var(--gym-lime,#b8fe22)]">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--gym-ink,#111111)] px-3 py-1 text-[11px] font-bold text-[var(--gym-lime,#fb5001)]">
                     <ShieldCheck className="size-3" />
                     <span>{isAr ? "كافة الأقسام (وصول كامل)" : "All Modules (Full)"}</span>
                   </span>
@@ -512,6 +548,19 @@ export function StaffPage() {
           await saveMutation.mutateAsync(input)
         }}
       />
+
+      {/* Confirm Action Dialog */}
+      {confirmDialog ? (
+        <ConfirmActionDialog
+          open={confirmDialog.open}
+          title={confirmDialog.title}
+          description={confirmDialog.description}
+          confirmLabel={confirmDialog.confirmLabel}
+          tone={confirmDialog.tone}
+          onCancel={() => setConfirmDialog(null)}
+          onConfirm={confirmDialog.onConfirm}
+        />
+      ) : null}
     </div>
   )
 }

@@ -24,8 +24,10 @@ import {
   Scale,
   Search,
   ShieldCheck,
+  Trash2,
 } from "lucide-react"
 import { AddProgressPhotoDialog } from "@/components/dashboard/AddProgressPhotoDialog"
+import { ConfirmActionDialog } from "@/components/dashboard/ConfirmActionDialog"
 import { LogMeasurementDialog } from "@/components/dashboard/LogMeasurementDialog"
 import { LogPerformanceDialog } from "@/components/dashboard/LogPerformanceDialog"
 import { PhotoComparisonDialog } from "@/components/dashboard/PhotoComparisonDialog"
@@ -33,6 +35,9 @@ import { FilterChip, StatCard } from "@/components/dashboard/StatCard"
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
 import { APP_ROUTES } from "@/config/constants"
 import {
+  useDeleteMeasurementMutation,
+  useDeletePerformanceMutation,
+  useDeletePhotoMutation,
   useMeasurementsQuery,
   usePerformanceQuery,
   usePhotosQuery,
@@ -40,9 +45,15 @@ import {
   useSavePerformanceMutation,
   useSavePhotoMutation,
 } from "@/features/progress/hooks"
+import { useSubscribersQuery } from "@/features/subscribers/hooks"
+import { useWorkoutProgramsQuery } from "@/features/workouts/hooks"
+import { useNutritionProgramsQuery } from "@/features/nutrition/hooks"
+import { appToast } from "@/lib/toast"
 import {
   adherenceFor,
+  adherenceScore,
   daysSinceCheckIn,
+  isStale,
   latestWeek,
   liftSeries,
   liftsFor,
@@ -67,8 +78,8 @@ type ReviewTab = "overview" | "body" | "photos" | "performance" | "history"
 const FILTERS: ProgressFilter[] = ["all", "attention", "ontrack", "quiet"]
 const TABS: ReviewTab[] = ["overview", "body", "photos", "performance", "history"]
 
-const INK = "var(--gym-ink,#063434)"
-const LIME = "var(--gym-lime,#b8fe22)"
+const INK = "var(--gym-ink,#111111)"
+const LIME = "var(--gym-lime,#fb5001)"
 
 function signed(value: number, digits = 1) {
   const abs = Math.abs(value).toFixed(digits).replace(/\.0$/, "")
@@ -98,13 +109,19 @@ export function ProgressPage() {
   useDocumentTitle(t("nav.progress"))
 
   // Real-time Queries & Mutations
+  const { data: subscribers = [] } = useSubscribersQuery()
   const { data: allMeasurements = [] } = useMeasurementsQuery()
   const { data: allPhotos = [] } = usePhotosQuery()
   const { data: allLifts = [] } = usePerformanceQuery()
+  const { data: allWorkouts = [] } = useWorkoutProgramsQuery()
+  const { data: allNutrition = [] } = useNutritionProgramsQuery()
 
   const saveMeasurementMutation = useSaveMeasurementMutation()
+  const deleteMeasurementMutation = useDeleteMeasurementMutation()
   const savePhotoMutation = useSavePhotoMutation()
+  const deletePhotoMutation = useDeletePhotoMutation()
   const savePerformanceMutation = useSavePerformanceMutation()
+  const deletePerformanceMutation = useDeletePerformanceMutation()
 
   // Dialog States
   const [measurementModalOpen, setMeasurementModalOpen] = useState(false)
@@ -112,11 +129,83 @@ export function ProgressPage() {
   const [performanceModalOpen, setPerformanceModalOpen] = useState(false)
   const [compareModalOpen, setCompareModalOpen] = useState(false)
 
+  // Confirm Action Dialog State
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    title: string
+    description?: string
+    confirmLabel?: string
+    tone?: "danger" | "primary" | "warning"
+    onConfirm: () => Promise<void> | void
+  } | null>(null)
+
   const [filter, setFilter] = useState<ProgressFilter>("all")
   const [query, setQuery] = useState("")
   const [tab, setTab] = useState<ReviewTab>("overview")
   const [params] = useSearchParams()
-  const roster = useMemo(() => progressRoster(), [])
+
+  // Dynamic Unified Roster combining registered subscribers with demo fallback
+  const roster: RosterPerson[] = useMemo(() => {
+    if (!subscribers.length) return progressRoster()
+
+    return subscribers
+      .filter((s) => s.status !== "rejected")
+      .map((sub) => {
+        const subMeasurements = allMeasurements
+          .filter((m) => m.subscriberId === sub.id)
+          .sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime())
+        const measurements = subMeasurements.length ? subMeasurements : measurementsFor(sub.id)
+        const latest = measurements[measurements.length - 1]
+        const first = measurements[0]
+        const weightKg = latest?.weightKg ?? sub.startingWeightKg
+        const deltaKg =
+          latest?.weightKg != null && sub.startingWeightKg != null
+            ? Math.round((latest.weightKg - sub.startingWeightKg) * 10) / 10
+            : latest?.weightKg != null && first?.weightKg != null
+              ? Math.round((latest.weightKg - first.weightKg) * 10) / 10
+              : null
+
+        const subPhotos = allPhotos.filter((p) => p.subscriberId === sub.id)
+        const photoCount = subPhotos.length || photosFor(sub.id).length
+        const lastCheckInDate = latest?.recordedAt ?? null
+
+        const days = lastCheckInDate
+          ? Math.floor((Date.now() - new Date(lastCheckInDate).getTime()) / (1000 * 60 * 60 * 24))
+          : daysSinceCheckIn(sub.id)
+        const stale = days != null ? days > 14 : isStale(sub.id)
+        const adherence = adherenceScore(sub.id)
+
+        let bucket: ProgressFilter = "ontrack"
+        let tone: "success" | "warning" | "danger" | "muted" = "success"
+
+        if (!lastCheckInDate) {
+          bucket = "quiet"
+          tone = "muted"
+        } else if (stale || (adherence != null && adherence < 70)) {
+          bucket = "attention"
+          tone = stale ? "danger" : "warning"
+        } else if (adherence != null && adherence >= 75) {
+          bucket = "ontrack"
+          tone = "success"
+        } else {
+          bucket = "ontrack"
+          tone = "success"
+        }
+
+        return {
+          subscriber: sub,
+          weightKg,
+          deltaKg,
+          adherence,
+          stale,
+          lastCheckIn: lastCheckInDate,
+          photoCount,
+          bucket,
+          tone,
+        }
+      })
+  }, [subscribers, allMeasurements, allPhotos])
+
   const requested = params.get("subscriber")
   const [selectedId, setSelectedId] = useState(
     requested && roster.some((item) => item.subscriber.id === requested)
@@ -143,25 +232,117 @@ export function ProgressPage() {
   }, [roster, filter, query])
 
   const selected = list.find((item) => item.subscriber.id === selectedId) ?? list[0]
-  const stats = useMemo(() => progressStats(roster), [roster])
+
+  const stats = useMemo(() => {
+    const weekAgo = new Date()
+    weekAgo.setHours(0, 0, 0, 0)
+    weekAgo.setDate(weekAgo.getDate() - 7)
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+
+    const checkInsCount = allMeasurements.filter(
+      (m) => new Date(m.recordedAt) >= weekAgo,
+    ).length
+    const photosCount = allPhotos.filter(
+      (p) => new Date(p.takenAt) >= monthStart,
+    ).length
+
+    return {
+      onTrack: roster.filter((item) => item.bucket === "ontrack").length,
+      attention: roster.filter((item) => item.bucket === "attention").length,
+      checkIns: checkInsCount || progressStats(roster).checkIns,
+      photos: photosCount || progressStats(roster).photos,
+    }
+  }, [roster, allMeasurements, allPhotos])
 
   // Filter live data for the currently selected subscriber
   const selectedMeasurements = useMemo(() => {
     if (!selected) return []
-    const live = allMeasurements.filter((m) => m.subscriberId === selected.subscriber.id)
+    const live = allMeasurements
+      .filter((m) => m.subscriberId === selected.subscriber.id)
+      .sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime())
     return live.length ? live : measurementsFor(selected.subscriber.id)
   }, [allMeasurements, selected])
 
   const selectedPhotos = useMemo(() => {
     if (!selected) return []
-    const live = allPhotos.filter((p) => p.subscriberId === selected.subscriber.id)
+    const live = allPhotos
+      .filter((p) => p.subscriberId === selected.subscriber.id)
+      .sort((a, b) => new Date(a.takenAt).getTime() - new Date(b.takenAt).getTime())
     return live.length ? live : photosFor(selected.subscriber.id)
   }, [allPhotos, selected])
 
   const selectedLifts = useMemo(() => {
     if (!selected) return []
-    return allLifts.filter((l) => l.subscriberId === selected.subscriber.id)
+    const live = allLifts
+      .filter((l) => l.subscriberId === selected.subscriber.id)
+      .sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime())
+    return live.length ? live : liftsFor(selected.subscriber.id)
   }, [allLifts, selected])
+
+  // Historical and active program assignments for selected subscriber
+  const subscriberPrograms = useMemo(() => {
+    if (!selected) return { workouts: [], nutrition: [] }
+    const liveWorkouts = allWorkouts.filter(
+      (w) => w.subscriberId === selected.subscriber.id,
+    )
+    const liveNutrition = allNutrition.filter(
+      (n) => n.subscriberId === selected.subscriber.id,
+    )
+    const demo = programsFor(selected.subscriber.id)
+    return {
+      workouts: liveWorkouts.length ? liveWorkouts : demo.workouts,
+      nutrition: liveNutrition.length ? liveNutrition : demo.nutrition,
+    }
+  }, [allWorkouts, allNutrition, selected])
+
+  // Delete Action Handlers
+  function handleDeleteMeasurement(row: BodyMeasurement) {
+    setConfirmDialog({
+      open: true,
+      title: isAr ? "حذف سجل القياسات" : "Delete Check-in Record",
+      description: isAr
+        ? `هل أنت متأكد من حذف قياس تاريخ ${formatDate(row.recordedAt, locale)} للمشترك "${selected?.subscriber.displayName}"؟`
+        : `Are you sure you want to delete the check-in from ${formatDate(row.recordedAt, locale)} for "${selected?.subscriber.displayName}"?`,
+      confirmLabel: isAr ? "تأكيد الحذف" : "Delete Record",
+      tone: "danger",
+      onConfirm: async () => {
+        await deleteMeasurementMutation.mutateAsync(row.id)
+        appToast.success(isAr ? "تم حذف السجل بنجاح" : "Record deleted successfully")
+      },
+    })
+  }
+
+  function handleDeletePhoto(item: ProgressPhoto) {
+    setConfirmDialog({
+      open: true,
+      title: isAr ? "حذف صورة التقدم" : "Delete Progress Photo",
+      description: isAr
+        ? `هل ترغب في حذف هذه الصورة نهائياً من ملف المشترك "${selected?.subscriber.displayName}"؟`
+        : `Are you sure you want to permanently delete this photo from "${selected?.subscriber.displayName}"'s profile?`,
+      confirmLabel: isAr ? "تأكيد الحذف" : "Delete Photo",
+      tone: "danger",
+      onConfirm: async () => {
+        await deletePhotoMutation.mutateAsync(item.id)
+        appToast.success(isAr ? "تم حذف الصورة بنجاح" : "Photo deleted successfully")
+      },
+    })
+  }
+
+  function handleDeleteLift(row: PerformanceRecord) {
+    setConfirmDialog({
+      open: true,
+      title: isAr ? "حذف رقم الأداء الرياضي" : "Delete Performance Record",
+      description: isAr
+        ? `هل ترغب في حذف سجل تمرين "${row.name}" (${row.value} ${row.unit}) للمشترك "${selected?.subscriber.displayName}"؟`
+        : `Delete ${row.name} record (${row.value} ${row.unit}) for "${selected?.subscriber.displayName}"?`,
+      confirmLabel: isAr ? "تأكيد الحذف" : "Delete Record",
+      tone: "danger",
+      onConfirm: async () => {
+        await deletePerformanceMutation.mutateAsync(row.id)
+        appToast.success(isAr ? "تم حذف السجل بنجاح" : "Record deleted successfully")
+      },
+    })
+  }
 
   function pickFilter(next: ProgressFilter) {
     setFilter(next)
@@ -210,7 +391,7 @@ export function ProgressPage() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={t("admin.progress.search")}
-                className="h-11 w-full rounded-full bg-[#F4F4F4] pe-4 ps-10 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none placeholder:font-normal placeholder:text-[#8c8c8c]"
+                className="h-11 w-full rounded-full bg-[#F4F4F4] pe-4 ps-10 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none placeholder:font-normal placeholder:text-[#8c8c8c]"
               />
             </label>
 
@@ -219,7 +400,7 @@ export function ProgressPage() {
               <button
                 type="button"
                 onClick={() => setMeasurementModalOpen(true)}
-                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#063434)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
               >
                 <Plus className="size-4" strokeWidth={2} />
                 <span>{isAr ? "تسجيل قياسات" : "Log Check-in"}</span>
@@ -228,7 +409,7 @@ export function ProgressPage() {
               <button
                 type="button"
                 onClick={() => setPhotoModalOpen(true)}
-                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[#F4F4F4] px-4 text-[13px] font-bold text-[var(--gym-ink,#063434)] transition hover:bg-black/5"
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[#F4F4F4] px-4 text-[13px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/5"
               >
                 <Camera className="size-4" />
                 <span>{isAr ? "إضافة صورة" : "Add Photo"}</span>
@@ -238,7 +419,7 @@ export function ProgressPage() {
                 <button
                   type="button"
                   onClick={() => setCompareModalOpen(true)}
-                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[#F4F4F4] px-4 text-[13px] font-bold text-[var(--gym-ink,#063434)] transition hover:bg-black/5"
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[#F4F4F4] px-4 text-[13px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/5"
                 >
                   <ArrowLeftRight className="size-4" />
                   <span>{isAr ? "مقارنة الصور" : "Compare"}</span>
@@ -286,10 +467,14 @@ export function ProgressPage() {
               liveMeasurements={selectedMeasurements}
               livePhotos={selectedPhotos}
               liveLifts={selectedLifts}
+              programs={subscriberPrograms}
               onOpenMeasurementModal={() => setMeasurementModalOpen(true)}
               onOpenPhotoModal={() => setPhotoModalOpen(true)}
               onOpenPerformanceModal={() => setPerformanceModalOpen(true)}
               onOpenCompareModal={() => setCompareModalOpen(true)}
+              onDeleteMeasurement={handleDeleteMeasurement}
+              onDeletePhoto={handleDeletePhoto}
+              onDeleteLift={handleDeleteLift}
             />
           </div>
         )}
@@ -336,6 +521,19 @@ export function ProgressPage() {
           />
         </>
       ) : null}
+
+      {/* Confirm Action Dialog */}
+      {confirmDialog ? (
+        <ConfirmActionDialog
+          open={confirmDialog.open}
+          title={confirmDialog.title}
+          description={confirmDialog.description}
+          confirmLabel={confirmDialog.confirmLabel}
+          tone={confirmDialog.tone}
+          onCancel={() => setConfirmDialog(null)}
+          onConfirm={confirmDialog.onConfirm}
+        />
+      ) : null}
     </div>
   )
 }
@@ -366,8 +564,8 @@ function PersonChip({
       className={cn(
         "flex h-fit w-full shrink-0 items-center gap-3 rounded-[18px] p-2.5 text-start transition-colors",
         active
-          ? "bg-[var(--gym-ink,#063434)] text-white"
-          : "bg-[#F4F4F4] text-[var(--gym-ink,#063434)] hover:bg-[#ececec]",
+          ? "bg-[var(--gym-ink,#111111)] text-white"
+          : "bg-[#F4F4F4] text-[var(--gym-ink,#111111)] hover:bg-[#ececec]",
         className,
       )}
     >
@@ -375,8 +573,8 @@ function PersonChip({
         className={cn(
           "inline-flex size-10 shrink-0 items-center justify-center rounded-2xl font-heading text-[13px] font-bold",
           active
-            ? "bg-[var(--gym-lime,#b8fe22)] text-[var(--gym-ink,#063434)]"
-            : "bg-white text-[var(--gym-ink,#063434)]",
+            ? "bg-[var(--gym-lime,#fb5001)] text-[var(--gym-ink,#111111)]"
+            : "bg-white text-[var(--gym-ink,#111111)]",
         )}
       >
         {initials(subscriber.displayName)}
@@ -446,7 +644,7 @@ function MobilePersonPicker({
         <div
           role="listbox"
           aria-label={t("admin.progress.chooseSubscriber")}
-          className="absolute inset-x-0 top-[calc(100%+8px)] z-30 max-h-[min(20rem,55vh)] overflow-y-auto rounded-[20px] bg-white p-1.5 shadow-[0_18px_40px_rgba(6,52,52,0.16)]"
+          className="absolute inset-x-0 top-[calc(100%+8px)] z-30 max-h-[min(20rem,55vh)] overflow-y-auto rounded-[20px] bg-white p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.16)]"
         >
           <p className="px-2.5 py-1.5 text-[11px] font-medium text-[#8c8c8c]">
             {t("admin.progress.subscriberCount", { count: list.length })}
@@ -479,10 +677,14 @@ function ReviewPanel({
   liveMeasurements,
   livePhotos,
   liveLifts,
+  programs: assignedPrograms,
   onOpenMeasurementModal,
   onOpenPhotoModal,
   onOpenPerformanceModal,
   onOpenCompareModal,
+  onDeleteMeasurement,
+  onDeletePhoto,
+  onDeleteLift,
 }: {
   person: RosterPerson
   tab: ReviewTab
@@ -491,10 +693,14 @@ function ReviewPanel({
   liveMeasurements?: BodyMeasurement[]
   livePhotos?: ProgressPhoto[]
   liveLifts?: PerformanceRecord[]
+  programs?: ReturnType<typeof programsFor>
   onOpenMeasurementModal: () => void
   onOpenPhotoModal: () => void
   onOpenPerformanceModal: () => void
   onOpenCompareModal: () => void
+  onDeleteMeasurement?: (row: BodyMeasurement) => void
+  onDeletePhoto?: (photo: ProgressPhoto) => void
+  onDeleteLift?: (row: PerformanceRecord) => void
 }) {
   const { t } = useTranslation()
   const { subscriber } = person
@@ -506,7 +712,7 @@ function ReviewPanel({
     liveMeasurements && liveMeasurements.length ? liveMeasurements : measurementsFor(subscriber.id)
   const photos =
     livePhotos && livePhotos.length ? livePhotos : photosFor(subscriber.id)
-  const programs = programsFor(subscriber.id)
+  const programs = assignedPrograms ?? programsFor(subscriber.id)
   const week = latestWeek(subscriber.id)
 
   const lifts = useMemo(() => {
@@ -542,7 +748,7 @@ function ReviewPanel({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-heading text-[18px] font-extrabold tracking-tight text-[var(--gym-ink,#063434)] sm:text-[20px]">
+            <h2 className="font-heading text-[18px] font-extrabold tracking-tight text-[var(--gym-ink,#111111)] sm:text-[20px]">
               {subscriber.displayName}
             </h2>
             <StatusBadge label={t(`admin.progress.filter.${person.bucket}`)} tone={person.tone} />
@@ -560,7 +766,7 @@ function ReviewPanel({
         <div className="flex flex-wrap items-center gap-2">
           <Link
             to={APP_ROUTES.admin.subscriberDetail(subscriber.id)}
-            className="inline-flex h-9 shrink-0 items-center rounded-full bg-white px-3.5 text-[12px] font-bold text-[var(--gym-ink,#063434)] shadow-2xs hover:bg-[#ececec]"
+            className="inline-flex h-9 shrink-0 items-center rounded-full bg-white px-3.5 text-[12px] font-bold text-[var(--gym-ink,#111111)] shadow-2xs hover:bg-[#ececec]"
           >
             {t("admin.progress.profile")}
           </Link>
@@ -598,6 +804,7 @@ function ReviewPanel({
             measurements={measurements}
             locale={locale}
             onAddMeasurement={onOpenMeasurementModal}
+            onDeleteMeasurement={onDeleteMeasurement}
           />
         ) : null}
         {tab === "photos" ? (
@@ -605,14 +812,17 @@ function ReviewPanel({
             photos={photos}
             onAddPhoto={onOpenPhotoModal}
             onCompare={onOpenCompareModal}
+            onDeletePhoto={onDeletePhoto}
           />
         ) : null}
         {tab === "performance" ? (
           <PerformanceTab
             subscriberId={subscriber.id}
             lifts={lifts}
+            liveLifts={liveLifts}
             locale={locale}
             onAddLift={onOpenPerformanceModal}
+            onDeleteLift={onDeleteLift}
           />
         ) : null}
         {tab === "history" ? <HistoryTab programs={programs} locale={locale} /> : null}
@@ -744,7 +954,7 @@ function OverviewTab({
             .filter((item) => item.status === "active")
             .map((item) => (
               <li key={item.id} className="rounded-2xl bg-[#F4F4F4] px-3 py-2.5">
-                <p className="text-[13px] font-bold text-[var(--gym-ink,#063434)]">{item.title[locale]}</p>
+                <p className="text-[13px] font-bold text-[var(--gym-ink,#111111)]">{item.title[locale]}</p>
                 <p className="mt-0.5 text-[11px] font-medium text-[#8c8c8c]">
                   {t("admin.progress.workoutWeek")} · {t(`admin.workouts.format.${item.format}`)} ·{" "}
                   {t("admin.workouts.version", { version: item.version })}
@@ -756,7 +966,7 @@ function OverviewTab({
             .filter((item) => item.status === "active")
             .map((item) => (
               <li key={item.id} className="rounded-2xl bg-[#F4F4F4] px-3 py-2.5">
-                <p className="text-[13px] font-bold text-[var(--gym-ink,#063434)]">{item.title[locale]}</p>
+                <p className="text-[13px] font-bold text-[var(--gym-ink,#111111)]">{item.title[locale]}</p>
                 <p className="mt-0.5 text-[11px] font-medium text-[#8c8c8c]">
                   {t("admin.progress.nutritionWeek")} · {t(`admin.workouts.format.${item.format}`)} ·{" "}
                   {t("admin.workouts.version", { version: item.version })}
@@ -779,10 +989,12 @@ function BodyTab({
   measurements,
   locale,
   onAddMeasurement,
+  onDeleteMeasurement,
 }: {
   measurements: BodyMeasurement[]
   locale: AppLocale
   onAddMeasurement?: () => void
+  onDeleteMeasurement?: (row: BodyMeasurement) => void
 }) {
   const { t } = useTranslation()
   const isAr = locale === "ar"
@@ -844,7 +1056,7 @@ function BodyTab({
             <button
               type="button"
               onClick={onAddMeasurement}
-              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--gym-ink,#063434)] px-3.5 text-[11px] font-bold text-white transition hover:opacity-90"
+              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--gym-ink,#111111)] px-3.5 text-[11px] font-bold text-white transition hover:opacity-90"
             >
               <Plus className="size-3.5" />
               <span>{isAr ? "تسجيل قياسات جديدة" : "Log Measurement"}</span>
@@ -863,6 +1075,9 @@ function BodyTab({
                 <th className="pb-2 pe-3 font-bold">{t("admin.progress.metrics.arms")}</th>
                 <th className="pb-2 pe-3 font-bold">{t("admin.progress.metrics.thighs")}</th>
                 <th className="pb-2 font-bold">{t("admin.progress.metrics.notes")}</th>
+                {onDeleteMeasurement ? (
+                  <th className="pb-2 text-end font-bold">{isAr ? "الإجراء" : "Action"}</th>
+                ) : null}
               </tr>
             </thead>
             <tbody>
@@ -870,7 +1085,7 @@ function BodyTab({
                 const index = measurements.findIndex((item) => item.id === row.id)
                 const older = index > 0 ? measurements[index - 1] : undefined
                 return (
-                  <tr key={row.id} className="border-t border-black/5 font-medium text-[var(--gym-ink,#063434)]">
+                  <tr key={row.id} className="border-t border-black/5 font-medium text-[var(--gym-ink,#111111)]">
                     <td className="py-2.5 pe-3 whitespace-nowrap">{formatDate(row.recordedAt, locale)}</td>
                     <MeasureCell value={row.weightKg} previous={older?.weightKg} />
                     <MeasureCell value={row.chestCm} previous={older?.chestCm} />
@@ -879,6 +1094,18 @@ function BodyTab({
                     <MeasureCell value={row.armsCm} previous={older?.armsCm} />
                     <MeasureCell value={row.thighsCm} previous={older?.thighsCm} />
                     <td className="py-2.5 text-[12px] font-medium text-[#6B7280]">{row.notes ?? "—"}</td>
+                    {onDeleteMeasurement ? (
+                      <td className="py-2.5 text-end">
+                        <button
+                          type="button"
+                          onClick={() => onDeleteMeasurement(row)}
+                          className="p-1 text-[#8c8c8c] hover:text-[#C44536] transition"
+                          title={isAr ? "حذف السجل" : "Delete record"}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </td>
+                    ) : null}
                   </tr>
                 )
               })}
@@ -894,10 +1121,12 @@ function PhotosTab({
   photos,
   onAddPhoto,
   onCompare,
+  onDeletePhoto,
 }: {
   photos: ProgressPhoto[]
   onAddPhoto?: () => void
   onCompare?: () => void
+  onDeletePhoto?: (photo: ProgressPhoto) => void
 }) {
   const { t } = useTranslation()
   const { locale } = useLocale()
@@ -921,7 +1150,7 @@ function PhotosTab({
             <button
               type="button"
               onClick={onCompare}
-              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[#F4F4F4] px-3.5 text-[11px] font-bold text-[var(--gym-ink,#063434)] hover:bg-[#ececec]"
+              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[#F4F4F4] px-3.5 text-[11px] font-bold text-[var(--gym-ink,#111111)] hover:bg-[#ececec]"
             >
               <ArrowLeftRight className="size-3.5" />
               <span>{isAr ? "مقارنة جنباً إلى جنب" : "Side-by-Side"}</span>
@@ -931,7 +1160,7 @@ function PhotosTab({
             <button
               type="button"
               onClick={onAddPhoto}
-              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--gym-ink,#063434)] px-3.5 text-[11px] font-bold text-white hover:opacity-90"
+              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--gym-ink,#111111)] px-3.5 text-[11px] font-bold text-white hover:opacity-90"
             >
               <Plus className="size-3.5" />
               <span>{isAr ? "إضافة صورة" : "Add Photo"}</span>
@@ -948,7 +1177,7 @@ function PhotosTab({
             </p>
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {start.map((item) => (
-                <PhotoCard key={item.id} photo={item} />
+                <PhotoCard key={item.id} photo={item} onDelete={onDeletePhoto} />
               ))}
             </div>
           </Panel>
@@ -958,7 +1187,7 @@ function PhotosTab({
             </p>
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {latest.map((item) => (
-                <PhotoCard key={item.id} photo={item} />
+                <PhotoCard key={item.id} photo={item} onDelete={onDeletePhoto} />
               ))}
             </div>
           </Panel>
@@ -970,7 +1199,7 @@ function PhotosTab({
         </p>
         <div className="mt-3 grid grid-cols-2 content-start items-start gap-2 sm:grid-cols-3 lg:grid-cols-4">
           {photos.map((item) => (
-            <PhotoCard key={item.id} photo={item} />
+            <PhotoCard key={item.id} photo={item} onDelete={onDeletePhoto} />
           ))}
         </div>
       </Panel>
@@ -981,18 +1210,22 @@ function PhotosTab({
 function PerformanceTab({
   subscriberId,
   lifts,
+  liveLifts,
   locale,
   onAddLift,
+  onDeleteLift,
 }: {
   subscriberId: string
   lifts: ReturnType<typeof liftSeries>
+  liveLifts?: PerformanceRecord[]
   locale: AppLocale
   onAddLift?: () => void
+  onDeleteLift?: (row: PerformanceRecord) => void
 }) {
   const { t } = useTranslation()
   const isAr = locale === "ar"
   const weeks = adherenceFor(subscriberId)
-  const log = [...liftsFor(subscriberId)].reverse()
+  const log = liveLifts && liveLifts.length ? [...liveLifts].reverse() : [...liftsFor(subscriberId)].reverse()
   const hasWorkout = weeks.some((week) => week.workoutTotal > 0)
   const hasNutrition = weeks.some((week) => week.nutritionTotal > 0)
   const chartData = weeks.map((week) => ({
@@ -1011,7 +1244,7 @@ function PerformanceTab({
           <button
             type="button"
             onClick={onAddLift}
-            className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--gym-ink,#063434)] px-3.5 text-[11px] font-bold text-white hover:opacity-90"
+            className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--gym-ink,#111111)] px-3.5 text-[11px] font-bold text-white hover:opacity-90"
           >
             <Plus className="size-3.5" />
             <span>{isAr ? "تسجيل رقم جديد" : "Log PR"}</span>
@@ -1024,10 +1257,10 @@ function PerformanceTab({
           {lifts.map((item) => (
             <div key={item.name} className="rounded-[18px] bg-white p-3.5">
               <p className="text-[12px] font-bold text-[#8c8c8c]">{item.name}</p>
-              <p className="mt-1 font-heading text-[22px] font-extrabold text-[var(--gym-ink,#063434)]">
+              <p className="mt-1 font-heading text-[22px] font-extrabold text-[var(--gym-ink,#111111)]">
                 {item.latest} {item.unit}
               </p>
-              <p className="mt-1 text-[12px] font-bold text-emerald-600">
+              <p className="mt-1 text-[12px] font-bold text-[var(--gym-lime,#fb5001)]">
                 {signed(item.delta)} {item.unit}
               </p>
             </div>
@@ -1047,17 +1280,32 @@ function PerformanceTab({
                   <th className="pb-2 pe-3 font-bold">{t("admin.progress.liftName")}</th>
                   <th className="pb-2 pe-3 font-bold">{t("admin.progress.liftValue")}</th>
                   <th className="pb-2 font-bold">{t("admin.progress.metrics.notes")}</th>
+                  {onDeleteLift ? (
+                    <th className="pb-2 text-end font-bold">{isAr ? "الإجراء" : "Action"}</th>
+                  ) : null}
                 </tr>
               </thead>
               <tbody>
                 {log.map((row) => (
-                  <tr key={row.id} className="border-t border-black/5 font-medium text-[var(--gym-ink,#063434)]">
+                  <tr key={row.id} className="border-t border-black/5 font-medium text-[var(--gym-ink,#111111)]">
                     <td className="py-2.5 pe-3 whitespace-nowrap">{formatDate(row.recordedAt, locale)}</td>
                     <td className="py-2.5 pe-3">{row.name}</td>
                     <td className="py-2.5 pe-3 whitespace-nowrap">
                       {row.value} {row.unit}
                     </td>
                     <td className="py-2.5 text-[12px] font-medium text-[#6B7280]">{row.notes ?? "—"}</td>
+                    {onDeleteLift ? (
+                      <td className="py-2.5 text-end">
+                        <button
+                          type="button"
+                          onClick={() => onDeleteLift(row)}
+                          className="p-1 text-[#8c8c8c] hover:text-[#C44536] transition"
+                          title={isAr ? "حذف الرقم" : "Delete record"}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
@@ -1094,9 +1342,9 @@ function PerformanceTab({
                   width={44}
                 />
                 <Tooltip
-                  cursor={{ fill: "rgba(6,52,52,0.04)" }}
+                  cursor={{ fill: "rgba(0,0,0,0.04)" }}
                   contentStyle={{
-                    background: "#063434",
+                    background: "#111111",
                     border: "none",
                     borderRadius: 12,
                     color: "#fff",
@@ -1183,7 +1431,7 @@ function ProgramList({
       {items.map((item) => (
         <li key={item.id} className="flex items-center justify-between gap-2 rounded-2xl bg-white px-3 py-2.5">
           <span className="min-w-0">
-            <span className="block truncate text-[13px] font-bold text-[var(--gym-ink,#063434)]">
+            <span className="block truncate text-[13px] font-bold text-[var(--gym-ink,#111111)]">
               {item.title[locale]}
             </span>
             <span className="text-[11px] font-medium text-[#8c8c8c]">
@@ -1223,8 +1471,8 @@ function WeightChart({ measurements, locale }: { measurements: BodyMeasurement[]
         <AreaChart data={data} margin={{ top: 10, right: 12, left: 4, bottom: 4 }}>
           <defs>
             <linearGradient id="weightFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#063434" stopOpacity={0.22} />
-              <stop offset="100%" stopColor="#063434" stopOpacity={0} />
+              <stop offset="0%" stopColor="#111111" stopOpacity={0.22} />
+              <stop offset="100%" stopColor="#111111" stopOpacity={0} />
             </linearGradient>
           </defs>
           <CartesianGrid stroke="#E8E8E8" strokeDasharray="3 3" vertical={false} />
@@ -1250,7 +1498,7 @@ function WeightChart({ measurements, locale }: { measurements: BodyMeasurement[]
           />
           <Tooltip
             contentStyle={{
-              background: "#063434",
+              background: "#111111",
               border: "none",
               borderRadius: 12,
               color: "#fff",
@@ -1289,18 +1537,18 @@ function AdherenceCard({
     <div className="rounded-[18px] bg-white p-3.5">
       <div className="flex items-center justify-between gap-2">
         <p className="text-[12px] font-bold text-[#8c8c8c]">{label}</p>
-        <span className="inline-flex size-8 items-center justify-center rounded-2xl bg-[#F4F4F4] text-[var(--gym-ink,#063434)]">
+        <span className="inline-flex size-8 items-center justify-center rounded-2xl bg-[#F4F4F4] text-[var(--gym-ink,#111111)]">
           {icon}
         </span>
       </div>
-      <p className="mt-2 font-heading text-[28px] font-extrabold leading-none text-[var(--gym-ink,#063434)]">
+      <p className="mt-2 font-heading text-[28px] font-extrabold leading-none text-[var(--gym-ink,#111111)]">
         {value == null ? "—" : `${value}%`}
       </p>
       <p className="mt-1.5 text-[12px] font-medium text-[#8c8c8c]">{detail}</p>
       {value != null ? (
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#F4F4F4]">
           <div
-            className="h-full rounded-full bg-[var(--gym-ink,#063434)]"
+            className="h-full rounded-full bg-[var(--gym-ink,#111111)]"
             style={{ width: `${Math.min(100, value)}%` }}
           />
         </div>
@@ -1324,7 +1572,7 @@ function DeltaStat({
   return (
     <div className="rounded-2xl bg-white px-3 py-2.5">
       <p className="text-[11px] font-bold text-[#8c8c8c]">{label}</p>
-      <p className="mt-1 font-heading text-[16px] font-extrabold text-[var(--gym-ink,#063434)]">
+      <p className="mt-1 font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
         {latest != null ? `${latest} ${unit}` : "—"}
       </p>
       <p className="text-[11px] font-bold text-[#6B7280]">{delta == null ? "—" : `${signed(delta)} ${unit}`}</p>
@@ -1332,13 +1580,20 @@ function DeltaStat({
   )
 }
 
-function PhotoCard({ photo }: { photo: ProgressPhoto }) {
+function PhotoCard({
+  photo,
+  onDelete,
+}: {
+  photo: ProgressPhoto
+  onDelete?: (photo: ProgressPhoto) => void
+}) {
   const { t } = useTranslation()
   const { locale } = useLocale()
+  const isAr = locale === "ar"
   const hasImage = photo.storagePath?.startsWith("data:") || photo.storagePath?.startsWith("http")
 
   return (
-    <figure className="h-fit overflow-hidden rounded-[16px] bg-[var(--gym-ink,#063434)] text-white shadow-2xs">
+    <figure className="group relative h-fit overflow-hidden rounded-[16px] bg-[var(--gym-ink,#111111)] text-white shadow-2xs">
       <div className="relative flex aspect-[3/4] items-center justify-center overflow-hidden bg-black/40">
         {hasImage ? (
           <img
@@ -1348,15 +1603,29 @@ function PhotoCard({ photo }: { photo: ProgressPhoto }) {
           />
         ) : (
           <div className="relative flex size-full items-center justify-center">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(184,254,34,0.22),transparent_45%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(251,80,1,0.22),transparent_45%)]" />
             <span className="relative font-heading text-[22px] font-extrabold text-white/80">
               {photo.pose ? t(`admin.progress.pose.${photo.pose}`) : "•"}
             </span>
           </div>
         )}
-        <span className="absolute bottom-2 start-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-bold uppercase backdrop-blur-xs">
+        <span className="absolute bottom-2 start-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-bold uppercase">
           {photo.pose ? t(`admin.progress.pose.${photo.pose}`) : "Photo"}
         </span>
+
+        {onDelete ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete(photo)
+            }}
+            className="absolute top-2 end-2 flex size-7 items-center justify-center rounded-full bg-black/60 text-white/80 opacity-0 group-hover:opacity-100 transition hover:bg-[#C44536] hover:text-white"
+            title={isAr ? "حذف الصورة" : "Delete photo"}
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        ) : null}
       </div>
       <figcaption className="px-2.5 py-2 text-[11px] font-bold text-white/80">
         <span className="block">{formatDate(photo.takenAt, locale)}</span>

@@ -24,9 +24,14 @@ export type WorkoutExercise = {
   notes?: string | BilingualText
   /** Associated instructional video from Content Library */
   videoContentId?: string
+  /** Direct or embedded video URL */
+  videoUrl?: string
+  /** Thumbnail preview image */
+  thumbnailUrl?: string
   /** Cached video title or metadata for fast rendering */
   videoTitle?: string | BilingualText
   equipment?: string
+  targetMuscles?: string[]
   /** Alternative exercises if subscriber lacks equipment or has limitations */
   alternatives?: ExerciseAlternative[]
 }
@@ -75,6 +80,7 @@ export type MealAlternative = {
   carbs?: number
   fats?: number
   reason?: string | BilingualText
+  thumbnailUrl?: string
 }
 
 export type MealItem = {
@@ -88,6 +94,7 @@ export type MealItem = {
   protein?: number
   carbs?: number
   fats?: number
+  thumbnailUrl?: string
   /** Alternative food choices with matching macronutrients */
   alternatives?: MealAlternative[]
 }
@@ -105,6 +112,10 @@ export type MealSlot = {
   slot: MealSlotKey
   label?: string | BilingualText
   timeRecommendation?: string
+  calories?: number
+  coachingNote?: string | BilingualText
+  photoUrl?: string
+  completed?: boolean
   items: MealItem[]
 }
 
@@ -149,6 +160,20 @@ export type NutritionProgram = {
 export type NutritionTemplate = NutritionProgram
 export type NutritionAssignment = NutritionProgram
 
+export type CompletedExerciseRecord = {
+  exerciseId: string
+  name: string
+  targetSets?: number
+  completedSets: number
+  weightKg?: number
+  repsDone?: string | number
+  durationSeconds?: number
+  restSeconds?: number
+  notes?: string
+  wasSubstituted?: boolean
+  substituteName?: string
+}
+
 export type WorkoutSessionLog = {
   id: string
   subscriberId: string
@@ -156,8 +181,14 @@ export type WorkoutSessionLog = {
   dayId: string
   weekday: number
   date: string
+  workoutTitle?: string
   durationMinutes?: number
+  activeMinutes?: number
+  restMinutes?: number
   perceivedEffort?: number // RPE 1-10
+  energyLevel?: "great" | "good" | "tired" | "exhausted"
+  totalVolumeKg?: number
+  exercisesCompleted?: CompletedExerciseRecord[]
   notes?: string
   completedAt: string
 }

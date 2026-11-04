@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+﻿import { useMemo } from "react"
 import { Link } from "react-router-dom"
 import {
   Apple,
@@ -113,7 +113,7 @@ export function SubscriberAssignedPrograms() {
             {/* Top Header Row: Icon + Title + Status */}
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3.5">
-                <span className="flex size-11 sm:size-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--gym-ink,#063434)] text-white shadow-sm transition-transform duration-300 group-hover:scale-105">
+                <span className="flex size-11 sm:size-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--gym-ink,#111111)] text-white shadow-sm transition-transform duration-300 group-hover:scale-105">
                   <Dumbbell className="size-5 sm:size-5.5" strokeWidth={2.2} />
                 </span>
                 <div>

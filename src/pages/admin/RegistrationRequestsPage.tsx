@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+﻿import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import {
@@ -146,7 +146,7 @@ export function RegistrationRequestsPage() {
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder={t("admin.requests.search")}
                   className={cn(
-                    "h-11 w-full rounded-full bg-[#F4F4F4] pe-4 ps-10 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none",
+                    "h-11 w-full rounded-full bg-[#F4F4F4] pe-4 ps-10 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none",
                     "placeholder:font-normal placeholder:text-[#8c8c8c]",
                   )}
                 />
@@ -154,7 +154,7 @@ export function RegistrationRequestsPage() {
               <button
                 type="button"
                 onClick={() => setDialogState({ mode: "create" })}
-                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#063434)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
               >
                 <Plus className="size-4" strokeWidth={2} />
                 {locale === "ar" ? "طلب يدوي جديد" : "New request"}
@@ -190,7 +190,7 @@ export function RegistrationRequestsPage() {
               const nameText = row.name?.[locale] || row.displayName
               return (
                 <div className="flex items-center gap-3">
-                  <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] font-heading text-[12px] font-bold text-[var(--gym-lime,#b8fe22)]">
+                  <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] font-heading text-[12px] font-bold text-[var(--gym-lime,#fb5001)]">
                     {initials(nameText)}
                   </span>
                   <div className="min-w-0">
@@ -316,7 +316,7 @@ function RequestDetails({
           <p className="text-[12px] font-bold uppercase tracking-[0.08em] text-[#8c8c8c]">
             {t("admin.requests.goal")}
           </p>
-          <p className="mt-1.5 text-[14px] font-medium leading-relaxed text-[var(--gym-ink,#063434)]">
+          <p className="mt-1.5 text-[14px] font-medium leading-relaxed text-[var(--gym-ink,#111111)]">
             {row.goal[locale]}
           </p>
         </div>
@@ -334,19 +334,19 @@ function RequestDetails({
       <dl className="space-y-2 text-[13px]">
         <div className="flex justify-between gap-3">
           <dt className="text-[#8c8c8c]">{t("admin.requests.columns.package")}</dt>
-          <dd className="font-semibold text-[var(--gym-ink,#063434)]">
+          <dd className="font-semibold text-[var(--gym-ink,#111111)]">
             {packageName ?? "—"}
           </dd>
         </div>
         <div className="flex justify-between gap-3">
           <dt className="text-[#8c8c8c]">{t("admin.requests.source")}</dt>
-          <dd className="font-semibold text-[var(--gym-ink,#063434)]">
+          <dd className="font-semibold text-[var(--gym-ink,#111111)]">
             {t(`admin.requests.sources.${row.source}`)}
           </dd>
         </div>
         <div className="flex justify-between gap-3">
           <dt className="text-[#8c8c8c]">{t("admin.subscribers.language")}</dt>
-          <dd className="font-semibold text-[var(--gym-ink,#063434)]">
+          <dd className="font-semibold text-[var(--gym-ink,#111111)]">
             {row.locale.toUpperCase()}
           </dd>
         </div>
@@ -355,7 +355,7 @@ function RequestDetails({
             <dt className="text-[#8c8c8c]">
               {locale === "ar" ? "تاريخ المراجعة" : "Reviewed on"}
             </dt>
-            <dd className="font-semibold text-[var(--gym-ink,#063434)]">
+            <dd className="font-semibold text-[var(--gym-ink,#111111)]">
               {formatDate(row.reviewedAt, locale)}
             </dd>
           </div>
@@ -365,7 +365,7 @@ function RequestDetails({
             <dt className="text-[#8c8c8c]">
               {locale === "ar" ? "تمت المراجعة بواسطة" : "Reviewed by"}
             </dt>
-            <dd className="font-semibold text-[var(--gym-ink,#063434)]">
+            <dd className="font-semibold text-[var(--gym-ink,#111111)]">
               {row.reviewedBy}
             </dd>
           </div>

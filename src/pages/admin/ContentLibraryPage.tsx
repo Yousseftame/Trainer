@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react"
+﻿import { useMemo, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { Link } from "react-router-dom"
 import { useTranslation } from "react-i18next"
@@ -80,23 +80,23 @@ const ENTITLEMENT_BADGE: Record<
 
 const PREVIEW: Record<ContentCategory, { className: string; icon: ReactNode }> = {
   exerciseVideo: {
-    className: "bg-[var(--gym-ink,#063434)] text-white",
+    className: "bg-[var(--gym-ink,#111111)] text-white",
     icon: <Clapperboard className="size-8" strokeWidth={1.5} />,
   },
   workoutPdf: {
-    className: "bg-[var(--gym-lime,#b8fe22)]/35 text-[var(--gym-ink,#063434)]",
+    className: "bg-[var(--gym-lime,#fb5001)]/35 text-[var(--gym-ink,#111111)]",
     icon: <Dumbbell className="size-8" strokeWidth={1.5} />,
   },
   nutritionPdf: {
-    className: "bg-[#eef1e8] text-[var(--gym-ink,#063434)]",
+    className: "bg-[#eef1e8] text-[var(--gym-ink,#111111)]",
     icon: <Apple className="size-8" strokeWidth={1.5} />,
   },
   education: {
-    className: "bg-[#F4F4F4] text-[var(--gym-ink,#063434)]",
+    className: "bg-[#F4F4F4] text-[var(--gym-ink,#111111)]",
     icon: <BookOpen className="size-8" strokeWidth={1.5} />,
   },
   reference: {
-    className: "bg-[#F4F4F4] text-[var(--gym-ink,#063434)]",
+    className: "bg-[#F4F4F4] text-[var(--gym-ink,#111111)]",
     icon: <Bookmark className="size-8" strokeWidth={1.5} />,
   },
 }
@@ -236,7 +236,7 @@ export function ContentLibraryPage() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={t("admin.content.search")}
-                className="h-11 w-full rounded-full bg-[#F4F4F4] pe-4 ps-10 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none placeholder:font-normal placeholder:text-[#8c8c8c]"
+                className="h-11 w-full rounded-full bg-[#F4F4F4] pe-4 ps-10 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none placeholder:font-normal placeholder:text-[#8c8c8c]"
               />
             </label>
 
@@ -265,7 +265,7 @@ export function ContentLibraryPage() {
               <button
                 type="button"
                 onClick={() => setFormModal({ open: true, asset: null })}
-                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#063434)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
               >
                 <Upload className="size-4" strokeWidth={2} />
                 {t("admin.content.upload")}
@@ -332,7 +332,7 @@ export function ContentLibraryPage() {
               />
 
               <div className="mt-4 flex flex-wrap items-center gap-1.5">
-                <h2 className="w-full font-heading text-[18px] font-extrabold tracking-tight text-[var(--gym-ink,#063434)]">
+                <h2 className="w-full font-heading text-[18px] font-extrabold tracking-tight text-[var(--gym-ink,#111111)]">
                   {selected.title[locale]}
                 </h2>
                 <StatusBadge
@@ -405,7 +405,7 @@ export function ContentLibraryPage() {
                   {selected.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-[var(--gym-ink,#063434)]"
+                      className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-[var(--gym-ink,#111111)]"
                     >
                       {tag}
                     </span>
@@ -498,7 +498,7 @@ export function ContentLibraryPage() {
                       tab: "programs",
                     })
                   }
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#063434)] px-4 text-[13px] font-bold text-white transition hover:opacity-95"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-4 text-[13px] font-bold text-white transition hover:opacity-95"
                 >
                   <Plus className="size-4" strokeWidth={2} />
                   {t("admin.content.associate")}
@@ -513,7 +513,7 @@ export function ContentLibraryPage() {
                         tab: "subscribers",
                       })
                     }
-                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-white px-3 text-[12px] font-bold text-[var(--gym-ink,#063434)] transition hover:bg-black/5"
+                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-white px-3 text-[12px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/5"
                   >
                     <Users className="size-3.5" />
                     {t("admin.content.assign")}
@@ -523,7 +523,7 @@ export function ContentLibraryPage() {
                     onClick={() =>
                       setFormModal({ open: true, asset: selected })
                     }
-                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-white px-3 text-[12px] font-bold text-[var(--gym-ink,#063434)] transition hover:bg-black/5"
+                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-white px-3 text-[12px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/5"
                   >
                     <Pencil className="size-3.5" />
                     {t("admin.content.update")}
@@ -533,7 +533,7 @@ export function ContentLibraryPage() {
                   <button
                     type="button"
                     onClick={() => setPreviewAsset(selected)}
-                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-white px-3 text-[12px] font-bold text-[var(--gym-ink,#063434)] transition hover:bg-black/5"
+                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-white px-3 text-[12px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/5"
                   >
                     <Eye className="size-3.5" />
                     {isAr ? "معاينة / تشغيل" : "Preview"}
@@ -725,8 +725,8 @@ function AssetCard({
       className={cn(
         "group flex h-fit w-full cursor-pointer flex-col self-start overflow-hidden rounded-[20px] text-start transition-shadow sm:rounded-[22px]",
         active
-          ? "bg-[var(--gym-ink,#063434)] text-white shadow-[0_12px_28px_rgba(6,52,52,0.18)]"
-          : "bg-[#F4F4F4] text-[var(--gym-ink,#063434)] hover:bg-[#ececec]",
+          ? "bg-[var(--gym-ink,#111111)] text-white shadow-[0_12px_28px_rgba(0,0,0,0.18)]"
+          : "bg-[#F4F4F4] text-[var(--gym-ink,#111111)] hover:bg-[#ececec]",
       )}
     >
       <div
@@ -746,7 +746,7 @@ function AssetCard({
             className={cn(
               "inline-flex size-9 items-center justify-center rounded-full transition-transform group-hover:scale-105 sm:size-12",
               active
-                ? "bg-[var(--gym-lime,#b8fe22)] text-[var(--gym-ink,#063434)]"
+                ? "bg-[var(--gym-lime,#fb5001)] text-[var(--gym-ink,#111111)]"
                 : "bg-white/15 text-white",
             )}
             aria-label={t("admin.content.play")}
@@ -765,7 +765,7 @@ function AssetCard({
             "absolute end-2 top-2 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.06em] sm:end-2.5 sm:top-2.5 sm:px-2 sm:text-[10px]",
             active
               ? "bg-white/15 text-white"
-              : "bg-white/80 text-[var(--gym-ink,#063434)]",
+              : "bg-white/80 text-[var(--gym-ink,#111111)]",
           )}
         >
           {asset.kind === "video"
@@ -809,12 +809,12 @@ function AssetPreview({
 
   if (asset.kind === "video") {
     return (
-      <div className="relative flex aspect-[16/9] w-full items-center justify-center overflow-hidden rounded-[16px] bg-[var(--gym-ink,#063434)] sm:aspect-video sm:rounded-[18px]">
+      <div className="relative flex aspect-[16/9] w-full items-center justify-center overflow-hidden rounded-[16px] bg-[var(--gym-ink,#111111)] sm:aspect-video sm:rounded-[18px]">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_80%,rgba(184,254,34,0.28),transparent_42%)]" />
         <button
           type="button"
           onClick={onPreview}
-          className="relative inline-flex size-12 items-center justify-center rounded-full bg-[var(--gym-lime,#b8fe22)] text-[var(--gym-ink,#063434)] transition-transform hover:scale-105 sm:size-14"
+          className="relative inline-flex size-12 items-center justify-center rounded-full bg-[var(--gym-lime,#fb5001)] text-[var(--gym-ink,#111111)] transition-transform hover:scale-105 sm:size-14"
           aria-label={t("admin.content.play")}
         >
           <Play
@@ -875,7 +875,7 @@ function LinkBlock({
         {label}
       </p>
       {hasItems ? (
-        <ul className="mt-2 flex flex-col gap-1.5 text-[13px] font-medium text-[var(--gym-ink,#063434)]">
+        <ul className="mt-2 flex flex-col gap-1.5 text-[13px] font-medium text-[var(--gym-ink,#111111)]">
           {children}
         </ul>
       ) : (

@@ -9,7 +9,12 @@ export function PublicLayout() {
 
   useEffect(() => {
     const id = location.hash.replace(/^#/, "")
-    if (!id) return
+    if (!id) {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" })
+      document.documentElement.scrollTop = 0
+      document.body.scrollTop = 0
+      return
+    }
 
     const timer = window.setTimeout(() => {
       document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })

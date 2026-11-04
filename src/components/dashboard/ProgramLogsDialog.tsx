@@ -1,6 +1,8 @@
+import { useState } from "react"
 import { createPortal } from "react-dom"
 import {
   CheckCircle2,
+  ChevronDown,
   Clock,
   Dumbbell,
   Flame,
@@ -10,6 +12,7 @@ import {
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
 import { useLocale } from "@/hooks/useLocale"
 import { formatDate } from "@/lib/format"
+import { cn } from "@/lib/utils"
 import type { NutritionAdherenceLog, WorkoutSessionLog } from "@/types/program"
 
 type ProgramLogsDialogProps = {
@@ -33,6 +36,7 @@ export function ProgramLogsDialog({
 }: ProgramLogsDialogProps) {
   const { locale } = useLocale()
   const isAr = locale === "ar"
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
 
   if (!open) return null
 
@@ -47,24 +51,24 @@ export function ProgramLogsDialog({
         onClick={onClose}
       />
 
-      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-[28px] bg-white shadow-2xl overflow-hidden">
+      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-[28px] bg-white shadow-2xl overflow-hidden text-[var(--gym-ink,#111111)]">
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-[#F0F0F0] px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-2xl bg-[var(--gym-ink,#063434)] text-white">
+            <div className="flex size-10 items-center justify-center rounded-2xl bg-[var(--gym-ink,#111111)] text-white">
               {type === "workout" ? (
-                <Dumbbell className="size-5" />
+                <Dumbbell className="size-5 text-[var(--gym-orange,#fb5001)]" />
               ) : (
-                <Utensils className="size-5" />
+                <Utensils className="size-5 text-[var(--gym-orange,#fb5001)]" />
               )}
             </div>
             <div>
-              <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#063434)]">
+              <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#111111)]">
                 {title}
               </h2>
               {subscriberName ? (
                 <p className="text-[12px] font-medium text-[#8c8c8c]">
-                  {isAr ? "سجل التزام وأداء المشترك:" : "Subscriber log & performance:"} {subscriberName}
+                  {isAr ? "سجل أداء وإنجاز المشترك:" : "Subscriber log & performance:"} {subscriberName}
                 </p>
               ) : null}
             </div>
@@ -93,39 +97,94 @@ export function ProgramLogsDialog({
               </div>
             ) : (
               <div className="space-y-3">
-                {workoutLogs.map((log) => (
-                  <div
-                    key={log.id}
-                    className="rounded-2xl border border-[#ECECEC] bg-[#FBFBFB] p-4 transition hover:bg-white space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="size-4 text-emerald-600" />
-                        <span className="font-heading text-[14px] font-bold text-[var(--gym-ink,#063434)]">
-                          {formatDate(log.date, locale)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-[11px] font-bold">
-                        {log.durationMinutes ? (
-                          <span className="rounded-full bg-[#EAEAEA] px-2.5 py-0.5 text-[var(--gym-ink,#063434)]">
-                            {log.durationMinutes} {isAr ? "دقيقة" : "min"}
-                          </span>
-                        ) : null}
-                        {log.perceivedEffort ? (
-                          <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-amber-900">
-                            RPE {log.perceivedEffort}/10
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
+                {workoutLogs.map((log) => {
+                  const isExpanded = expandedLogId === log.id
+                  const exercises = log.exercisesCompleted ?? []
 
-                    {log.notes ? (
-                      <p className="text-[12px] leading-relaxed text-[#6B7280]">
-                        {log.notes}
-                      </p>
-                    ) : null}
-                  </div>
-                ))}
+                  return (
+                    <div
+                      key={log.id}
+                      className="rounded-2xl border border-[#ECECEC] bg-[#FBFBFB] p-4 transition hover:bg-white space-y-2.5"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="size-4 text-[var(--gym-orange,#fb5001)] shrink-0" />
+                          <div>
+                            <span className="font-heading text-[14px] font-bold text-[var(--gym-ink,#111111)]">
+                              {log.workoutTitle || (isAr ? "جلسة تدريبية" : "Workout Session")}
+                            </span>
+                            <span className="text-[11px] text-[#8c8c8c] ms-2">
+                              {formatDate(log.date, locale)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Metric Tags */}
+                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
+                          {log.durationMinutes ? (
+                            <span className="rounded-full bg-[#EAEAEA] px-2.5 py-0.5 text-[var(--gym-ink,#111111)]">
+                              {log.durationMinutes} {isAr ? "دقيقة" : "min"}
+                            </span>
+                          ) : null}
+
+                          {log.totalVolumeKg ? (
+                            <span className="rounded-full bg-[var(--gym-orange,#fb5001)]/10 text-[var(--gym-orange,#fb5001)] px-2.5 py-0.5">
+                              {log.totalVolumeKg.toLocaleString()} {isAr ? "كجم" : "kg"}
+                            </span>
+                          ) : null}
+
+                          {log.perceivedEffort ? (
+                            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-amber-900">
+                              RPE {log.perceivedEffort}/10
+                            </span>
+                          ) : null}
+
+                          {exercises.length > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                              className="inline-flex items-center gap-1 rounded-full bg-black/5 px-2.5 py-0.5 text-[#555] hover:bg-black/10 transition"
+                            >
+                              <span>{exercises.length} {isAr ? "تمارين" : "exercises"}</span>
+                              <ChevronDown className={cn("size-3 transition-transform", isExpanded && "rotate-180")} />
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {log.notes ? (
+                        <p className="text-[12px] leading-relaxed text-[#6B7280] bg-white p-2.5 rounded-xl border border-black/[0.04]">
+                          💬 {log.notes}
+                        </p>
+                      ) : null}
+
+                      {/* Detailed Exercises Performed */}
+                      {isExpanded && exercises.length > 0 ? (
+                        <div className="pt-2 border-t border-black/[0.06] space-y-1.5 animate-in fade-in">
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-[#8c8c8c]">
+                            {isAr ? "التمارين المنفذة والأوزان المسجلة:" : "Completed Exercises & Weights:"}
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {exercises.map((ex, i) => (
+                              <div
+                                key={ex.exerciseId || i}
+                                className="flex items-center justify-between rounded-lg bg-white p-2 border border-black/[0.05] text-[11.5px]"
+                              >
+                                <span className="font-bold text-[var(--gym-ink,#111111)] truncate">
+                                  {ex.name}
+                                </span>
+                                <span className="font-mono font-bold text-[#6B7280] shrink-0">
+                                  {ex.completedSets} {isAr ? "مج" : "sets"}{" "}
+                                  {ex.weightKg ? `• ${ex.weightKg} كجم` : ""}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  )
+                })}
               </div>
             )
           ) : nutritionLogs.length === 0 ? (
@@ -172,12 +231,12 @@ export function ProgramLogsDialog({
                     className="rounded-2xl border border-[#ECECEC] bg-[#FBFBFB] p-4 transition hover:bg-white space-y-2"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-heading text-[14px] font-bold text-[var(--gym-ink,#063434)]">
+                      <span className="font-heading text-[14px] font-bold text-[var(--gym-ink,#111111)]">
                         {formatDate(log.date, locale)}
                       </span>
                       <div className="flex items-center gap-2">
                         {log.caloriesActual ? (
-                          <span className="rounded-full bg-[#EAEAEA] px-2 py-0.5 text-[11px] font-bold text-[var(--gym-ink,#063434)]">
+                          <span className="rounded-full bg-[#EAEAEA] px-2 py-0.5 text-[11px] font-bold text-[var(--gym-ink,#111111)]">
                             {log.caloriesActual} kcal
                           </span>
                         ) : null}
@@ -200,17 +259,6 @@ export function ProgramLogsDialog({
               })}
             </div>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex shrink-0 items-center justify-end border-t border-[#F0F0F0] px-6 py-3 bg-[#FBFBFB]">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full bg-[var(--gym-ink,#063434)] px-5 py-2 text-[12px] font-bold text-white hover:opacity-95"
-          >
-            {isAr ? "إغلاق" : "Close"}
-          </button>
         </div>
       </div>
     </div>,

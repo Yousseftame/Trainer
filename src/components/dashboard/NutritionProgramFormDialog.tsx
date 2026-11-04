@@ -5,8 +5,10 @@ import {
   Check,
   ChevronDown,
   FileText,
+  Info,
   Layers,
   Plus,
+  Repeat,
   ShieldAlert,
   Trash2,
   Utensils,
@@ -28,6 +30,7 @@ import { useLocale } from "@/hooks/useLocale"
 import { cn } from "@/lib/utils"
 import type {
   BilingualText,
+  MealAlternative,
   MealItem,
   MealSlot,
   MealSlotKey,
@@ -134,6 +137,7 @@ export function NutritionProgramFormDialog({
   const [pdfNameEn, setPdfNameEn] = useState("")
   const [pdfNameAr, setPdfNameAr] = useState("")
   const [days, setDays] = useState<NutritionDay[]>(emptyNutritionWeek())
+  const [expandedItemAlts, setExpandedItemAlts] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     if (!open || !mode) return
@@ -345,6 +349,123 @@ export function NutritionProgramFormDialog({
     )
   }
 
+  function updateMealSlotCoachingNote(slotId: string, value: string) {
+    setDays((prev) =>
+      prev.map((d) => {
+        if (d.weekday !== selectedWeekday) return d
+        return {
+          ...d,
+          meals: d.meals.map((s) => {
+            if (s.id !== slotId) return s
+            const cur =
+              typeof s.coachingNote === "object" && s.coachingNote !== null
+                ? s.coachingNote
+                : { en: "", ar: "" }
+            return {
+              ...s,
+              coachingNote: {
+                ...cur,
+                [activeLangTab]: value,
+              },
+            }
+          }),
+        }
+      }),
+    )
+  }
+
+  function addFoodAlternative(slotId: string, itemId: string) {
+    const newAlt: MealAlternative = {
+      id: `alt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+      name: { en: "Substitute Food", ar: "بديل غذائي معتمد" },
+      quantity: { en: "1 portion", ar: "1 حصة" },
+      calories: 200,
+      protein: 20,
+      carbs: 20,
+      fats: 5,
+      reason: {
+        en: "Approved substitute option",
+        ar: "بديل معتمد بنفس القيمة الغذائية",
+      },
+    }
+    setDays((prev) =>
+      prev.map((d) => {
+        if (d.weekday !== selectedWeekday) return d
+        return {
+          ...d,
+          meals: d.meals.map((s) => {
+            if (s.id !== slotId) return s
+            return {
+              ...s,
+              items: s.items.map((item) => {
+                if (item.id !== itemId) return item
+                const alts = item.alternatives || []
+                return { ...item, alternatives: [...alts, newAlt] }
+              }),
+            }
+          }),
+        }
+      }),
+    )
+  }
+
+  function updateFoodAlternative(
+    slotId: string,
+    itemId: string,
+    altId: string,
+    field: keyof MealAlternative,
+    value: unknown,
+  ) {
+    setDays((prev) =>
+      prev.map((d) => {
+        if (d.weekday !== selectedWeekday) return d
+        return {
+          ...d,
+          meals: d.meals.map((s) => {
+            if (s.id !== slotId) return s
+            return {
+              ...s,
+              items: s.items.map((item) => {
+                if (item.id !== itemId) return item
+                return {
+                  ...item,
+                  alternatives: (item.alternatives || []).map((alt) => {
+                    if (alt.id !== altId) return alt
+                    return { ...alt, [field]: value }
+                  }),
+                }
+              }),
+            }
+          }),
+        }
+      }),
+    )
+  }
+
+  function removeFoodAlternative(slotId: string, itemId: string, altId: string) {
+    setDays((prev) =>
+      prev.map((d) => {
+        if (d.weekday !== selectedWeekday) return d
+        return {
+          ...d,
+          meals: d.meals.map((s) => {
+            if (s.id !== slotId) return s
+            return {
+              ...s,
+              items: s.items.map((item) => {
+                if (item.id !== itemId) return item
+                return {
+                  ...item,
+                  alternatives: (item.alternatives || []).filter((a) => a.id !== altId),
+                }
+              }),
+            }
+          }),
+        }
+      }),
+    )
+  }
+
   // Subscriber entitlement check
   const selectedSubscriber = subscribers.find((s) => s.id === selectedSubscriberId)
   const subActiveSubscription = useMemo(() => {
@@ -503,11 +624,11 @@ export function NutritionProgramFormDialog({
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-[#F0F0F0] px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-2xl bg-[var(--gym-ink,#063434)] text-white">
+            <div className="flex size-10 items-center justify-center rounded-2xl bg-[var(--gym-ink,#111111)] text-white">
               <Apple className="size-5" />
             </div>
             <div>
-              <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#063434)]">
+              <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#111111)]">
                 {mode.type === "create-template"
                   ? isAr
                     ? "إنشاء قالب خطة تغذية جديد"
@@ -545,7 +666,7 @@ export function NutritionProgramFormDialog({
                 className={cn(
                   "rounded-full px-3 py-1 transition",
                   activeLangTab === "ar"
-                    ? "bg-[var(--gym-ink,#063434)] text-white shadow-sm"
+                    ? "bg-[var(--gym-ink,#111111)] text-white shadow-sm"
                     : "text-[#8c8c8c] hover:text-black",
                 )}
               >
@@ -557,7 +678,7 @@ export function NutritionProgramFormDialog({
                 className={cn(
                   "rounded-full px-3 py-1 transition",
                   activeLangTab === "en"
-                    ? "bg-[var(--gym-ink,#063434)] text-white shadow-sm"
+                    ? "bg-[var(--gym-ink,#111111)] text-white shadow-sm"
                     : "text-[#8c8c8c] hover:text-black",
                 )}
               >
@@ -612,7 +733,7 @@ export function NutritionProgramFormDialog({
                         disabled={mode.type === "edit-assignment"}
                         value={selectedSubscriberId}
                         onChange={(e) => setSelectedSubscriberId(e.target.value)}
-                        className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#063434)] outline-none focus:border-black appearance-none pe-8"
+                        className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#111111)] outline-none focus:border-black appearance-none pe-8"
                       >
                         <option value="">{isAr ? "اختر مشترك..." : "Select subscriber..."}</option>
                         {subscribers.map((sub) => (
@@ -634,7 +755,7 @@ export function NutritionProgramFormDialog({
                         <select
                           value={selectedTemplateId}
                           onChange={(e) => handleTemplatePickerChange(e.target.value)}
-                          className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#063434)] outline-none focus:border-black appearance-none pe-8"
+                          className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#111111)] outline-none focus:border-black appearance-none pe-8"
                         >
                           <option value="">{isAr ? "خطة فارغة مخصصة" : "Start from blank custom"}</option>
                           {templates.map((tpl) => (
@@ -656,9 +777,9 @@ export function NutritionProgramFormDialog({
                           type="checkbox"
                           checked={createNewVersion}
                           onChange={(e) => setCreateNewVersion(e.target.checked)}
-                          className="size-4 rounded accent-[var(--gym-ink,#063434)]"
+                          className="size-4 rounded accent-[var(--gym-ink,#111111)]"
                         />
-                        <span className="text-[13px] font-bold text-[var(--gym-ink,#063434)]">
+                        <span className="text-[13px] font-bold text-[var(--gym-ink,#111111)]">
                           {isAr
                             ? `إنشاء إصدار جديد (v${(mode.program.version || 1) + 1}) وحفظ السجل السابق`
                             : `Bump to new version (v${(mode.program.version || 1) + 1}) & keep history`}
@@ -672,7 +793,7 @@ export function NutritionProgramFormDialog({
                   <div className="flex items-center justify-between text-[12px] pt-1 border-t border-[#ECECEC]">
                     <span className="text-[#8c8c8c]">
                       {isAr ? "حالة الاشتراك:" : "Subscription status:"}{" "}
-                      <strong className="text-[var(--gym-ink,#063434)]">
+                      <strong className="text-[var(--gym-ink,#111111)]">
                         {subActiveSubscription?.status ?? (isAr ? "بدون اشتراك نشط" : "No active plan")}
                       </strong>
                     </span>
@@ -680,8 +801,8 @@ export function NutritionProgramFormDialog({
                       className={cn(
                         "rounded-full px-2.5 py-0.5 text-[11px] font-bold",
                         hasNutritionEntitlement
-                          ? "bg-emerald-100 text-emerald-800"
-                          : "bg-amber-100 text-amber-800",
+                          ? "bg-[var(--gym-ink,#111111)] text-white"
+                          : "bg-amber-100 text-amber-900 border border-amber-200",
                       )}
                     >
                       {hasNutritionEntitlement
@@ -709,7 +830,7 @@ export function NutritionProgramFormDialog({
                     value={titleAr}
                     onChange={(e) => setTitleAr(e.target.value)}
                     placeholder="مثال: خطة التنشيف المتوازن"
-                    className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#063434)] outline-none focus:border-black"
+                    className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#111111)] outline-none focus:border-black"
                   />
                 ) : (
                   <input
@@ -717,7 +838,7 @@ export function NutritionProgramFormDialog({
                     value={titleEn}
                     onChange={(e) => setTitleEn(e.target.value)}
                     placeholder="e.g. Fat-loss Balanced Plate"
-                    className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#063434)] outline-none focus:border-black"
+                    className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#111111)] outline-none focus:border-black"
                   />
                 )}
               </div>
@@ -733,7 +854,7 @@ export function NutritionProgramFormDialog({
                     className={cn(
                       "flex h-10 items-center justify-center gap-2 rounded-xl border text-[13px] font-bold transition",
                       format === "interactive"
-                        ? "border-[var(--gym-ink,#063434)] bg-[var(--gym-ink,#063434)] text-white"
+                        ? "border-[var(--gym-ink,#111111)] bg-[var(--gym-ink,#111111)] text-white"
                         : "border-[#E0E0E0] bg-white text-[#8c8c8c] hover:bg-black/5",
                     )}
                   >
@@ -746,7 +867,7 @@ export function NutritionProgramFormDialog({
                     className={cn(
                       "flex h-10 items-center justify-center gap-2 rounded-xl border text-[13px] font-bold transition",
                       format === "pdf"
-                        ? "border-[var(--gym-ink,#063434)] bg-[var(--gym-ink,#063434)] text-white"
+                        ? "border-[var(--gym-ink,#111111)] bg-[var(--gym-ink,#111111)] text-white"
                         : "border-[#E0E0E0] bg-white text-[#8c8c8c] hover:bg-black/5",
                     )}
                   >
@@ -759,7 +880,7 @@ export function NutritionProgramFormDialog({
 
             {/* Target Calories & Daily Macros Targets Bar */}
             <div className="rounded-2xl border border-[#E5E5E5] bg-[#FBFBFB] p-4 space-y-3">
-              <span className="text-[13px] font-extrabold text-[var(--gym-ink,#063434)]">
+              <span className="text-[13px] font-extrabold text-[var(--gym-ink,#111111)]">
                 {isAr ? "الأهداف اليومية للسعرات والماكروز والماء" : "Daily Calorie, Macro & Hydration Targets"}
               </span>
 
@@ -775,7 +896,7 @@ export function NutritionProgramFormDialog({
                     step={50}
                     value={targetCalories}
                     onChange={(e) => setTargetCalories(parseInt(e.target.value, 10) || 2000)}
-                    className="h-9 w-full rounded-xl border border-[#E0E0E0] bg-white px-2.5 text-center text-[13px] font-extrabold text-[var(--gym-ink,#063434)]"
+                    className="h-9 w-full rounded-xl border border-[#E0E0E0] bg-white px-2.5 text-center text-[13px] font-extrabold text-[var(--gym-ink,#111111)]"
                   />
                 </div>
 
@@ -789,7 +910,7 @@ export function NutritionProgramFormDialog({
                     max={400}
                     value={proteinGrams}
                     onChange={(e) => setProteinGrams(parseInt(e.target.value, 10) || 150)}
-                    className="h-9 w-full rounded-xl border border-[#E0E0E0] bg-white px-2.5 text-center text-[13px] font-extrabold text-[var(--gym-ink,#063434)]"
+                    className="h-9 w-full rounded-xl border border-[#E0E0E0] bg-white px-2.5 text-center text-[13px] font-extrabold text-[var(--gym-ink,#111111)]"
                   />
                 </div>
 
@@ -803,7 +924,7 @@ export function NutritionProgramFormDialog({
                     max={600}
                     value={carbsGrams}
                     onChange={(e) => setCarbsGrams(parseInt(e.target.value, 10) || 200)}
-                    className="h-9 w-full rounded-xl border border-[#E0E0E0] bg-white px-2.5 text-center text-[13px] font-extrabold text-[var(--gym-ink,#063434)]"
+                    className="h-9 w-full rounded-xl border border-[#E0E0E0] bg-white px-2.5 text-center text-[13px] font-extrabold text-[var(--gym-ink,#111111)]"
                   />
                 </div>
 
@@ -817,7 +938,7 @@ export function NutritionProgramFormDialog({
                     max={200}
                     value={fatsGrams}
                     onChange={(e) => setFatsGrams(parseInt(e.target.value, 10) || 65)}
-                    className="h-9 w-full rounded-xl border border-[#E0E0E0] bg-white px-2.5 text-center text-[13px] font-extrabold text-[var(--gym-ink,#063434)]"
+                    className="h-9 w-full rounded-xl border border-[#E0E0E0] bg-white px-2.5 text-center text-[13px] font-extrabold text-[var(--gym-ink,#111111)]"
                   />
                 </div>
 
@@ -832,7 +953,7 @@ export function NutritionProgramFormDialog({
                     max={8}
                     value={targetWaterLiters}
                     onChange={(e) => setTargetWaterLiters(parseFloat(e.target.value) || 3.0)}
-                    className="h-9 w-full rounded-xl border border-[#E0E0E0] bg-white px-2.5 text-center text-[13px] font-extrabold text-[var(--gym-ink,#063434)]"
+                    className="h-9 w-full rounded-xl border border-[#E0E0E0] bg-white px-2.5 text-center text-[13px] font-extrabold text-[var(--gym-ink,#111111)]"
                   />
                 </div>
               </div>
@@ -841,7 +962,7 @@ export function NutritionProgramFormDialog({
             {/* If format is PDF */}
             {format === "pdf" ? (
               <div className="rounded-2xl bg-[#F8F9FA] p-4 border border-[#EBEBEB] space-y-3">
-                <div className="flex items-center gap-2 text-[14px] font-bold text-[var(--gym-ink,#063434)]">
+                <div className="flex items-center gap-2 text-[14px] font-bold text-[var(--gym-ink,#111111)]">
                   <FileText className="size-4" />
                   {isAr ? "ربط مستند PDF من مكتبة المحتوى" : "Attach PDF from Content Library"}
                 </div>
@@ -861,7 +982,7 @@ export function NutritionProgramFormDialog({
                             setPdfNameAr(asset.title.ar)
                           }
                         }}
-                        className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#063434)] outline-none focus:border-black appearance-none pe-8"
+                        className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#111111)] outline-none focus:border-black appearance-none pe-8"
                       >
                         <option value="">{isAr ? "ملف خارجي / يدوي" : "Custom / External file"}</option>
                         {pdfAssets.map((asset) => (
@@ -886,7 +1007,7 @@ export function NutritionProgramFormDialog({
                           : setPdfNameEn(e.target.value)
                       }
                       placeholder="e.g. Ramadan_Nutrition_Guide.pdf"
-                      className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#063434)] outline-none focus:border-black"
+                      className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#111111)] outline-none focus:border-black"
                     />
                   </div>
                 </div>
@@ -895,12 +1016,12 @@ export function NutritionProgramFormDialog({
               /* If format is Interactive: Days & Meal Slots */
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-[14px] font-extrabold text-[var(--gym-ink,#063434)]">
+                  <span className="text-[14px] font-extrabold text-[var(--gym-ink,#111111)]">
                     {isAr ? "جدول الوجبات الأسبوعي" : "Weekly Meal Schedule"}
                   </span>
                   {currentMacros ? (
                     <div className="flex items-center gap-2 text-[11px] font-bold">
-                      <span className="rounded-full bg-[#F4F4F4] px-2.5 py-1 text-[var(--gym-ink,#063434)]">
+                      <span className="rounded-full bg-[#F4F4F4] px-2.5 py-1 text-[var(--gym-ink,#111111)]">
                         {currentMacros.calories} / {targetCalories} kcal
                       </span>
                       <span className="rounded-full bg-blue-50 px-2 py-0.5 text-blue-700">
@@ -929,8 +1050,8 @@ export function NutritionProgramFormDialog({
                         className={cn(
                           "flex flex-col items-center justify-center rounded-2xl py-2 px-1 text-center transition",
                           active
-                            ? "bg-[var(--gym-ink,#063434)] text-white shadow-sm"
-                            : "bg-[#F4F4F4] text-[var(--gym-ink,#063434)] hover:bg-[#EBEBEB]",
+                            ? "bg-[var(--gym-ink,#111111)] text-white shadow-sm"
+                            : "bg-[#F4F4F4] text-[var(--gym-ink,#111111)] hover:bg-[#EBEBEB]",
                         )}
                       >
                         <span className="text-[11px] font-extrabold">
@@ -953,7 +1074,7 @@ export function NutritionProgramFormDialog({
                 <div className="rounded-2xl border border-[#EBEBEB] bg-[#FAFAFA] p-4 space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="font-heading text-[15px] font-extrabold text-[var(--gym-ink,#063434)]">
+                      <h4 className="font-heading text-[15px] font-extrabold text-[var(--gym-ink,#111111)]">
                         {isAr ? WEEKDAY_NAMES_AR[selectedWeekday] : WEEKDAY_NAMES_EN[selectedWeekday]}
                       </h4>
                       <p className="text-[12px] font-medium text-[#8c8c8c]">
@@ -970,7 +1091,7 @@ export function NutritionProgramFormDialog({
                           key={extraKey}
                           type="button"
                           onClick={() => addMealSlotToCurrentDay(extraKey)}
-                          className="rounded-full bg-[#EAEAEA] px-2.5 py-1 text-[11px] font-bold text-[var(--gym-ink,#063434)] hover:bg-[#DDD]"
+                          className="rounded-full bg-[#EAEAEA] px-2.5 py-1 text-[11px] font-bold text-[var(--gym-ink,#111111)] hover:bg-[#DDD]"
                         >
                           + {MEAL_SLOT_LABELS[extraKey][locale]}
                         </button>
@@ -989,8 +1110,8 @@ export function NutritionProgramFormDialog({
                         >
                           <div className="flex items-center justify-between border-b border-[#F0F0F0] pb-2">
                             <div className="flex items-center gap-2">
-                              <Utensils className="size-4 text-[var(--gym-ink,#063434)]" />
-                              <span className="font-heading text-[14px] font-extrabold text-[var(--gym-ink,#063434)]">
+                              <Utensils className="size-4 text-[var(--gym-ink,#111111)]" />
+                              <span className="font-heading text-[14px] font-extrabold text-[var(--gym-ink,#111111)]">
                                 {slotTitle}
                               </span>
                               <span className="text-[11px] font-bold text-[#8c8c8c]">
@@ -1002,7 +1123,7 @@ export function NutritionProgramFormDialog({
                               <button
                                 type="button"
                                 onClick={() => addMealItem(slot.id)}
-                                className="inline-flex items-center gap-1 rounded-full bg-[var(--gym-ink,#063434)] px-3 py-1 text-[11px] font-bold text-white transition hover:opacity-95"
+                                className="inline-flex items-center gap-1 rounded-full bg-[var(--gym-ink,#111111)] px-3 py-1 text-[11px] font-bold text-white transition hover:opacity-95"
                               >
                                 <Plus className="size-3" />
                                 {isAr ? "إضافة صنف" : "Add food"}
@@ -1016,6 +1137,30 @@ export function NutritionProgramFormDialog({
                                 <Trash2 className="size-3.5" />
                               </button>
                             </div>
+                          </div>
+
+                          {/* Meal Slot Instructions / Coaching Note */}
+                          <div className="rounded-xl bg-amber-50/70 p-2.5 border border-amber-200/60 space-y-1">
+                            <label className="flex items-center gap-1.5 text-[11px] font-extrabold text-amber-900">
+                              <Info className="size-3 text-amber-700" />
+                              <span>{isAr ? "تعليمات وتوجيهات الوجبة للمشترك (تظهر في البنر الإرشادي):" : "Meal instructions / coach note (shown to subscriber):"}</span>
+                            </label>
+                            <input
+                              value={
+                                typeof slot.coachingNote === "string"
+                                  ? slot.coachingNote
+                                  : activeLangTab === "ar"
+                                    ? slot.coachingNote?.ar || ""
+                                    : slot.coachingNote?.en || ""
+                              }
+                              onChange={(e) => updateMealSlotCoachingNote(slot.id, e.target.value)}
+                              placeholder={
+                                isAr
+                                  ? "مثال: بعد الوجبة تناول كوب شاي أخضر واحرص على شرب نصف لتر ماء..."
+                                  : "e.g. Drink 500ml water before meal, take vitamins after..."
+                              }
+                              className="h-8 w-full rounded-lg border border-amber-200 bg-white px-2.5 text-[11.5px] font-medium text-amber-950 outline-none focus:border-amber-500"
+                            />
                           </div>
 
                           {/* Food Items in this slot */}
@@ -1068,7 +1213,7 @@ export function NutritionProgramFormDialog({
                                           })
                                         }}
                                         placeholder={isAr ? "اسم الصنف (مثال: صدور دجاج مشوية)" : "Food item (e.g. Grilled Chicken Breast)"}
-                                        className="h-8 flex-1 rounded-lg border border-[#E0E0E0] bg-white px-2.5 text-[12px] font-bold text-[var(--gym-ink,#063434)] outline-none focus:border-black"
+                                        className="h-8 flex-1 rounded-lg border border-[#E0E0E0] bg-white px-2.5 text-[12px] font-bold text-[var(--gym-ink,#111111)] outline-none focus:border-black"
                                       />
 
                                       <input
@@ -1085,7 +1230,7 @@ export function NutritionProgramFormDialog({
                                           })
                                         }}
                                         placeholder={isAr ? "الكمية (مثال: 180 جم)" : "Portion (e.g. 180g)"}
-                                        className="h-8 w-32 rounded-lg border border-[#E0E0E0] bg-white px-2 text-[12px] font-semibold text-[var(--gym-ink,#063434)] outline-none focus:border-black"
+                                        className="h-8 w-32 rounded-lg border border-[#E0E0E0] bg-white px-2 text-[12px] font-semibold text-[var(--gym-ink,#111111)] outline-none focus:border-black"
                                       />
 
                                       <button
@@ -1115,7 +1260,7 @@ export function NutritionProgramFormDialog({
                                               parseInt(e.target.value, 10) || 0,
                                             )
                                           }
-                                          className="h-7 w-full rounded border border-[#E0E0E0] bg-white px-1 text-center text-[11px] font-bold text-[var(--gym-ink,#063434)]"
+                                          className="h-7 w-full rounded border border-[#E0E0E0] bg-white px-1 text-center text-[11px] font-bold text-[var(--gym-ink,#111111)]"
                                         />
                                       </div>
 
@@ -1135,7 +1280,7 @@ export function NutritionProgramFormDialog({
                                               parseInt(e.target.value, 10) || 0,
                                             )
                                           }
-                                          className="h-7 w-full rounded border border-[#E0E0E0] bg-white px-1 text-center text-[11px] font-bold text-[var(--gym-ink,#063434)]"
+                                          className="h-7 w-full rounded border border-[#E0E0E0] bg-white px-1 text-center text-[11px] font-bold text-[var(--gym-ink,#111111)]"
                                         />
                                       </div>
 
@@ -1155,7 +1300,7 @@ export function NutritionProgramFormDialog({
                                               parseInt(e.target.value, 10) || 0,
                                             )
                                           }
-                                          className="h-7 w-full rounded border border-[#E0E0E0] bg-white px-1 text-center text-[11px] font-bold text-[var(--gym-ink,#063434)]"
+                                          className="h-7 w-full rounded border border-[#E0E0E0] bg-white px-1 text-center text-[11px] font-bold text-[var(--gym-ink,#111111)]"
                                         />
                                       </div>
 
@@ -1175,7 +1320,7 @@ export function NutritionProgramFormDialog({
                                               parseInt(e.target.value, 10) || 0,
                                             )
                                           }
-                                          className="h-7 w-full rounded border border-[#E0E0E0] bg-white px-1 text-center text-[11px] font-bold text-[var(--gym-ink,#063434)]"
+                                          className="h-7 w-full rounded border border-[#E0E0E0] bg-white px-1 text-center text-[11px] font-bold text-[var(--gym-ink,#111111)]"
                                         />
                                       </div>
                                     </div>
@@ -1196,6 +1341,215 @@ export function NutritionProgramFormDialog({
                                       placeholder={isAr ? "ملاحظات على الوجبة (اختياري)..." : "Meal item notes (optional)..."}
                                       className="h-7 w-full rounded-md border border-[#E0E0E0] bg-white px-2 text-[11px] text-[#6B7280] outline-none focus:border-black"
                                     />
+
+                                    <input
+                                      value={item.thumbnailUrl || ""}
+                                      onChange={(e) =>
+                                        updateMealItem(
+                                          slot.id,
+                                          item.id,
+                                          "thumbnailUrl",
+                                          e.target.value,
+                                        )
+                                      }
+                                      placeholder={
+                                        isAr
+                                          ? "رابط صورة الصنف (اختياري)..."
+                                          : "Food image URL (optional)..."
+                                      }
+                                      className="h-7 w-full rounded-md border border-[#E0E0E0] bg-white px-2 text-[11px] text-[#6B7280] outline-none focus:border-black font-mono"
+                                    />
+
+                                    {/* Alternatives for this food item */}
+                                    <div className="pt-1.5 border-t border-[#ECECEC]">
+                                      <div className="flex items-center justify-between">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setExpandedItemAlts((prev) => ({
+                                              ...prev,
+                                              [item.id]: !prev[item.id],
+                                            }))
+                                          }
+                                          className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[var(--gym-ink,#111111)] hover:text-[var(--gym-orange,#fb5001)]"
+                                        >
+                                          <Repeat className="size-3 text-[var(--gym-orange,#fb5001)]" />
+                                          <span>
+                                            {isAr
+                                              ? `بدائل الطعام المعتمدة (${item.alternatives?.length || 0})`
+                                              : `Approved Substitutes (${item.alternatives?.length || 0})`}
+                                          </span>
+                                          <ChevronDown
+                                            className={cn(
+                                              "size-3 transition-transform",
+                                              expandedItemAlts[item.id] && "rotate-180",
+                                            )}
+                                          />
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            addFoodAlternative(slot.id, item.id)
+                                            setExpandedItemAlts((prev) => ({
+                                              ...prev,
+                                              [item.id]: true,
+                                            }))
+                                          }}
+                                          className="inline-flex items-center gap-1 rounded-full bg-neutral-200 hover:bg-neutral-300 px-2.5 py-0.5 text-[10px] font-bold text-[var(--gym-ink,#111111)] transition"
+                                        >
+                                          <Plus className="size-2.5" />
+                                          {isAr ? "إضافة بديل" : "Add alternative"}
+                                        </button>
+                                      </div>
+
+                                      {expandedItemAlts[item.id] &&
+                                      item.alternatives &&
+                                      item.alternatives.length > 0 ? (
+                                        <div className="mt-2 space-y-2 rounded-xl bg-white p-2.5 border border-black/10">
+                                          {item.alternatives.map((alt) => {
+                                            const altName =
+                                              typeof alt.name === "object"
+                                                ? activeLangTab === "ar"
+                                                  ? alt.name.ar
+                                                  : alt.name.en
+                                                : alt.name
+                                            const altQty =
+                                              typeof alt.quantity === "object"
+                                                ? activeLangTab === "ar"
+                                                  ? alt.quantity.ar
+                                                  : alt.quantity.en
+                                                : alt.quantity || ""
+                                            const altReason =
+                                              typeof alt.reason === "object"
+                                                ? activeLangTab === "ar"
+                                                  ? alt.reason.ar
+                                                  : alt.reason.en
+                                                : alt.reason || ""
+
+                                            return (
+                                              <div
+                                                key={alt.id}
+                                                className="rounded-lg bg-neutral-50 p-2 border border-black/5 space-y-1.5"
+                                              >
+                                                <div className="flex items-center gap-2">
+                                                  <input
+                                                    value={altName}
+                                                    onChange={(e) => {
+                                                      const val = e.target.value
+                                                      const cur =
+                                                        typeof alt.name === "object"
+                                                          ? alt.name
+                                                          : {
+                                                              en: alt.name,
+                                                              ar: alt.name,
+                                                            }
+                                                      updateFoodAlternative(
+                                                        slot.id,
+                                                        item.id,
+                                                        alt.id,
+                                                        "name",
+                                                        {
+                                                          ...cur,
+                                                          [activeLangTab]: val,
+                                                        },
+                                                      )
+                                                    }}
+                                                    placeholder={
+                                                      isAr ? "اسم البديل" : "Substitute name"
+                                                    }
+                                                    className="h-7 flex-1 rounded border border-[#E0E0E0] bg-white px-2 text-[11px] font-bold text-[var(--gym-ink,#111111)]"
+                                                  />
+                                                  <input
+                                                    value={altQty}
+                                                    onChange={(e) => {
+                                                      const val = e.target.value
+                                                      const cur =
+                                                        typeof alt.quantity === "object"
+                                                          ? alt.quantity
+                                                          : { en: "", ar: "" }
+                                                      updateFoodAlternative(
+                                                        slot.id,
+                                                        item.id,
+                                                        alt.id,
+                                                        "quantity",
+                                                        {
+                                                          ...cur,
+                                                          [activeLangTab]: val,
+                                                        },
+                                                      )
+                                                    }}
+                                                    placeholder={
+                                                      isAr ? "الكمية (مثال: 120 جم)" : "Portion (e.g. 120g)"
+                                                    }
+                                                    className="h-7 w-28 rounded border border-[#E0E0E0] bg-white px-2 text-[11px] font-semibold text-[var(--gym-ink,#111111)]"
+                                                  />
+                                                  <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                      removeFoodAlternative(
+                                                        slot.id,
+                                                        item.id,
+                                                        alt.id,
+                                                      )
+                                                    }
+                                                    className="flex size-6 shrink-0 items-center justify-center rounded text-red-500 hover:bg-red-50"
+                                                  >
+                                                    <Trash2 className="size-3" />
+                                                  </button>
+                                                </div>
+
+                                                <div className="flex items-center gap-2">
+                                                  <input
+                                                    value={altReason}
+                                                    onChange={(e) => {
+                                                      const val = e.target.value
+                                                      const cur =
+                                                        typeof alt.reason === "object"
+                                                          ? alt.reason
+                                                          : { en: "", ar: "" }
+                                                      updateFoodAlternative(
+                                                        slot.id,
+                                                        item.id,
+                                                        alt.id,
+                                                        "reason",
+                                                        {
+                                                          ...cur,
+                                                          [activeLangTab]: val,
+                                                        },
+                                                      )
+                                                    }}
+                                                    placeholder={
+                                                      isAr
+                                                        ? "سبب البديل (مثال: بديل عالي البروتين في حال عدم توفر الدجاج)"
+                                                        : "Substitution reason"
+                                                    }
+                                                    className="h-6 flex-1 rounded border border-[#E0E0E0] bg-white px-2 text-[10.5px] text-[#6B7280]"
+                                                  />
+                                                  <div className="flex items-center gap-1 text-[10px] font-bold text-[#8c8c8c]">
+                                                    <span>{isAr ? "سعرات:" : "kcal:"}</span>
+                                                    <input
+                                                      type="number"
+                                                      value={alt.calories || 0}
+                                                      onChange={(e) =>
+                                                        updateFoodAlternative(
+                                                          slot.id,
+                                                          item.id,
+                                                          alt.id,
+                                                          "calories",
+                                                          parseInt(e.target.value, 10) || 0,
+                                                        )
+                                                      }
+                                                      className="h-6 w-14 rounded border border-[#E0E0E0] bg-white text-center text-[10px] font-bold text-[#111111]"
+                                                    />
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            )
+                                          })}
+                                        </div>
+                                      ) : null}
+                                    </div>
                                   </div>
                                 )
                               })}
@@ -1223,7 +1577,7 @@ export function NutritionProgramFormDialog({
             <button
               type="submit"
               disabled={busy}
-              className="inline-flex items-center gap-2 rounded-full bg-[var(--gym-ink,#063434)] px-6 py-2.5 text-[13px] font-bold text-white transition hover:opacity-95 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-6 py-2.5 text-[13px] font-bold text-white transition hover:opacity-95 disabled:opacity-50"
             >
               {busy ? (
                 <span>{isAr ? "جاري الحفظ..." : "Saving..."}</span>

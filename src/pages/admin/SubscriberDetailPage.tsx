@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react"
+﻿import { useMemo, useState, type ReactNode } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import {
@@ -489,7 +489,7 @@ export function SubscriberDetailPage() {
       <section className="rounded-[24px] bg-white p-5 sm:p-7 shadow-xs">
         <div className="flex items-center justify-between gap-3">
           <h3 className="inline-flex items-center gap-2 font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
-            <StickyNote className="size-4 text-[var(--gym-ink,#063434)]" strokeWidth={1.8} />
+            <StickyNote className="size-4 text-[var(--gym-ink,#111111)]" strokeWidth={1.8} />
             {t("admin.subscribers.coachNotes")}
           </h3>
           {!editingNotes ? (
@@ -500,7 +500,7 @@ export function SubscriberDetailPage() {
                 setNoteAr(subscriber.coachNotes?.ar || subscriber.coachNotes?.en || "")
                 setEditingNotes(true)
               }}
-              className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[var(--gym-ink,#063434)] hover:underline"
+              className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[var(--gym-ink,#111111)] hover:underline"
             >
               <Pencil className="size-3.5" />
               {subscriber.coachNotes ? (locale === "ar" ? "تعديل الملاحظة" : "Edit note") : (locale === "ar" ? "+ إضافة ملاحظة" : "+ Add note")}
@@ -520,7 +520,7 @@ export function SubscriberDetailPage() {
                   onChange={(e) => setNoteEn(e.target.value)}
                   rows={3}
                   placeholder="Private training remarks, progression limits, biomechanics..."
-                  className="w-full rounded-xl border border-black/10 bg-[#F8F8F8] p-3 text-[13px] font-medium outline-none focus:border-[var(--gym-ink,#063434)]"
+                  className="w-full rounded-xl border border-black/10 bg-[#F8F8F8] p-3 text-[13px] font-medium outline-none focus:border-[var(--gym-ink,#111111)]"
                 />
               </div>
               <div>
@@ -532,7 +532,7 @@ export function SubscriberDetailPage() {
                   onChange={(e) => setNoteAr(e.target.value)}
                   rows={3}
                   placeholder="ملاحظات تدريبية خاصة، توجيهات أوزان، قيود حركية..."
-                  className="w-full rounded-xl border border-black/10 bg-[#F8F8F8] p-3 text-[13px] font-medium outline-none focus:border-[var(--gym-ink,#063434)]"
+                  className="w-full rounded-xl border border-black/10 bg-[#F8F8F8] p-3 text-[13px] font-medium outline-none focus:border-[var(--gym-ink,#111111)]"
                 />
               </div>
             </div>
@@ -556,7 +556,7 @@ export function SubscriberDetailPage() {
                   setEditingNotes(false)
                   appToast.success(locale === "ar" ? "تم حفظ ملاحظات المدرب بنجاح" : "Coach notes updated successfully")
                 }}
-                className="inline-flex h-9 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] px-5 text-[12px] font-bold text-white transition hover:opacity-95 disabled:opacity-50"
+                className="inline-flex h-9 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[12px] font-bold text-white transition hover:opacity-95 disabled:opacity-50"
               >
                 {updateCoachNotesMutation.isPending
                   ? locale === "ar"

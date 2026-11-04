@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+﻿import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import {
   Area,
@@ -178,12 +178,12 @@ export function SubscriberActivityProgressChart() {
                 <span className={cn("text-[12px] sm:text-[13px] font-semibold text-[#8c8c8c]", isRtl && "font-arabic")}>
                   {isRtl ? "معدل الالتزام" : "Adherence Rate"}
                 </span>
-                <span className="inline-flex size-8 sm:size-9 shrink-0 items-center justify-center rounded-2xl bg-white text-[var(--gym-ink,#063434)] shadow-xs">
+                <span className="inline-flex size-8 sm:size-9 shrink-0 items-center justify-center rounded-2xl bg-white text-[var(--gym-ink,#111111)] shadow-xs">
                   <Activity className="size-4" strokeWidth={1.8} />
                 </span>
               </div>
               <div className="mt-2.5 sm:mt-3 flex items-baseline gap-2">
-                <span className={cn("font-heading text-[24px] sm:text-[28px] font-extrabold leading-none tracking-tight text-[var(--gym-ink,#063434)]", isRtl && "font-arabic")}>
+                <span className={cn("font-heading text-[24px] sm:text-[28px] font-extrabold leading-none tracking-tight text-[var(--gym-ink,#111111)]", isRtl && "font-arabic")}>
                   96%
                 </span>
                 <span className="inline-flex items-center text-[12px] font-bold text-[#2F7D32]">
@@ -202,12 +202,12 @@ export function SubscriberActivityProgressChart() {
                 <span className={cn("text-[12px] sm:text-[13px] font-semibold text-[#8c8c8c]", isRtl && "font-arabic")}>
                   {isRtl ? "جلسات الأسبوع" : "Weekly Sessions"}
                 </span>
-                <span className="inline-flex size-8 sm:size-9 shrink-0 items-center justify-center rounded-2xl bg-white text-[var(--gym-ink,#063434)] shadow-xs">
+                <span className="inline-flex size-8 sm:size-9 shrink-0 items-center justify-center rounded-2xl bg-white text-[var(--gym-ink,#111111)] shadow-xs">
                   <CheckCircle2 className="size-4" strokeWidth={1.8} />
                 </span>
               </div>
               <div className="mt-2.5 sm:mt-3 flex items-baseline gap-1.5">
-                <span className={cn("font-heading text-[24px] sm:text-[28px] font-extrabold leading-none tracking-tight text-[var(--gym-ink,#063434)]", isRtl && "font-arabic")}>
+                <span className={cn("font-heading text-[24px] sm:text-[28px] font-extrabold leading-none tracking-tight text-[var(--gym-ink,#111111)]", isRtl && "font-arabic")}>
                   4 / 5
                 </span>
                 <span className="text-[12px] font-bold text-[#8c8c8c]">
@@ -225,12 +225,12 @@ export function SubscriberActivityProgressChart() {
                 <span className={cn("text-[12px] sm:text-[13px] font-semibold text-[#8c8c8c]", isRtl && "font-arabic")}>
                   {isRtl ? "الوزن الحالي" : "Current Weight"}
                 </span>
-                <span className="inline-flex size-8 sm:size-9 shrink-0 items-center justify-center rounded-2xl bg-white text-[var(--gym-ink,#063434)] shadow-xs">
+                <span className="inline-flex size-8 sm:size-9 shrink-0 items-center justify-center rounded-2xl bg-white text-[var(--gym-ink,#111111)] shadow-xs">
                   <Scale className="size-4" strokeWidth={1.8} />
                 </span>
               </div>
               <div className="mt-2.5 sm:mt-3 flex items-baseline gap-1.5">
-                <span className={cn("font-heading text-[24px] sm:text-[28px] font-extrabold leading-none tracking-tight text-[var(--gym-ink,#063434)]", isRtl && "font-arabic")}>
+                <span className={cn("font-heading text-[24px] sm:text-[28px] font-extrabold leading-none tracking-tight text-[var(--gym-ink,#111111)]", isRtl && "font-arabic")}>
                   78.8
                 </span>
                 <span className="text-[12px] font-bold text-[#8c8c8c]">

@@ -11,6 +11,7 @@ import {
   ShieldAlert,
   Trash2,
 } from "lucide-react"
+import { ConfirmActionDialog } from "@/components/dashboard/ConfirmActionDialog"
 import { PTRecordFormDialog } from "@/components/dashboard/PTRecordFormDialog"
 import { FilterChip, StatCard } from "@/components/dashboard/StatCard"
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
@@ -56,6 +57,14 @@ export function PhysicalTherapyPage() {
   // Form Dialog
   const [formOpen, setFormOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState<PhysicalTherapyRecord | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    title: string
+    description?: string
+    confirmLabel?: string
+    tone?: "danger" | "primary" | "warning"
+    onConfirm: () => Promise<void> | void
+  } | null>(null)
 
   const { data: records = [] } = usePTRecordsQuery()
   const { data: subscribers = [] } = useSubscribersQuery()
@@ -115,14 +124,20 @@ export function PhysicalTherapyPage() {
     )
   }
 
-  async function handleDelete(record: PhysicalTherapyRecord) {
-    const confirmMsg = isAr
-      ? `هل أنت متأكد من حذف ملف العلاج الطبيعي لـ "${record.subscriberName || record.subscriberId}"؟`
-      : `Are you sure you want to delete the physical therapy record for "${record.subscriberName || record.subscriberId}"?`
-    if (!window.confirm(confirmMsg)) return
-
-    await deleteMutation.mutateAsync(record.id)
-    appToast.success(isAr ? "تم حذف السجل بنجاح" : "Record deleted successfully")
+  function handleDelete(record: PhysicalTherapyRecord) {
+    setConfirmDialog({
+      open: true,
+      title: isAr ? "حذف ملف العلاج الطبيعي" : "Delete Physical Therapy Record",
+      description: isAr
+        ? `هل أنت متأكد من حذف ملف العلاج الطبيعي للمشترك "${record.subscriberName || record.subscriberId}"؟ هذا الإجراء لا يمكن التراجع عنه.`
+        : `Are you sure you want to delete the physical therapy record for "${record.subscriberName || record.subscriberId}"? This action cannot be undone.`,
+      confirmLabel: isAr ? "تأكيد الحذف" : "Delete Record",
+      tone: "danger",
+      onConfirm: async () => {
+        await deleteMutation.mutateAsync(record.id)
+        appToast.success(isAr ? "تم حذف السجل بنجاح" : "Record deleted successfully")
+      },
+    })
   }
 
   return (
@@ -147,7 +162,7 @@ export function PhysicalTherapyPage() {
         <StatCard
           label={isAr ? "تعافي تام ومكتمل" : "Medically Cleared"}
           value={stats.cleared}
-          icon={<CheckCircle2 className="size-4 text-emerald-500" strokeWidth={1.8} />}
+          icon={<CheckCircle2 className="size-4 text-[var(--gym-ink,#111111)]" strokeWidth={1.8} />}
         />
       </div>
 
@@ -162,7 +177,7 @@ export function PhysicalTherapyPage() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={isAr ? "بحث بالاسم أو الإصابة أو المنطقة..." : "Search subscriber, injury, or area..."}
-                className="h-11 w-full rounded-full bg-[#F4F4F4] pe-4 ps-10 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none placeholder:font-normal placeholder:text-[#8c8c8c]"
+                className="h-11 w-full rounded-full bg-[#F4F4F4] pe-4 ps-10 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none placeholder:font-normal placeholder:text-[#8c8c8c]"
               />
             </label>
 
@@ -189,7 +204,7 @@ export function PhysicalTherapyPage() {
                   setEditingRecord(null)
                   setFormOpen(true)
                 }}
-                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#063434)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
               >
                 <Plus className="size-4" strokeWidth={2} />
                 {isAr ? "تقييم تأهيلي جديد" : "New Assessment"}
@@ -217,7 +232,7 @@ export function PhysicalTherapyPage() {
         {filteredRecords.length === 0 ? (
           <div className="mt-5 flex min-h-40 flex-col items-center justify-center rounded-[20px] bg-[#F4F4F4] p-6 text-center">
             <Activity className="size-8 text-[#8c8c8c] mb-2" strokeWidth={1.5} />
-            <p className="text-[14px] font-bold text-[var(--gym-ink,#063434)]">
+            <p className="text-[14px] font-bold text-[var(--gym-ink,#111111)]">
               {isAr ? "لا توجد سجلات علاج طبيعي تطابق هذا البحث" : "No physical therapy records found"}
             </p>
             <p className="mt-1 text-[12px] text-[#8c8c8c]">
@@ -243,8 +258,8 @@ export function PhysicalTherapyPage() {
                     className={cn(
                       "rounded-2xl p-3.5 text-start transition-colors",
                       active
-                        ? "bg-[var(--gym-ink,#063434)] text-white shadow-sm"
-                        : "bg-[#F4F4F4] text-[var(--gym-ink,#063434)] hover:bg-[#ececec]",
+                        ? "bg-[var(--gym-ink,#111111)] text-white shadow-sm"
+                        : "bg-[#F4F4F4] text-[var(--gym-ink,#111111)] hover:bg-[#ececec]",
                     )}
                   >
                     <div className="flex items-center justify-between gap-1">
@@ -258,7 +273,7 @@ export function PhysicalTherapyPage() {
                             ? "bg-red-500/20 text-red-700"
                             : rec.status === "recovering"
                               ? "bg-amber-500/20 text-amber-700"
-                              : "bg-emerald-500/20 text-emerald-700",
+                              : "bg-black/10 text-[var(--gym-ink,#111111)]",
                           active && "bg-white/20 text-white",
                         )}
                       >
@@ -292,7 +307,7 @@ export function PhysicalTherapyPage() {
                       <span
                         className={cn(
                           "font-bold",
-                          active ? "text-[var(--gym-lime,#b8fe22)]" : "text-emerald-700",
+                          active ? "text-[var(--gym-lime,#fb5001)]" : "text-[var(--gym-ink,#111111)]",
                         )}
                       >
                         {rec.rehabExercises.length} {isAr ? "تمارين تأهيل" : "rehab"}
@@ -310,7 +325,7 @@ export function PhysicalTherapyPage() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between border-b border-black/5 pb-4">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-heading text-[20px] font-extrabold tracking-tight text-[var(--gym-ink,#063434)]">
+                      <h2 className="font-heading text-[20px] font-extrabold tracking-tight text-[var(--gym-ink,#111111)]">
                         {selectedRecord.subscriberName ||
                           subscribers.find((s) => s.id === selectedRecord.subscriberId)?.displayName}
                       </h2>
@@ -352,7 +367,7 @@ export function PhysicalTherapyPage() {
                       />
                     </div>
 
-                    <p className="mt-1 font-heading text-[15px] font-bold text-[var(--gym-ink,#063434)]">
+                    <p className="mt-1 font-heading text-[15px] font-bold text-[var(--gym-ink,#111111)]">
                       {selectedRecord.injuryTitle[locale] || selectedRecord.injuryTitle.en}
                     </p>
 
@@ -379,7 +394,7 @@ export function PhysicalTherapyPage() {
                         "inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[12px] font-bold transition shadow-xs",
                         selectedRecord.status === "cleared"
                           ? "bg-amber-50 text-amber-800 hover:bg-amber-100"
-                          : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
+                          : "bg-[var(--gym-ink,#111111)] text-white hover:opacity-90",
                       )}
                     >
                       <CheckCircle2 className="size-3.5" />
@@ -398,7 +413,7 @@ export function PhysicalTherapyPage() {
                         setEditingRecord(selectedRecord)
                         setFormOpen(true)
                       }}
-                      className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#063434)] shadow-xs hover:bg-black/5"
+                      className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-xs hover:bg-black/5"
                       title={isAr ? "تعديل الملف" : "Edit record"}
                     >
                       <Pencil className="size-4" />
@@ -450,14 +465,14 @@ export function PhysicalTherapyPage() {
                           </div>
 
                           <div className="flex items-start gap-2 pt-2 border-t border-red-100/80">
-                            <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-black text-emerald-700">
+                            <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-black/10 text-[11px] font-black text-[var(--gym-ink,#111111)]">
                               ✓
                             </span>
                             <div>
-                              <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">
+                              <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--gym-ink,#111111)]">
                                 {isAr ? "البديل الآمن المعتمد:" : "Approved Alternative:"}
                               </p>
-                              <p className="text-[13px] font-bold text-emerald-950">
+                              <p className="text-[13px] font-bold text-[var(--gym-ink,#111111)]">
                                 {res.safeAlternative[locale] || res.safeAlternative.en}
                               </p>
                               {res.equipment ? (
@@ -527,7 +542,7 @@ export function PhysicalTherapyPage() {
                     <h4 className="text-[12px] font-bold uppercase tracking-wider text-[#8c8c8c] mb-1.5">
                       {isAr ? "ملاحظات وتوصيات أخصائي العلاج الطبيعي" : "Therapist Clinical Notes"}
                     </h4>
-                    <p className="text-[13px] font-medium leading-relaxed text-[var(--gym-ink,#063434)]">
+                    <p className="text-[13px] font-medium leading-relaxed text-[var(--gym-ink,#111111)]">
                       {selectedRecord.therapistNotes[locale] || selectedRecord.therapistNotes.en}
                     </p>
                   </div>
@@ -547,6 +562,19 @@ export function PhysicalTherapyPage() {
           await saveMutation.mutateAsync(record)
         }}
       />
+
+      {/* Confirm Action Dialog */}
+      {confirmDialog ? (
+        <ConfirmActionDialog
+          open={confirmDialog.open}
+          title={confirmDialog.title}
+          description={confirmDialog.description}
+          confirmLabel={confirmDialog.confirmLabel}
+          tone={confirmDialog.tone}
+          onCancel={() => setConfirmDialog(null)}
+          onConfirm={confirmDialog.onConfirm}
+        />
+      ) : null}
     </div>
   )
 }

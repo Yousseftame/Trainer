@@ -43,12 +43,12 @@ import { formatChartDate, formatDate, initials } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { Permission } from "@/lib/permissions/permissions"
 
-const INK = "var(--gym-ink,#063434)"
-const LIME = "var(--gym-lime,#b8fe22)"
+const INK = "var(--gym-ink,#111111)"
+const LIME = "var(--gym-lime,#fb5001)"
 const EASE = [0.22, 1, 0.36, 1] as const
 
 const MIX_COLORS: Record<string, string> = {
-  active: "#063434",
+  active: "#111111",
   expired: "#B8B8B8",
   pending: "#4A7C78",
   suspended: "#7E9198",
@@ -56,13 +56,13 @@ const MIX_COLORS: Record<string, string> = {
 
 const KIND_TONE: Record<PriorityKind, string> = {
   request: "bg-[#FFF3D6] text-[#9A6B00]",
-  expiring: "bg-[var(--gym-lime,#b8fe22)]/35 text-[var(--gym-ink,#063434)]",
+  expiring: "bg-[var(--gym-lime,#fb5001)]/35 text-[var(--gym-ink,#111111)]",
   expired: "bg-[#FFE8E4] text-[#C44536]",
   stale: "bg-[#EEEEEE] text-[#6B7280]",
 }
 
 const TOOLTIP_STYLE = {
-  background: "#063434",
+  background: "#111111",
   border: "none",
   borderRadius: 12,
   color: "#fff",
@@ -172,7 +172,7 @@ export function OverviewPage() {
     <div className="flex flex-col gap-4 sm:gap-5">
       <motion.section
         {...fadeUp(0)}
-        className="relative isolate overflow-hidden rounded-[22px] bg-[var(--gym-ink,#063434)] sm:rounded-[28px]"
+        className="relative isolate overflow-hidden rounded-[22px] bg-[var(--gym-ink,#111111)] sm:rounded-[28px]"
       >
         <img
           src={adminBanner}
@@ -185,7 +185,7 @@ export function OverviewPage() {
           className="pointer-events-none absolute inset-0 sm:hidden"
           style={{
             background:
-              "linear-gradient(180deg, rgba(6,52,52,0.28) 0%, rgba(6,52,52,0.42) 40%, rgba(6,52,52,0.82) 100%)",
+              "linear-gradient(180deg, rgba(17,17,17,0.3) 0%, rgba(17,17,17,0.55) 40%, rgba(17,17,17,0.92) 100%)",
           }}
         />
         <div
@@ -193,17 +193,17 @@ export function OverviewPage() {
           className="pointer-events-none absolute inset-0 hidden sm:block rtl:-scale-x-100"
           style={{
             background:
-              "linear-gradient(90deg, #063434 0%, rgba(6,52,52,0.92) 36%, rgba(6,52,52,0.45) 62%, rgba(6,52,52,0.12) 100%)",
+              "linear-gradient(90deg, #111111 0%, rgba(17,17,17,0.92) 36%, rgba(17,17,17,0.45) 62%, rgba(17,17,17,0.12) 100%)",
           }}
         />
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 hidden sm:block bg-[linear-gradient(180deg,rgba(6,52,52,0.15)_0%,rgba(6,52,52,0.55)_100%)]"
+          className="pointer-events-none absolute inset-0 hidden sm:block bg-[linear-gradient(180deg,rgba(17,17,17,0.15)_0%,rgba(17,17,17,0.55)_100%)]"
         />
 
         <div className="relative z-10 flex flex-col justify-end gap-3 p-4 sm:min-h-[228px] sm:flex-row sm:items-end sm:justify-between sm:gap-5 sm:p-7 lg:min-h-[248px] lg:p-8">
           <div className="min-w-0 max-w-2xl">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--gym-lime,#b8fe22)] sm:text-[11px]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--gym-orange,#fb5001)] sm:text-[11px]">
               {formatDate(data.today, locale)}
             </p>
             <h2 className="mt-1 font-heading text-[22px] font-extrabold leading-[1.12] tracking-tight text-white sm:mt-2 sm:text-[34px] lg:text-[40px]">
@@ -273,7 +273,7 @@ export function OverviewPage() {
               <AdherenceRing
                 value={data.adherence.workout}
                 label={t("admin.overview.charts.workout")}
-                color="#063434"
+                color="#111111"
               />
               <AdherenceRing
                 value={data.adherence.nutrition}
@@ -287,8 +287,8 @@ export function OverviewPage() {
               <AreaChart data={trend} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="overviewWorkout" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#063434" stopOpacity={0.2} />
-                    <stop offset="100%" stopColor="#063434" stopOpacity={0} />
+                    <stop offset="0%" stopColor="#111111" stopOpacity={0.2} />
+                    <stop offset="100%" stopColor="#111111" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid stroke="#EFEFEF" strokeDasharray="4 6" vertical={false} />
@@ -333,7 +333,7 @@ export function OverviewPage() {
                   stroke={LIME}
                   strokeWidth={2.2}
                   fill="none"
-                  dot={{ r: 3, fill: LIME, stroke: "#063434", strokeWidth: 1.4 }}
+                  dot={{ r: 3, fill: LIME, stroke: "#111111", strokeWidth: 1.4 }}
                   connectNulls
                 />
               </AreaChart>
@@ -368,7 +368,7 @@ export function OverviewPage() {
               </PieChart>
             </ResponsiveContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <p className="font-heading text-[28px] font-extrabold leading-none text-[var(--gym-ink,#063434)]">
+              <p className="font-heading text-[28px] font-extrabold leading-none text-[var(--gym-ink,#111111)]">
                 <Count value={data.subscriptions.active} />
               </p>
               <p className="mt-1 text-[11px] font-bold text-[#8c8c8c]">{t("admin.overview.charts.live")}</p>
@@ -378,7 +378,7 @@ export function OverviewPage() {
             {mix.map((item) => (
               <li key={item.key} className="flex items-center gap-2.5 text-[13px]">
                 <span className="size-2.5 shrink-0 rounded-full" style={{ background: MIX_COLORS[item.key] }} />
-                <span className="min-w-0 flex-1 font-bold text-[var(--gym-ink,#063434)]">{item.label}</span>
+                <span className="min-w-0 flex-1 font-bold text-[var(--gym-ink,#111111)]">{item.label}</span>
                 <span className="font-bold text-[#8c8c8c]">{item.value}</span>
               </li>
             ))}
@@ -395,7 +395,7 @@ export function OverviewPage() {
             {data.packages.map((row, index) => (
               <li key={row.pkg.id}>
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-[14px] font-bold text-[var(--gym-ink,#063434)]">
+                  <span className="text-[14px] font-bold text-[var(--gym-ink,#111111)]">
                     {row.pkg.name[locale]}
                   </span>
                   <span className="text-[12px] font-semibold text-[#8c8c8c]">
@@ -404,7 +404,7 @@ export function OverviewPage() {
                 </div>
                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#F4F4F4]">
                   <motion.div
-                    className="h-full rounded-full bg-[var(--gym-ink,#063434)]"
+                    className="h-full rounded-full bg-[var(--gym-ink,#111111)]"
                     initial={{ width: 0 }}
                     animate={{ width: `${row.share}%` }}
                     transition={{ duration: 0.75, delay: 0.3 + index * 0.08, ease: EASE }}
@@ -444,7 +444,7 @@ export function OverviewPage() {
           </div>
           <div className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-[#F4F4F4]">
             <motion.div
-              className="h-full bg-[var(--gym-lime,#b8fe22)]"
+              className="h-full bg-[var(--gym-lime,#fb5001)]"
               initial={{ width: 0 }}
               animate={{ width: `${(data.progress.onTrack / progressTotal) * 100}%` }}
               transition={{ duration: 0.7, delay: 0.4, ease: EASE }}
@@ -480,12 +480,12 @@ export function OverviewPage() {
                   to={item.href}
                   className="flex items-center gap-3 py-3 text-start transition-opacity hover:opacity-80"
                 >
-                  <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-2xl bg-[#F4F4F4] font-heading text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+                  <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-2xl bg-[#F4F4F4] font-heading text-[12px] font-bold text-[var(--gym-ink,#111111)]">
                     {initials(item.name)}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-2">
-                      <span className="truncate text-[13px] font-bold text-[var(--gym-ink,#063434)]">
+                      <span className="truncate text-[13px] font-bold text-[var(--gym-ink,#111111)]">
                         {item.name}
                       </span>
                       <span
@@ -530,9 +530,9 @@ export function OverviewPage() {
               <Link
                 key={item.to}
                 to={item.to}
-                className="group flex items-center gap-3 rounded-[18px] bg-[#F4F4F4] p-3.5 transition-colors hover:bg-[var(--gym-ink,#063434)] hover:text-white"
+                className="group flex items-center gap-3 rounded-[18px] bg-[#F4F4F4] p-3.5 transition-colors hover:bg-[var(--gym-ink,#111111)] hover:text-white"
               >
-                <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[var(--gym-ink,#063434)] transition-colors group-hover:bg-[var(--gym-lime,#b8fe22)]">
+                <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[var(--gym-ink,#111111)] transition-colors group-hover:bg-[var(--gym-lime,#fb5001)]">
                   {item.icon}
                 </span>
                 <span className="min-w-0 flex-1">
@@ -550,14 +550,14 @@ export function OverviewPage() {
               <div className="mt-1 grid grid-cols-2 gap-2">
                 <Link
                   to={APP_ROUTES.admin.workouts}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#F4F4F4] text-[12px] font-bold text-[var(--gym-ink,#063434)]"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#F4F4F4] text-[12px] font-bold text-[var(--gym-ink,#111111)]"
                 >
                   <Dumbbell className="size-3.5" strokeWidth={1.8} />
                   {t("admin.overview.actions.workouts")}
                 </Link>
                 <Link
                   to={APP_ROUTES.admin.nutrition}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#F4F4F4] text-[12px] font-bold text-[var(--gym-ink,#063434)]"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#F4F4F4] text-[12px] font-bold text-[var(--gym-ink,#111111)]"
                 >
                   <Apple className="size-3.5" strokeWidth={1.8} />
                   {t("admin.overview.actions.nutrition")}
@@ -608,15 +608,15 @@ function Kpi({
   return (
     <motion.div
       {...fadeUp(delay)}
-      className="rounded-[20px] bg-white p-3.5 shadow-[0_8px_24px_rgba(6,52,52,0.04)] sm:rounded-[24px] sm:p-5"
+      className="rounded-[20px] bg-white p-3.5 shadow-[0_8px_24px_rgba(0,0,0,0.04)] sm:rounded-[24px] sm:p-5"
     >
       <div className="flex items-start justify-between gap-3">
         <p className="text-[12px] font-semibold text-[#8c8c8c] sm:text-[13px]">{label}</p>
-        <span className="inline-flex size-8 items-center justify-center rounded-2xl bg-[#F4F4F4] text-[var(--gym-ink,#063434)] sm:size-9">
+        <span className="inline-flex size-8 items-center justify-center rounded-2xl bg-[#F4F4F4] text-[var(--gym-ink,#111111)] sm:size-9">
           {icon}
         </span>
       </div>
-      <p className="mt-2 flex items-end gap-2 font-heading text-[24px] font-extrabold leading-none tracking-tight text-[var(--gym-ink,#063434)] sm:mt-3 sm:text-[28px] lg:text-[32px]">
+      <p className="mt-2 flex items-end gap-2 font-heading text-[24px] font-extrabold leading-none tracking-tight text-[var(--gym-ink,#111111)] sm:mt-3 sm:text-[28px] lg:text-[32px]">
         <Count value={value} />
         {suffix ? <span className="text-[18px] sm:text-[20px]">{suffix}</span> : null}
         {delta != null && delta !== 0 ? (
@@ -666,7 +666,7 @@ function AdherenceRing({
         />
       </svg>
       <div>
-        <p className="font-heading text-[16px] font-extrabold leading-none text-[var(--gym-ink,#063434)]">
+        <p className="font-heading text-[16px] font-extrabold leading-none text-[var(--gym-ink,#111111)]">
           {value == null ? "—" : `${value}%`}
         </p>
         <p className="mt-1 text-[11px] font-bold text-[#8c8c8c]">{label}</p>
@@ -689,7 +689,7 @@ function ProgressStat({
       <p
         className={cn(
           "font-heading text-[22px] font-extrabold leading-none",
-          tone === "live" && "text-[var(--gym-ink,#063434)]",
+          tone === "live" && "text-[var(--gym-ink,#111111)]",
           tone === "warn" && "text-[#9A6B00]",
           tone === "muted" && "text-[#6B7280]",
         )}

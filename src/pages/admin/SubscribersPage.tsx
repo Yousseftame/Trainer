@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+﻿import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { ChevronDown, Clock, Search, UserCheck, UserPlus, Users, UserX } from "lucide-react"
@@ -270,7 +270,7 @@ export function SubscribersPage() {
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder={t("admin.subscribers.search")}
                   className={cn(
-                    "h-11 w-full rounded-full bg-[#F4F4F4] pe-4 ps-10 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none",
+                    "h-11 w-full rounded-full bg-[#F4F4F4] pe-4 ps-10 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none",
                     "placeholder:font-normal placeholder:text-[#8c8c8c]",
                   )}
                 />
@@ -301,7 +301,7 @@ export function SubscribersPage() {
                 <button
                   type="button"
                   onClick={() => setFormState({ open: true, subscriber: null })}
-                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#063434)] px-4 sm:px-5 text-[13px] font-bold text-white transition hover:opacity-95"
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-4 sm:px-5 text-[13px] font-bold text-white transition hover:opacity-95"
                 >
                   <UserPlus className="size-4" strokeWidth={2} />
                   <span className="whitespace-nowrap">{t("admin.subscribers.add")}</span>
@@ -333,7 +333,7 @@ export function SubscribersPage() {
               const nameText = subscriberDisplayName(row, locale)
               return (
                 <div className="flex items-center gap-3">
-                  <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] font-heading text-[12px] font-bold text-[var(--gym-lime,#b8fe22)]">
+                  <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] font-heading text-[12px] font-bold text-[var(--gym-lime,#fb5001)]">
                     {initials(nameText)}
                   </span>
                   <div className="min-w-0">

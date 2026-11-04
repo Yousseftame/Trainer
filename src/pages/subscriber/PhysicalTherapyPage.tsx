@@ -1,21 +1,27 @@
+import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import {
   Activity,
+  ArrowRight,
+  ArrowLeft,
+  Calendar,
   CheckCircle2,
   Dumbbell,
   HeartPulse,
+  Info,
   ShieldAlert,
+  Sparkles,
+  UserCheck,
 } from "lucide-react"
-import { StatusBadge } from "@/components/dashboard/StatusBadge"
 import { APP_ROUTES } from "@/config/constants"
 import { useAuth } from "@/features/auth/auth-context"
-import { useSubscriberPTQuery } from "@/features/physicalTherapy/hooks"
+import { useSubscriberPTRecordsQuery } from "@/features/physicalTherapy/hooks"
 import { useSubscribersQuery } from "@/features/subscribers/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
-import type { PTAffectedArea } from "@/types/physicalTherapy"
+import type { PTAffectedArea, PhysicalTherapyRecord } from "@/types/physicalTherapy"
 
 const AREA_LABELS: Record<PTAffectedArea, { en: string; ar: string }> = {
   shoulder: { en: "Shoulder", ar: "الكتف" },
@@ -30,283 +36,538 @@ const AREA_LABELS: Record<PTAffectedArea, { en: string; ar: string }> = {
 }
 
 export function PhysicalTherapyPage() {
-  const { locale } = useLocale()
+  const { locale, isRtl } = useLocale()
   const isAr = locale === "ar"
-  useDocumentTitle(isAr ? "العلاج الطبيعي والتأهيل الحركي" : "Physical Therapy & Rehab")
+  useDocumentTitle(isAr ? "العلاج الطبيعي والتأهيل الحركي" : "Physical Therapy & Movement Rehab")
 
-  const { user } = useAuth()
+  const { user, isAdmin } = useAuth()
+  const isStaff = isAdmin || (user?.role && user.role !== "subscriber")
   const { data: subscribers = [] } = useSubscribersQuery()
 
-  // Match logged in subscriber
-  const currentSub = subscribers.find(
+  // Match logged in subscriber or let admin preview
+  const defaultSub = subscribers.find(
     (s) =>
       s.id === user?.uid ||
       s.email.toLowerCase() === (user?.email || "").toLowerCase(),
-  )
+  ) || subscribers[0]
 
-  const subscriberId = currentSub?.id || user?.uid || "sub-alex"
-  const { data: ptRecord, isLoading } = useSubscriberPTQuery(subscriberId)
+  const [selectedSubscriberId, setSelectedSubscriberId] = useState<string>("")
+  const activeSubscriberId = selectedSubscriberId || defaultSub?.id || user?.uid || "sub-alex"
+
+  // Fetch all PT records for this subscriber
+  const { data: records = [], isLoading } = useSubscriberPTRecordsQuery(activeSubscriberId)
+
+  // Currently selected record ID (defaults to active/recovering record first, then latest)
+  const [activeRecordId, setActiveRecordId] = useState<string>("")
+
+  const activeRecord: PhysicalTherapyRecord | null = useMemo(() => {
+    if (!records.length) return null
+    if (activeRecordId) {
+      const match = records.find((r) => r.id === activeRecordId)
+      if (match) return match
+    }
+    // Prefer active or recovering record, otherwise first available
+    return records.find((r) => r.status === "active" || r.status === "recovering") || records[0]
+  }, [records, activeRecordId])
+
+  const areaLabel = activeRecord
+    ? isAr
+      ? AREA_LABELS[activeRecord.affectedArea]?.ar
+      : AREA_LABELS[activeRecord.affectedArea]?.en
+    : ""
 
   return (
-    <div className="flex flex-col gap-5 pb-10">
-      {/* Hero Banner */}
-      <div className="relative overflow-hidden rounded-[26px] bg-[var(--gym-ink,#063434)] p-5 sm:p-8 text-white shadow-md">
-        <div className="relative z-10 flex flex-col gap-2.5 max-w-2xl">
-          <div className="inline-flex self-start items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] sm:text-[12px] font-bold text-[var(--gym-lime,#fb5001)]">
-            <HeartPulse className="size-3.5" />
-            <span>{isAr ? "الرعاية الحركية والتأهيل الوقائي" : "Preventative Care & Rehab Protocol"}</span>
+    <div className="flex flex-col gap-5 pb-14">
+      {/* ======================================================== */}
+      {/* 1. Clean Top Header & Metric Highlights                  */}
+      {/* ======================================================== */}
+      <div className="flex flex-col gap-4">
+        {/* Top Header Row (Matching Progress Page layout) */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="font-heading text-[20px] sm:text-[23px] font-black text-[var(--gym-ink,#111111)] tracking-tight">
+                {isAr ? "العلاج الطبيعي والتأهيل الحركي" : "Physical Therapy & Movement Rehab"}
+              </h1>
+              {activeRecord ? (
+                <span
+                  className={cn(
+                    "inline-flex h-7 items-center rounded-full px-2.5 text-[12px] font-bold whitespace-nowrap",
+                    activeRecord.status === "active"
+                      ? "bg-rose-100 text-rose-800"
+                      : activeRecord.status === "recovering"
+                        ? "bg-amber-100 text-amber-900"
+                        : "bg-[var(--gym-lime,#fb5001)]/35 text-[var(--gym-ink,#111111)]",
+                  )}
+                >
+                  {activeRecord.status === "active"
+                    ? isAr
+                      ? "تأهيل نشط"
+                      : "Active Rehab"
+                    : activeRecord.status === "recovering"
+                      ? isAr
+                        ? "في مرحلة الاستشفاء"
+                        : "Recovering"
+                      : isAr
+                        ? "معافى / مصرح بالتمرين"
+                        : "Medically Cleared"}
+                </span>
+              ) : null}
+            </div>
+            <p className="mt-0.5 text-[12px] sm:text-[13px] font-medium text-[#6B7280]">
+              {isAr
+                ? "بروتوكول معتمد للوقاية من الإصابات، موانع الحركة في الجيم، وبدائل التمارين الآمنة المعتمدة"
+                : "Certified injury prevention protocols, gym contraindications, and approved safe movement substitutes."}
+            </p>
           </div>
 
-          <h1 className={cn("text-[20px] sm:text-[28px] lg:text-[30px] font-extrabold tracking-tight leading-[1.3]", isAr ? "font-arabic" : "font-heading")}>
-            {isAr ? "خطة العلاج الطبيعي والتأهيل الحركي" : "My Physical Therapy & Rehab"}
-          </h1>
-          <p className={cn("text-[13px] sm:text-[14px] leading-relaxed text-white/80", isAr && "font-arabic")}>
-            {isAr
-              ? "بروتوكول موجه لحمايتك من الإصابات، مع بدائل ذكية للتمارين لتستمر في التدريب بأمان وفاعلية تامة."
-              : "Trainer-approved injury recovery and movement guidance with safe exercise alternatives so you stay strong without pain."}
-          </p>
+          {/* Action Buttons Row */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Admin Member Switcher (Only visible to staff/admin) */}
+            {isStaff ? (
+              <div className="flex items-center gap-1.5 rounded-full bg-[#F4F4F4] px-3 py-1.5 text-[11.5px] font-bold text-[var(--gym-ink,#111111)] border border-black/8">
+                <UserCheck className="size-3.5 text-[var(--gym-lime,#fb5001)]" />
+                <span className="hidden xs:inline">
+                  {isAr ? "معاينة:" : "Member:"}
+                </span>
+                <select
+                  value={activeSubscriberId}
+                  onChange={(e) => {
+                    setSelectedSubscriberId(e.target.value)
+                    setActiveRecordId("")
+                  }}
+                  className="rounded-lg bg-white px-2 py-0.5 text-[11.5px] font-bold outline-none cursor-pointer"
+                >
+                  {subscribers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.displayName || s.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+
+            {/* View Workout Plan Button */}
+            <Link
+              to={APP_ROUTES.subscriber.workout}
+              className="inline-flex h-9.5 sm:h-10 items-center justify-center gap-1.5 rounded-full bg-[var(--gym-ink,#111111)] hover:bg-[var(--gym-lime,#fb5001)] px-3.5 sm:px-4.5 text-[12px] sm:text-[12.5px] font-extrabold text-white shadow-2xs transition-all active:scale-95"
+            >
+              <Dumbbell className="size-3.5" />
+              <span>{isAr ? "جدول التمارين اليومي" : "View Workout Plan"}</span>
+            </Link>
+          </div>
         </div>
 
-        <div className="pointer-events-none absolute -end-8 -top-8 size-48 rounded-full bg-white/5 blur-2xl" />
+        {/* Multiple Records Chips (if member has more than 1 assessment/history) */}
+        {records.length > 1 ? (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 no-scrollbar">
+            <span className="text-[11.5px] font-bold text-[#8c8c8c] shrink-0">
+              {isAr ? "السجلات المتاحة:" : "Assessments:"}
+            </span>
+            {records.map((rec) => {
+              const isSelected = activeRecord?.id === rec.id
+              const area = isAr ? AREA_LABELS[rec.affectedArea]?.ar : AREA_LABELS[rec.affectedArea]?.en
+              return (
+                <button
+                  key={rec.id}
+                  type="button"
+                  onClick={() => setActiveRecordId(rec.id)}
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[12px] font-bold transition shrink-0 border",
+                    isSelected
+                      ? "bg-[var(--gym-ink,#111111)] text-white border-transparent shadow-xs"
+                      : "bg-white text-[var(--gym-ink,#111111)] border-black/10 hover:bg-neutral-50",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "size-2 rounded-full",
+                      rec.status === "active"
+                        ? "bg-rose-500"
+                        : rec.status === "recovering"
+                          ? "bg-amber-500"
+                          : "bg-neutral-400",
+                    )}
+                  />
+                  <span>
+                    {area} · {rec.injuryTitle[locale] || rec.injuryTitle.en}
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[10px] px-1.5 py-0.2 rounded-full font-semibold",
+                      isSelected ? "bg-white/20 text-white" : "bg-black/5 text-[#8c8c8c]",
+                    )}
+                  >
+                    {rec.status === "cleared" ? (isAr ? "معافى" : "Cleared") : isAr ? "جاري التأهيل" : "Active"}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        ) : null}
+
+        {/* 4 Clean Metric Cards (Eye-Comfortable, Zero Green) */}
+        {activeRecord ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {/* Card 1: Rehab State */}
+            <div className="rounded-[20px] bg-white p-3.5 sm:p-4 border border-black/6 shadow-2xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11.5px] font-bold text-[#8c8c8c]">
+                  {isAr ? "حالة التأهيل" : "Rehab Status"}
+                </span>
+                <span className="flex size-7 items-center justify-center rounded-xl bg-black/5 text-[var(--gym-lime,#fb5001)]">
+                  <Activity className="size-3.5" />
+                </span>
+              </div>
+              <div className="mt-2.5">
+                <p className="font-heading text-[15px] sm:text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
+                  {activeRecord.status === "active"
+                    ? isAr
+                      ? "تأهيل نشط"
+                      : "Active Rehab"
+                    : activeRecord.status === "recovering"
+                      ? isAr
+                        ? "في مرحلة الاستشفاء"
+                        : "In Recovery"
+                      : isAr
+                        ? "معافى تماماً"
+                        : "Fully Cleared"}
+                </p>
+                <p className="text-[11px] font-semibold text-[#8c8c8c]">
+                  {activeRecord.severity === "mild"
+                    ? isAr
+                      ? "درجة إصابة خفيفة"
+                      : "Mild severity"
+                    : activeRecord.severity === "moderate"
+                      ? isAr
+                        ? "درجة إصابة متوسطة"
+                        : "Moderate severity"
+                      : isAr
+                        ? "إصابة شديدة تتطلب الحذر"
+                        : "Severe severity"}
+                </p>
+              </div>
+            </div>
+
+            {/* Card 2: Affected Joint / Area */}
+            <div className="rounded-[20px] bg-white p-3.5 sm:p-4 border border-black/6 shadow-2xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11.5px] font-bold text-[#8c8c8c]">
+                  {isAr ? "المنطقة المتأثرة" : "Target Joint"}
+                </span>
+                <span className="flex size-7 items-center justify-center rounded-xl bg-black/5 text-[var(--gym-lime,#fb5001)]">
+                  <HeartPulse className="size-3.5" />
+                </span>
+              </div>
+              <div className="mt-2.5">
+                <p className="font-heading text-[15px] sm:text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
+                  {areaLabel}
+                </p>
+                <p className="text-[11px] font-semibold text-[#8c8c8c] truncate">
+                  {activeRecord.injuryTitle[locale] || activeRecord.injuryTitle.en}
+                </p>
+              </div>
+            </div>
+
+            {/* Card 3: Contraindications count */}
+            <div className="rounded-[20px] bg-white p-3.5 sm:p-4 border border-black/6 shadow-2xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11.5px] font-bold text-[#8c8c8c]">
+                  {isAr ? "موانع الحركة والبدائل" : "Contraindications"}
+                </span>
+                <span className="flex size-7 items-center justify-center rounded-xl bg-black/5 text-[var(--gym-lime,#fb5001)]">
+                  <ShieldAlert className="size-3.5" />
+                </span>
+              </div>
+              <div className="mt-2.5">
+                <p className="font-heading text-[15px] sm:text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
+                  {activeRecord.restrictions.length} {isAr ? "حركات مقيدة" : "restrictions"}
+                </p>
+                <p className="text-[11px] font-semibold text-[#8c8c8c]">
+                  {activeRecord.restrictions.length} {isAr ? "بدائل آمنة معتمدة" : "approved substitutes"}
+                </p>
+              </div>
+            </div>
+
+            {/* Card 4: Next Checkup / Dates */}
+            <div className="rounded-[20px] bg-white p-3.5 sm:p-4 border border-black/6 shadow-2xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11.5px] font-bold text-[#8c8c8c]">
+                  {activeRecord.status === "cleared"
+                    ? isAr
+                      ? "تاريخ التعافي"
+                      : "Clearance Date"
+                    : isAr
+                      ? "التقييم الطبي القادم"
+                      : "Next Evaluation"}
+                </span>
+                <span className="flex size-7 items-center justify-center rounded-xl bg-black/5 text-[var(--gym-lime,#fb5001)]">
+                  <Calendar className="size-3.5" />
+                </span>
+              </div>
+              <div className="mt-2.5">
+                <p className="font-heading text-[15px] sm:text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
+                  {activeRecord.status === "cleared" && activeRecord.clearanceDate
+                    ? formatDate(activeRecord.clearanceDate, locale)
+                    : activeRecord.nextEvaluationDate
+                      ? formatDate(activeRecord.nextEvaluationDate, locale)
+                      : formatDate(activeRecord.diagnosisDate, locale)}
+                </p>
+                <p className="text-[11px] font-semibold text-[#8c8c8c]">
+                  {isAr ? "تاريخ بدء التشخيص: " : "Diagnosed: "}
+                  {formatDate(activeRecord.diagnosisDate, locale)}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
 
+      {/* ======================================================== */}
+      {/* 2. Loading State / Empty State / Main Content            */}
+      {/* ======================================================== */}
       {isLoading ? (
-        <div className="flex min-h-60 items-center justify-center rounded-[24px] bg-white p-8 text-sm text-[#8c8c8c]">
-          {isAr ? "جارٍ تحميل بيانات التأهيل..." : "Loading rehab records..."}
+        <div className="flex min-h-60 items-center justify-center rounded-[24px] bg-white p-8 text-sm text-[#8c8c8c] border border-black/6">
+          {isAr ? "جارٍ تحميل بروتوكول التأهيل..." : "Loading rehab protocol..."}
         </div>
-      ) : !ptRecord ? (
-        <div className="flex min-h-64 flex-col items-center justify-center rounded-[24px] bg-white p-8 text-center shadow-xs">
-          <div className="flex size-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 mb-3">
+      ) : !activeRecord ? (
+        /* Empty State: Subscriber has no injury records */
+        <div className="flex min-h-64 flex-col items-center justify-center rounded-[28px] bg-white p-8 text-center shadow-xs border border-black/6">
+          <div className="flex size-14 items-center justify-center rounded-2xl bg-[#111111] text-[var(--gym-orange,#fb5001)] mb-3 shadow-xs">
             <CheckCircle2 className="size-7" />
           </div>
-          <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#063434)]">
+          <h2 className="font-heading text-[19px] font-extrabold text-[var(--gym-ink,#111111)]">
             {isAr ? "لا توجد قيود حركية أو إصابات مسجلة" : "No Active Injury Restrictions"}
           </h2>
           <p className="mt-1.5 max-w-md text-[13px] text-[#8c8c8c] leading-relaxed">
             {isAr
-              ? "ملفك الطبي وتدريبك في حالة ممتازة. إذا شعرت بأي ألم أو احتكاك أثناء التمرين، تواصل مع مدربك لإضافة بروتوكول تأهيل فوري."
+              ? "ملفك الطبي وتدريبك في حالة ممتازة ولا توجد أي موانع حركة معتمدة. إذا شعرت بأي ألم أو احتكاك أثناء التمرين، أبلغ مدربك لإضافة بروتوكول استشفاء وتعديل التمارين فوراً."
               : "Your physical profile is clear! If you ever feel joint discomfort or pain during your sessions, reach out to your coach to prescribe safe alternatives."}
           </p>
-          <Link
-            to={APP_ROUTES.subscriber.workout}
-            className="mt-5 inline-flex items-center gap-2 rounded-full bg-[var(--gym-ink,#063434)] px-5 py-2.5 text-[13px] font-bold text-white transition hover:opacity-95"
-          >
-            <Dumbbell className="size-4" />
-            {isAr ? "الانتقال إلى جدول التمارين" : "View Workout Plan"}
-          </Link>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
+            <Link
+              to={APP_ROUTES.subscriber.workout}
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 py-2.5 text-[13px] font-bold text-white transition hover:opacity-95"
+            >
+              <Dumbbell className="size-4 text-[var(--gym-orange,#fb5001)]" />
+              <span>{isAr ? "الانتقال إلى جدول التمارين" : "View Workout Plan"}</span>
+            </Link>
+            {isStaff ? (
+              <Link
+                to="/admin/physical-therapy"
+                className="inline-flex items-center gap-2 rounded-full bg-[#F4F4F4] px-4 py-2.5 text-[13px] font-bold text-[var(--gym-ink,#111111)] hover:bg-[#e9e9e9]"
+              >
+                <span>{isAr ? "إضافة سجل تأهيل جديد للمتدرب" : "Add PT Record in Admin"}</span>
+              </Link>
+            ) : null}
+          </div>
         </div>
       ) : (
         <div className="flex flex-col gap-5">
-          {/* Status & Injury Overview Card */}
-          <div className="rounded-[24px] bg-white p-5 sm:p-7 shadow-xs">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between border-b border-black/5 pb-5">
-              <div>
-                <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <StatusBadge
-                    label={isAr ? AREA_LABELS[ptRecord.affectedArea]?.ar : AREA_LABELS[ptRecord.affectedArea]?.en}
-                    tone="info"
-                  />
-                  <StatusBadge
-                    label={
-                      ptRecord.status === "active"
-                        ? isAr
-                          ? "تأهيل نشط"
-                          : "Active Rehab"
-                        : ptRecord.status === "recovering"
-                          ? isAr
-                            ? "في مرحلة الاستشفاء"
-                            : "In Recovery"
-                          : isAr
-                            ? "تعافي مكتمل"
-                            : "Cleared"
-                    }
-                    tone={ptRecord.status === "cleared" ? "success" : "warning"}
-                  />
-                  <StatusBadge
-                    label={
-                      ptRecord.severity === "mild"
-                        ? isAr
-                          ? "درجة خفيفة"
-                          : "Mild"
-                        : ptRecord.severity === "moderate"
-                          ? isAr
-                            ? "درجة متوسطة"
-                            : "Moderate"
-                          : isAr
-                            ? "إصابة شديدة"
-                            : "Severe"
-                    }
-                    tone={ptRecord.severity === "severe" ? "danger" : "muted"}
-                  />
+          {/* Section 1: Contraindications & Exercise Alternatives */}
+          <section className="rounded-[26px] bg-white p-5 sm:p-7 shadow-xs border border-black/6">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between mb-4 border-b border-black/5 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-8 items-center justify-center rounded-xl bg-rose-100 text-rose-700">
+                  <ShieldAlert className="size-4" strokeWidth={2.2} />
                 </div>
-
-                <h2 className="font-heading text-[22px] font-extrabold text-[var(--gym-ink,#063434)]">
-                  {ptRecord.injuryTitle[locale] || ptRecord.injuryTitle.en}
-                </h2>
-
-                <div className="mt-2 flex flex-wrap items-center gap-4 text-[13px] text-[#8c8c8c]">
-                  <span>
-                    {isAr ? "تاريخ بدء التشخيص: " : "Diagnosed: "}
-                    <strong className="text-[var(--gym-ink,#063434)]">
-                      {formatDate(ptRecord.diagnosisDate, locale)}
-                    </strong>
-                  </span>
-                  {ptRecord.nextEvaluationDate ? (
-                    <span>
-                      · {isAr ? "التقييم القادم: " : "Next check-in: "}
-                      <strong className="text-[var(--gym-ink,#063434)]">
-                        {formatDate(ptRecord.nextEvaluationDate, locale)}
-                      </strong>
-                    </span>
-                  ) : null}
+                <div>
+                  <h3 className="font-heading text-[16px] sm:text-[18px] font-black text-[var(--gym-ink,#111111)]">
+                    {isAr ? "موانع الحركة والبدائل الآمنة في الجيم" : "Movement Contraindications & Approved Substitutes"}
+                  </h3>
+                  <p className="text-[12px] text-[#8c8c8c]">
+                    {isAr
+                      ? "تجنب الحركات التالية تماماً، واستبدلها بالبديل الآمن المعتمد لحماية المفصل من التدهور."
+                      : "Avoid prohibited exercises to protect joint integrity. Use the approved safe substitute."}
+                  </p>
                 </div>
               </div>
 
-              <Link
-                to={APP_ROUTES.subscriber.workout}
-                className="inline-flex items-center gap-2 self-start rounded-full bg-[#F4F4F4] px-4 py-2 text-[12px] font-bold text-[var(--gym-ink,#063434)] hover:bg-[#e9e9e9]"
-              >
-                <Dumbbell className="size-3.5" />
-                {isAr ? "جدول التمارين الحالي" : "Go to Workout Plan"}
-              </Link>
+              <span className="self-start sm:self-auto rounded-full bg-black/5 px-2.5 py-1 text-[11px] font-bold text-[var(--gym-ink,#111111)]">
+                {activeRecord.restrictions.length} {isAr ? "بدائل معتمدة" : "substitutes"}
+              </span>
             </div>
 
-            {/* Therapist Clinical Advice */}
-            {ptRecord.therapistNotes ? (
-              <div className="mt-4 rounded-xl bg-[#F8F9FA] p-4 border border-black/5">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-[#8c8c8c] mb-1">
-                  {isAr ? "توجيهات ونصائح المعالج الرياضي" : "Therapist Clinical Notes"}
-                </p>
-                <p className="text-[13px] leading-relaxed text-[var(--gym-ink,#063434)] font-medium">
-                  {ptRecord.therapistNotes[locale] || ptRecord.therapistNotes.en}
-                </p>
-              </div>
-            ) : null}
-          </div>
+            {activeRecord.restrictions.length === 0 ? (
+              <p className="text-[13px] text-[#8c8c8c] py-4 text-center">
+                {isAr ? "لا توجد موانع حركة مسجلة لهذا البروتوكول." : "No specific movement restrictions recorded."}
+              </p>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {activeRecord.restrictions.map((res) => (
+                  <div
+                    key={res.id}
+                    className="flex flex-col justify-between gap-3.5 rounded-2xl border border-black/8 bg-[#FAF9F7] p-4 sm:p-5 shadow-2xs"
+                  >
+                    <div className="space-y-3.5">
+                      {/* Prohibited Exercise Block */}
+                      <div className="rounded-xl bg-rose-50/70 border border-rose-200/60 p-3.5 flex items-start gap-3">
+                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-rose-600 text-white text-[12px] font-black shadow-xs">
+                          ✕
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-[10.5px] font-black uppercase tracking-wider text-rose-700">
+                            {isAr ? "ممنوع أداءه نهائياً في الجيم:" : "Strictly Prohibited:"}
+                          </p>
+                          <p className="font-heading text-[14px] font-black text-rose-950 mt-0.5 leading-snug">
+                            {res.prohibited[locale] || res.prohibited.en}
+                          </p>
+                        </div>
+                      </div>
 
-          {/* Section 1: Movement Restrictions & Safe Alternatives */}
-          <div className="rounded-[24px] bg-white p-5 sm:p-7 shadow-xs">
-            <div className="flex items-center gap-2.5 mb-2">
-              <div className="flex size-7 items-center justify-center rounded-full bg-red-100 text-red-600">
-                <ShieldAlert className="size-4" />
-              </div>
-              <h3 className="font-heading text-[17px] font-extrabold text-[var(--gym-ink,#063434)]">
-                {isAr ? "موانع الحركة والبدائل الآمنة في الجيم" : "Prohibited Movements & Safe Substitutes"}
-              </h3>
-            </div>
-            <p className="text-[13px] text-[#8c8c8c] mb-5">
-              {isAr
-                ? "تجنب الحركات التالية لحماية المفصل من التدهور، واستبدلها فوراً بالبديل الآمن المعتمد أدناه."
-                : "Avoid the following movements to prevent aggravating the injury. Use the approved safe substitute instead."}
-            </p>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              {ptRecord.restrictions.map((res) => (
-                <div
-                  key={res.id}
-                  className="rounded-2xl border border-red-200/70 bg-gradient-to-br from-red-50/40 via-white to-emerald-50/30 p-4 sm:p-5 flex flex-col justify-between gap-3"
-                >
-                  <div className="space-y-3">
-                    {/* Prohibited */}
-                    <div className="flex items-start gap-2.5">
-                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-red-100 text-[12px] font-bold text-red-700">
-                        ✕
-                      </span>
-                      <div>
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-red-600">
-                          {isAr ? "ممنوع أداءه حالياً:" : "Avoid / Do Not Perform:"}
-                        </p>
-                        <p className="text-[14px] font-extrabold text-red-950 mt-0.5">
-                          {res.prohibited[locale] || res.prohibited.en}
-                        </p>
+                      {/* Approved Safe Alternative Block */}
+                      <div className="rounded-xl bg-white border border-black/10 p-3.5 shadow-2xs flex items-start gap-3">
+                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] text-white text-[12px] font-black shadow-xs">
+                          ✓
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-[10.5px] font-black uppercase tracking-wider text-[var(--gym-orange,#fb5001)]">
+                            {isAr ? "البديل الآمن المعتمد لبرنامجك:" : "Approved Safe Substitute:"}
+                          </p>
+                          <p className="font-heading text-[14px] font-black text-[var(--gym-ink,#111111)] mt-0.5 leading-snug">
+                            {res.safeAlternative[locale] || res.safeAlternative.en}
+                          </p>
+                          {res.equipment ? (
+                            <span className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-black/5 px-2 py-0.5 text-[10.5px] font-bold text-[#555]">
+                              <span>{isAr ? "الأداة:" : "Equipment:"}</span>
+                              <strong className="text-[var(--gym-ink,#111111)]">{res.equipment}</strong>
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Safe Substitute */}
-                    <div className="flex items-start gap-2.5 pt-3 border-t border-black/5">
-                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[12px] font-bold text-emerald-700">
-                        ✓
-                      </span>
-                      <div>
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">
-                          {isAr ? "البديل الآمن المعتمد:" : "Approved Safe Substitute:"}
-                        </p>
-                        <p className="text-[14px] font-extrabold text-emerald-950 mt-0.5">
-                          {res.safeAlternative[locale] || res.safeAlternative.en}
-                        </p>
-                        {res.equipment ? (
-                          <span className="mt-1 inline-block rounded-md bg-emerald-100/60 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                            {res.equipment}
-                          </span>
-                        ) : null}
+                    {/* Biomechanical Reason */}
+                    {res.reason ? (
+                      <div className="flex items-start gap-2 pt-2.5 border-t border-black/6 text-[11.5px] text-[#666] leading-relaxed">
+                        <Info className="size-3.5 shrink-0 text-[#8c8c8c] mt-0.5" />
+                        <span>
+                          <strong className="text-[var(--gym-ink,#111111)]">
+                            {isAr ? "الهدف الطبي: " : "Clinical Rationale: "}
+                          </strong>
+                          {res.reason[locale] || res.reason.en}
+                        </span>
                       </div>
-                    </div>
+                    ) : null}
                   </div>
-
-                  {res.reason ? (
-                    <p className="text-[11px] text-[#777] italic pt-2 border-t border-black/5">
-                      💡 {res.reason[locale] || res.reason.en}
-                    </p>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          </div>
+                ))}
+              </div>
+            )}
+          </section>
 
           {/* Section 2: Prescribed Rehab Exercises */}
-          <div className="rounded-[24px] bg-white p-5 sm:p-7 shadow-xs">
-            <div className="flex items-center gap-2.5 mb-2">
-              <div className="flex size-7 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-                <Activity className="size-4" />
-              </div>
-              <h3 className="font-heading text-[17px] font-extrabold text-[var(--gym-ink,#063434)]">
-                {isAr ? "تمارين التأهيل والاستشفاء الموصوفة لك" : "Prescribed Rehab & Mobility Routine"}
-              </h3>
-            </div>
-            <p className="text-[13px] text-[#8c8c8c] mb-5">
-              {isAr
-                ? "احرص على أداء هذه التمارين وفق الجدول الموصى به لتقوية العضلات المساندة وتسريع التعافي."
-                : "Perform these exercises according to the prescribed frequency to restore joint stability and tissue resilience."}
-            </p>
-
-            <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-              {ptRecord.rehabExercises.map((reh, idx) => (
-                <div
-                  key={reh.id}
-                  className="rounded-2xl border border-blue-100 bg-[#FBFDFF] p-4 sm:p-5 flex flex-col justify-between gap-3 shadow-2xs"
-                >
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="flex size-6 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-800">
-                        #{idx + 1}
-                      </span>
-                      <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
-                        {reh.frequency}
-                      </span>
-                    </div>
-
-                    <h4 className="font-heading text-[15px] font-extrabold text-blue-950">
-                      {reh.name[locale] || reh.name.en}
-                    </h4>
-
-                    <div className="mt-2 inline-flex items-center gap-2 rounded-lg bg-blue-100/50 px-2.5 py-1 text-[12px] font-bold text-blue-900">
-                      <span>{reh.sets} {isAr ? "مجموعات" : "sets"}</span>
-                      <span>×</span>
-                      <span>{reh.reps}</span>
-                    </div>
-                  </div>
-
-                  {reh.notes ? (
-                    <div className="rounded-xl bg-white p-2.5 text-[12px] text-[#555] leading-relaxed border border-blue-50">
-                      <span className="font-bold text-[var(--gym-ink,#063434)] block text-[10px] uppercase tracking-wider mb-0.5">
-                        {isAr ? "توجيهات الأداء:" : "Form Cue:"}
-                      </span>
-                      {reh.notes[locale] || reh.notes.en}
-                    </div>
-                  ) : null}
+          <section className="rounded-[26px] bg-white p-5 sm:p-7 shadow-xs border border-black/6">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between mb-4 border-b border-black/5 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-8 items-center justify-center rounded-xl bg-[var(--gym-ink,#111111)] text-[var(--gym-orange,#fb5001)]">
+                  <Activity className="size-4" strokeWidth={2.2} />
                 </div>
-              ))}
+                <div>
+                  <h3 className="font-heading text-[16px] sm:text-[18px] font-black text-[var(--gym-ink,#111111)]">
+                    {isAr ? "تمارين التأهيل والاستشفاء الموصوفة لك" : "Prescribed Rehab & Mobility Routine"}
+                  </h3>
+                  <p className="text-[12px] text-[#8c8c8c]">
+                    {isAr
+                      ? "احرص على أداء هذه التمارين وفق التكرارات المحددة لتقوية العضلات المساندة واستعادة ثبات المفصل."
+                      : "Perform these exercises according to the prescribed sets to restore joint stability and tissue resilience."}
+                  </p>
+                </div>
+              </div>
+
+              <span className="self-start sm:self-auto rounded-full bg-black/5 px-2.5 py-1 text-[11px] font-bold text-[var(--gym-ink,#111111)]">
+                {activeRecord.rehabExercises.length} {isAr ? "تمارين مخصصة" : "rehab drills"}
+              </span>
             </div>
+
+            {activeRecord.rehabExercises.length === 0 ? (
+              <p className="text-[13px] text-[#8c8c8c] py-4 text-center">
+                {isAr ? "لم يتم إدراج تمارين تأهيل مخصصة حالياً." : "No specific rehab exercises listed."}
+              </p>
+            ) : (
+              <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+                {activeRecord.rehabExercises.map((reh, idx) => (
+                  <div
+                    key={reh.id}
+                    className="flex flex-col justify-between gap-3 rounded-2xl border border-black/8 bg-white p-4 sm:p-5 shadow-2xs hover:border-black/20 transition"
+                  >
+                    <div>
+                      {/* Drill Header */}
+                      <div className="flex items-center justify-between gap-2 mb-2.5">
+                        <span className="flex size-6 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] text-[11px] font-black text-white">
+                          #{idx + 1}
+                        </span>
+                        <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-900 border border-amber-200/60">
+                          {reh.frequency}
+                        </span>
+                      </div>
+
+                      <h4 className="font-heading text-[14.5px] font-black text-[var(--gym-ink,#111111)] leading-snug">
+                        {reh.name[locale] || reh.name.en}
+                      </h4>
+
+                      {/* Sets & Reps Pill */}
+                      <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg bg-[#F4F4F4] px-2.5 py-1 text-[12px] font-bold text-[var(--gym-ink,#111111)]">
+                        <span>{reh.sets} {isAr ? "مجموعات" : "sets"}</span>
+                        <span className="text-[#8c8c8c]">×</span>
+                        <span>{reh.reps}</span>
+                      </div>
+                    </div>
+
+                    {/* Form cues / Notes */}
+                    {reh.notes ? (
+                      <div className="rounded-xl bg-[#F8F9FA] p-3 text-[12px] text-[#555] leading-relaxed border border-black/5 mt-1">
+                        <span className="font-bold text-[var(--gym-ink,#111111)] block text-[10.5px] uppercase tracking-wider mb-0.5">
+                          💡 {isAr ? "توجيهات الأداء الصحيح:" : "Form Cue:"}
+                        </span>
+                        {reh.notes[locale] || reh.notes.en}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Section 3: Therapist Clinical Notes */}
+          {activeRecord.therapistNotes ? (
+            <section className="rounded-[26px] bg-white p-5 sm:p-6 shadow-xs border border-black/6">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="size-4 text-[var(--gym-orange,#fb5001)]" />
+                <h4 className="font-heading text-[14px] font-black uppercase tracking-wider text-[var(--gym-ink,#111111)]">
+                  {isAr ? "توجيهات وملاحظات أخصائي التأهيل الرياضي" : "Therapist Clinical Guidance"}
+                </h4>
+              </div>
+              <p className="text-[13.5px] font-medium leading-relaxed text-[#333] ps-6">
+                {activeRecord.therapistNotes[locale] || activeRecord.therapistNotes.en}
+              </p>
+            </section>
+          ) : null}
+
+          {/* Section 4: Bottom Reassurance & Direct Link to Workout */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5 rounded-[22px] bg-[#111111] p-4 sm:p-5 text-white shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-[var(--gym-orange,#fb5001)]">
+                <Dumbbell className="size-5" />
+              </div>
+              <div>
+                <p className="font-heading text-[14.5px] font-bold text-white">
+                  {isAr ? "تمارينك مصممة لحمايتك ومتابعة تقدمك" : "Safe Training Integration"}
+                </p>
+                <p className="text-[12px] text-white/70">
+                  {isAr
+                    ? "تم ربط هذه الموانع والبدائل مع جدولك التدريبي حتى تتدرب بأمان وبدون انقطاع."
+                    : "These guidelines are integrated into your training schedule to keep you injury-free."}
+                </p>
+              </div>
+            </div>
+
+            <Link
+              to={APP_ROUTES.subscriber.workout}
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--gym-orange,#fb5001)] hover:bg-[#e04500] text-white px-5 py-2.5 text-[12.5px] font-bold transition shadow-xs shrink-0"
+            >
+              <span>{isAr ? "الانتقال إلى جدول التمارين" : "Go to Workout Plan"}</span>
+              {isRtl ? <ArrowLeft className="size-4" /> : <ArrowRight className="size-4" />}
+            </Link>
           </div>
         </div>
       )}

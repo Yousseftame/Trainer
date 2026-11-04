@@ -122,7 +122,7 @@ export function RequireActiveSubscription() {
 export function RequirePackageEntitlement({
   entitlement,
 }: {
-  entitlement: PackageEntitlementKey
+  entitlement: PackageEntitlementKey | PackageEntitlementKey[]
 }) {
   const { isAdmin, user, hasActiveSubscription } = useAuth()
 
@@ -139,7 +139,10 @@ export function RequirePackageEntitlement({
     (user.email ? currentSubscriptionFor(user.email) : null)
   const pkg = getPackageById(sub?.packageId)
 
-  if (!canAccessPackageEntitlement(sub, pkg, entitlement)) {
+  const keys = Array.isArray(entitlement) ? entitlement : [entitlement]
+  const hasAny = keys.some((k) => canAccessPackageEntitlement(sub, pkg, k))
+
+  if (!hasAny) {
     return <Navigate to={APP_ROUTES.subscriber.subscription} replace />
   }
 

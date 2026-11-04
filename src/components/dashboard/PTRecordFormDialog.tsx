@@ -174,18 +174,18 @@ export function PTRecordFormDialog({
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5">
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-black/60"
         onClick={onClose}
       />
       <div className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-[26px] bg-white shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-black/5 px-6 py-4">
           <div className="flex items-center gap-2.5">
-            <div className="flex size-9 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] text-white">
+            <div className="flex size-9 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] text-white">
               <Activity className="size-4" />
             </div>
             <div>
-              <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#063434)]">
+              <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#111111)]">
                 {initialRecord
                   ? isAr
                     ? "تعديل ملف العلاج الطبيعي والتأهيل"
@@ -215,14 +215,14 @@ export function PTRecordFormDialog({
           {/* Section 1: Subscriber & Core Status */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
                 {isAr ? "المشترك" : "Subscriber"} *
               </label>
               <select
                 value={subscriberId}
                 onChange={(e) => setSubscriberId(e.target.value)}
                 disabled={Boolean(initialRecord)}
-                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none focus:border-[var(--gym-ink,#063434)]"
+                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none focus:border-[var(--gym-ink,#111111)]"
               >
                 {subscribers.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -233,13 +233,13 @@ export function PTRecordFormDialog({
             </div>
 
             <div>
-              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
                 {isAr ? "المنطقة المصابة" : "Affected Area"} *
               </label>
               <select
                 value={affectedArea}
                 onChange={(e) => setAffectedArea(e.target.value as PTAffectedArea)}
-                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none focus:border-[var(--gym-ink,#063434)]"
+                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none focus:border-[var(--gym-ink,#111111)]"
               >
                 {AFFECTED_AREAS.map((a) => (
                   <option key={a.key} value={a.key}>
@@ -253,7 +253,7 @@ export function PTRecordFormDialog({
           {/* Section 2: Injury Name Bilingual */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
                 {isAr ? "تشخيص الإصابة (إنجليزي)" : "Injury Diagnosis (EN)"} *
               </label>
               <input
@@ -261,11 +261,11 @@ export function PTRecordFormDialog({
                 value={injuryEn}
                 onChange={(e) => setInjuryEn(e.target.value)}
                 placeholder="e.g. Right Rotator Cuff Tendonitis"
-                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none focus:border-[var(--gym-ink,#063434)]"
+                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none focus:border-[var(--gym-ink,#111111)]"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
                 {isAr ? "تشخيص الإصابة (عربي)" : "Injury Diagnosis (AR)"}
               </label>
               <input
@@ -273,7 +273,7 @@ export function PTRecordFormDialog({
                 value={injuryAr}
                 onChange={(e) => setInjuryAr(e.target.value)}
                 placeholder="مثال: التهاب أوتار الكفة المدورة للكتف الأيمن"
-                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none focus:border-[var(--gym-ink,#063434)]"
+                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none focus:border-[var(--gym-ink,#111111)]"
               />
             </div>
           </div>
@@ -281,13 +281,13 @@ export function PTRecordFormDialog({
           {/* Section 3: Severity, Status & Dates */}
           <div className="grid gap-4 sm:grid-cols-4">
             <div>
-              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
                 {isAr ? "درجة الإصابة" : "Severity"}
               </label>
               <select
                 value={severity}
                 onChange={(e) => setSeverity(e.target.value as PTSeverity)}
-                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3 text-[13px] font-bold text-[var(--gym-ink,#063434)] outline-none"
+                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3 text-[13px] font-bold text-[var(--gym-ink,#111111)] outline-none"
               >
                 <option value="mild">{isAr ? "خفيفة (Mild)" : "Mild"}</option>
                 <option value="moderate">{isAr ? "متوسطة (Moderate)" : "Moderate"}</option>
@@ -296,13 +296,13 @@ export function PTRecordFormDialog({
             </div>
 
             <div>
-              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
                 {isAr ? "حالة التأهيل" : "Rehab Status"}
               </label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as PTStatus)}
-                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3 text-[13px] font-bold text-[var(--gym-ink,#063434)] outline-none"
+                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3 text-[13px] font-bold text-[var(--gym-ink,#111111)] outline-none"
               >
                 <option value="active">{isAr ? "تأهيل نشط (Active)" : "Active Rehab"}</option>
                 <option value="recovering">{isAr ? "في مرحلة الشفاء (Recovering)" : "Recovering"}</option>
@@ -311,26 +311,26 @@ export function PTRecordFormDialog({
             </div>
 
             <div>
-              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
                 {isAr ? "تاريخ التشخيص" : "Diagnosis Date"}
               </label>
               <input
                 type="date"
                 value={diagnosisDate}
                 onChange={(e) => setDiagnosisDate(e.target.value)}
-                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3 text-[13px] font-medium text-[var(--gym-ink,#063434)] outline-none"
+                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3 text-[13px] font-medium text-[var(--gym-ink,#111111)] outline-none"
               />
             </div>
 
             <div>
-              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
                 {isAr ? "موعد التقييم القادم" : "Next Evaluation"}
               </label>
               <input
                 type="date"
                 value={nextEvaluationDate}
                 onChange={(e) => setNextEvaluationDate(e.target.value)}
-                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3 text-[13px] font-medium text-[var(--gym-ink,#063434)] outline-none"
+                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3 text-[13px] font-medium text-[var(--gym-ink,#111111)] outline-none"
               />
             </div>
           </div>
@@ -391,7 +391,7 @@ export function PTRecordFormDialog({
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-bold text-emerald-700 block mb-1">
+                      <label className="text-[11px] font-bold text-neutral-800 block mb-1">
                         {isAr ? "البديل الآمن المعتمد" : "Safe Prescribed Alternative"}
                       </label>
                       <input
@@ -567,7 +567,7 @@ export function PTRecordFormDialog({
           {/* Section 6: Clinical Therapist Notes */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
                 {isAr ? "ملاحظات وتوصيات المعالج (إنجليزي)" : "Therapist Notes & Clinical Advice (EN)"}
               </label>
               <textarea
@@ -575,11 +575,11 @@ export function PTRecordFormDialog({
                 onChange={(e) => setNotesEn(e.target.value)}
                 rows={3}
                 placeholder="Clinical observations, progression criteria, next steps..."
-                className="w-full rounded-xl border border-black/10 bg-[#F8F8F8] p-3 text-[13px] outline-none focus:border-[var(--gym-ink,#063434)]"
+                className="w-full rounded-xl border border-black/10 bg-[#F8F8F8] p-3 text-[13px] outline-none focus:border-[var(--gym-ink,#111111)]"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+              <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
                 {isAr ? "ملاحظات وتوصيات المعالج (عربي)" : "Therapist Notes & Clinical Advice (AR)"}
               </label>
               <textarea
@@ -587,7 +587,7 @@ export function PTRecordFormDialog({
                 onChange={(e) => setNotesAr(e.target.value)}
                 rows={3}
                 placeholder="ملاحظات سريرية، معايير التدرج في الأوزان، وخطة المرحلة التالية..."
-                className="w-full rounded-xl border border-black/10 bg-[#F8F8F8] p-3 text-[13px] outline-none focus:border-[var(--gym-ink,#063434)]"
+                className="w-full rounded-xl border border-black/10 bg-[#F8F8F8] p-3 text-[13px] outline-none focus:border-[var(--gym-ink,#111111)]"
               />
             </div>
           </div>
@@ -605,7 +605,7 @@ export function PTRecordFormDialog({
             <button
               type="submit"
               disabled={saving}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#063434)] px-6 text-[13px] font-bold text-white transition hover:opacity-95 disabled:opacity-50"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-6 text-[13px] font-bold text-white transition hover:opacity-95 disabled:opacity-50"
             >
               <Check className="size-4" />
               {saving

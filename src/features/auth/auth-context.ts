@@ -12,6 +12,7 @@ export type AuthContextValue = AuthState & {
   signOut: () => Promise<void>
   updateAccount: (patch: { displayName?: string; phone?: string }) => Promise<void>
   changePassword: (currentPassword: string, nextPassword: string) => Promise<void>
+  sendPasswordResetLink: (email?: string) => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)

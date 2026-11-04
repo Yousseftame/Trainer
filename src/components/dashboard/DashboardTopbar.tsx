@@ -31,7 +31,7 @@ export function DashboardTopbar({
   return (
     <header
       className={cn(
-        "relative z-40 w-full max-w-full shrink-0 bg-[#F4F4F4] px-3.5 pt-3.5 pb-2.5 sm:px-6 sm:pt-5 sm:pb-3.5 lg:px-7",
+        "relative z-40 w-full max-w-full shrink-0 bg-[#F4F4F4] px-3.5 pt-[max(0.875rem,calc(0.5rem+env(safe-area-inset-top,0px)))] pb-2.5 sm:px-6 sm:pt-5 sm:pb-3.5 lg:px-7",
         className,
       )}
     >
@@ -41,7 +41,7 @@ export function DashboardTopbar({
           <button
             type="button"
             onClick={onSidebarToggle}
-            className="inline-flex size-9 sm:size-11 shrink-0 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#063434)] shadow-[0_4px_16px_rgba(6,52,52,0.06)] transition-transform active:scale-[0.97]"
+            className="inline-flex size-9 sm:size-11 shrink-0 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-transform active:scale-[0.97]"
             aria-label={t("nav.openMenu")}
           >
             <PanelLeft className="size-4 sm:size-5 rtl:-scale-x-100" strokeWidth={1.8} />
@@ -56,7 +56,7 @@ export function DashboardTopbar({
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
                 className={cn(
-                  "min-w-0 max-w-full truncate text-[15px] sm:text-[20px] lg:text-[22px] font-extrabold leading-[1.3] tracking-tight text-[var(--gym-ink,#063434)]",
+                  "min-w-0 max-w-full truncate text-[15px] sm:text-[20px] lg:text-[22px] font-extrabold leading-[1.3] tracking-tight text-[var(--gym-ink,#111111)]",
                   isRtl ? "font-arabic" : "font-heading",
                 )}
                 title={title}
@@ -65,7 +65,7 @@ export function DashboardTopbar({
               </motion.h1>
             </AnimatePresence>
 
-            <span className="hidden shrink-0 items-center rounded-full bg-[var(--gym-lime,#fb5001)]/20 px-2.5 py-0.5 text-[11px] font-bold leading-none text-[var(--gym-ink,#063434)] md:inline-flex">
+            <span className="hidden shrink-0 items-center rounded-full bg-[var(--gym-lime,#fb5001)]/20 px-2.5 py-0.5 text-[11px] font-bold leading-none text-[var(--gym-ink,#111111)] md:inline-flex">
               {areaLabel}
             </span>
           </div>
@@ -83,10 +83,10 @@ export function DashboardTopbar({
             placeholder={t("dashboard.searchPlaceholder")}
             className={cn(
               "h-11 w-full rounded-full border-0 bg-white pe-4 ps-11",
-              "font-heading text-[14px] font-medium text-[var(--gym-ink,#063434)]",
-              "shadow-[0_8px_24px_rgba(6,52,52,0.06)] outline-none",
+              "font-heading text-[14px] font-medium text-[var(--gym-ink,#111111)]",
+              "shadow-[0_8px_24px_rgba(0,0,0,0.06)] outline-none",
               "placeholder:font-normal placeholder:text-[var(--gym-muted,#4e5151)]/55",
-              "transition-[box-shadow] focus:shadow-[0_10px_28px_rgba(6,52,52,0.1)]",
+              "transition-[box-shadow] focus:shadow-[0_10px_28px_rgba(0,0,0,0.1)]",
             )}
           />
         </label>
@@ -95,7 +95,7 @@ export function DashboardTopbar({
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
           <Link
             to={APP_ROUTES.public.home}
-            className="hidden h-10 lg:h-11 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] px-4 lg:px-5 text-[12.5px] lg:text-[13px] font-bold text-white transition-opacity hover:opacity-90 xl:inline-flex"
+            className="hidden h-10 lg:h-11 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] px-4 lg:px-5 text-[12.5px] lg:text-[13px] font-bold text-white transition-opacity hover:opacity-90 xl:inline-flex"
           >
             {t("dashboard.website")}
           </Link>
@@ -118,8 +118,8 @@ export function DashboardTopbar({
           placeholder={t("dashboard.searchPlaceholder")}
           className={cn(
             "h-10 w-full rounded-full border-0 bg-white pe-4 ps-10",
-            "text-[13.5px] font-medium text-[var(--gym-ink,#063434)]",
-            "shadow-[0_4px_16px_rgba(6,52,52,0.05)] outline-none",
+            "text-[13.5px] font-medium text-[var(--gym-ink,#111111)]",
+            "shadow-[0_4px_16px_rgba(0,0,0,0.05)] outline-none",
             "placeholder:font-normal placeholder:text-[var(--gym-muted,#4e5151)]/55",
             isRtl ? "font-arabic" : "font-heading",
           )}

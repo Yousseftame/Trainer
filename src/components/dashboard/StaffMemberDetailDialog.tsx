@@ -1,4 +1,4 @@
-import {
+﻿import {
   Ban,
   Calendar,
   CheckCircle2,
@@ -109,17 +109,17 @@ export function StaffMemberDetailDialog({
               className={cn(
                 "flex size-11 shrink-0 items-center justify-center rounded-2xl font-heading text-[15px] font-extrabold text-white shadow-2xs",
                 isHead
-                  ? "bg-[var(--gym-ink,#063434)] text-[var(--gym-lime,#b8fe22)]"
+                  ? "bg-[var(--gym-ink,#111111)] text-[var(--gym-lime,#fb5001)]"
                   : isSuspended
                     ? "bg-red-700 text-white"
-                    : "bg-[var(--gym-ink,#063434)] text-white",
+                    : "bg-[var(--gym-ink,#111111)] text-white",
               )}
             >
               {initials(member.displayName)}
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#063434)]">
+                <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#111111)]">
                   {member.displayName}
                 </h2>
                 <StatusBadge
@@ -178,8 +178,8 @@ export function StaffMemberDetailDialog({
 
           {/* Section 1: Account Information */}
           <div className="rounded-2xl border border-black/5 bg-[#F9F9F9] p-4 sm:p-5">
-            <h3 className="font-heading text-[14px] font-extrabold text-[var(--gym-ink,#063434)] mb-3 flex items-center gap-2">
-              <User className="size-4 text-[var(--gym-ink,#063434)]" />
+            <h3 className="font-heading text-[14px] font-extrabold text-[var(--gym-ink,#111111)] mb-3 flex items-center gap-2">
+              <User className="size-4 text-[var(--gym-ink,#111111)]" />
               <span>{isAr ? "بيانات الحساب والاتصال" : "Account & Contact Details"}</span>
             </h3>
 
@@ -190,7 +190,7 @@ export function StaffMemberDetailDialog({
                   <span className="block text-[11px] text-[#8c8c8c]">
                     {isAr ? "البريد الإلكتروني (تسجيل الدخول)" : "Login Email"}
                   </span>
-                  <span className="font-semibold text-[var(--gym-ink,#063434)] truncate block">
+                  <span className="font-semibold text-[var(--gym-ink,#111111)] truncate block">
                     {member.email}
                   </span>
                 </div>
@@ -202,7 +202,7 @@ export function StaffMemberDetailDialog({
                   <span className="block text-[11px] text-[#8c8c8c]">
                     {isAr ? "رقم الهاتف" : "Phone Number"}
                   </span>
-                  <span className="font-semibold text-[var(--gym-ink,#063434)] truncate block">
+                  <span className="font-semibold text-[var(--gym-ink,#111111)] truncate block">
                     {member.phone || (isAr ? "غير مسجل" : "Not provided")}
                   </span>
                 </div>
@@ -214,7 +214,7 @@ export function StaffMemberDetailDialog({
                   <span className="block text-[11px] text-[#8c8c8c]">
                     {isAr ? "تاريخ إنشاء الحساب" : "Account Created"}
                   </span>
-                  <span className="font-semibold text-[var(--gym-ink,#063434)] truncate block">
+                  <span className="font-semibold text-[var(--gym-ink,#111111)] truncate block">
                     {formatDate(member.createdAt, locale)}
                   </span>
                 </div>
@@ -226,7 +226,7 @@ export function StaffMemberDetailDialog({
                   <span className="block text-[11px] text-[#8c8c8c]">
                     {isAr ? "آخر نشاط / تسجيل" : "Last Activity"}
                   </span>
-                  <span className="font-semibold text-[var(--gym-ink,#063434)] truncate block">
+                  <span className="font-semibold text-[var(--gym-ink,#111111)] truncate block">
                     {member.lastLoginAt
                       ? formatDate(member.lastLoginAt, locale)
                       : isAr
@@ -239,9 +239,9 @@ export function StaffMemberDetailDialog({
 
             {/* Role Responsibility Card */}
             <div className="mt-3 rounded-xl bg-white p-3.5 border border-black/5 flex items-start gap-3">
-              <Shield className="size-4 text-[var(--gym-ink,#063434)] shrink-0 mt-0.5" />
+              <Shield className="size-4 text-[var(--gym-ink,#111111)] shrink-0 mt-0.5" />
               <div className="text-[12px] leading-relaxed">
-                <span className="font-bold text-[var(--gym-ink,#063434)] block">
+                <span className="font-bold text-[var(--gym-ink,#111111)] block">
                   {isAr ? "طبيعة الدور والمسؤوليات:" : "Role Responsibilities:"}
                 </span>
                 <span className="text-[#666]">
@@ -254,8 +254,8 @@ export function StaffMemberDetailDialog({
           {/* Section 2: Module Permissions Matrix */}
           <div className="rounded-2xl border border-black/5 bg-[#F9F9F9] p-4 sm:p-5">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-heading text-[14px] font-extrabold text-[var(--gym-ink,#063434)] flex items-center gap-2">
-                <ShieldCheck className="size-4 text-[var(--gym-ink,#063434)]" />
+              <h3 className="font-heading text-[14px] font-extrabold text-[var(--gym-ink,#111111)] flex items-center gap-2">
+                <ShieldCheck className="size-4 text-[var(--gym-ink,#111111)]" />
                 <span>{isAr ? "مصفوفة صلاحيات الأقسام والصفحات" : "Module Access & Permissions Matrix"}</span>
               </h3>
               <span className="text-[12px] font-bold text-[#8c8c8c]">
@@ -287,7 +287,7 @@ export function StaffMemberDetailDialog({
                   >
                     <div>
                       <div className="flex items-center justify-between gap-1 mb-1">
-                        <span className="font-heading text-[13px] font-extrabold text-[var(--gym-ink,#063434)]">
+                        <span className="font-heading text-[13px] font-extrabold text-[var(--gym-ink,#111111)]">
                           {isAr ? mod.title.ar : mod.title.en}
                         </span>
                         {hasAccess ? (
@@ -350,7 +350,7 @@ export function StaffMemberDetailDialog({
           {/* Section 3: Internal Notes */}
           {member.notes ? (
             <div className="rounded-2xl border border-black/5 bg-[#F9F9F9] p-4">
-              <h4 className="text-[12px] font-bold text-[var(--gym-ink,#063434)] mb-1">
+              <h4 className="text-[12px] font-bold text-[var(--gym-ink,#111111)] mb-1">
                 {isAr ? "ملاحظات وتوجيهات إدارية:" : "Administrative Notes:"}
               </h4>
               <p className="text-[12.5px] text-[#555] leading-relaxed">
@@ -370,7 +370,7 @@ export function StaffMemberDetailDialog({
                 onClose()
                 onEdit(member)
               }}
-              className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--gym-ink,#063434)] px-4 sm:px-5 text-[12.5px] font-bold text-white transition hover:opacity-95 shadow-xs"
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-4 sm:px-5 text-[12.5px] font-bold text-white transition hover:opacity-95 shadow-xs"
             >
               <Pencil className="size-3.5" />
               <span>{isAr ? "تعديل الصلاحيات والحساب" : "Edit Account & Permissions"}</span>
@@ -424,7 +424,7 @@ export function StaffMemberDetailDialog({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-10 items-center justify-center rounded-full bg-white px-5 text-[12.5px] font-bold text-[var(--gym-ink,#063434)] border border-black/10 hover:bg-black/5 transition"
+            className="inline-flex h-10 items-center justify-center rounded-full bg-white px-5 text-[12.5px] font-bold text-[var(--gym-ink,#111111)] border border-black/10 hover:bg-black/5 transition"
           >
             {isAr ? "إغلاق" : "Close"}
           </button>

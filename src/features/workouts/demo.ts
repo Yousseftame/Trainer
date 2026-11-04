@@ -9,6 +9,139 @@ import type {
 export type DemoWorkoutDay = WorkoutDay
 export type DemoWorkoutProgram = WorkoutProgram
 
+const WARMUP_CARDIO: WorkoutExercise[] = [
+  {
+    id: "ex-jump-jacks",
+    name: { en: "Jump Jacks", ar: "القفز مع فتح الذراعين والقدمين (Jump Jacks)" },
+    description: {
+      en: "Jump with your legs spread wide and hands touching overhead, then return.",
+      ar: "اقفز مع فتح الذراعين والقدمين للأعلى ثم العودة للوضع الابتدائي بإيقاع سريع ومنتظم.",
+    },
+    sets: 1,
+    reps: "max",
+    restSeconds: 60,
+    videoUrl: "https://www.youtube.com/embed/iSSAk4XCsRA",
+    thumbnailUrl: "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=400&auto=format&fit=crop&q=80",
+    equipment: "Bodyweight",
+    targetMuscles: ["Full Body", "Cardio"],
+    notes: {
+      en: "Warmup - maintain continuous breathing rhythm",
+      ar: "إحماء لكامل الجسم - حافظ على وتيرة تنفس منتظمة",
+    },
+    alternatives: [
+      {
+        id: "alt-step-jacks",
+        name: { en: "Low Impact Step Jacks", ar: "ستيب جاكس خفيف بدون قفز" },
+        reason: {
+          en: "Knee discomfort or zero-impact preference",
+          ar: "لحماية الركبتين أو تجنب الارتطام",
+        },
+        equipment: "Bodyweight",
+      },
+    ],
+  },
+  {
+    id: "ex-arm-circles",
+    name: { en: "Forward Arm Circle", ar: "دوائر الذراعين للأمام (Forward Arm Circle)" },
+    description: {
+      en: "Rotate arms forward in controlled circles to warm up shoulders and rotator cuff.",
+      ar: "تدوير الذراعين للأمام بحركة دائرية محكمة لتهيئة الكتفين وأوتار الروتاتور كف.",
+    },
+    sets: 1,
+    reps: "max",
+    restSeconds: 60,
+    videoUrl: "https://www.youtube.com/embed/140RTNMQQve",
+    thumbnailUrl: "https://images.unsplash.com/photo-1544033527-b192daee1f5b?w=400&auto=format&fit=crop&q=80",
+    equipment: "Bodyweight",
+    targetMuscles: ["Shoulders", "Rotator Cuff"],
+    notes: {
+      en: "Controlled speed, keep core braced",
+      ar: "سرعة متوسطة محكمة مع شد الجذع",
+    },
+    alternatives: [
+      {
+        id: "alt-band-pullapart",
+        name: { en: "Band Pull-Aparts", ar: "سحب حبل مطاطي للكتف" },
+        reason: {
+          en: "Gentler on shoulder joints",
+          ar: "أكثر ملاءمة لمرونة مفصل الكتف",
+        },
+        equipment: "Resistance Band",
+      },
+    ],
+  },
+  {
+    id: "ex-high-knee",
+    name: { en: "High Knee", ar: "الجري في المكان برفع الركبتين (High Knee)" },
+    description: {
+      en: "Drive knees up towards chest quickly while pumping arms.",
+      ar: "رفع الركبتين بالتناوب نحو الصدر بسرعة مع تحريك الذراعين لتنشيط الدورة الدموية.",
+    },
+    sets: 1,
+    reps: "max",
+    restSeconds: 60,
+    videoUrl: "https://www.youtube.com/embed/8opcQdC-5gk",
+    thumbnailUrl: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=400&auto=format&fit=crop&q=80",
+    equipment: "Bodyweight",
+    targetMuscles: ["Hip Flexors", "Quads", "Cardio"],
+    notes: {
+      en: "Stay on balls of your feet",
+      ar: "حافظ على الارتكاز على مشط القدم",
+    },
+    alternatives: [
+      {
+        id: "alt-high-march",
+        name: { en: "Standing High March", ar: "المشي السريع في المكان برفع الركبة" },
+        reason: {
+          en: "Joint friendly alternative",
+          ar: "بديل آمن وخفيف على المفاصل",
+        },
+        equipment: "Bodyweight",
+      },
+    ],
+  },
+]
+
+const INCLINE_PUSHUP: WorkoutExercise = {
+  id: "ex-incline-pushup",
+  name: { en: "Incline Push Up", ar: "تمرين ضغط مائل (Incline Push Up)" },
+  description: {
+    en: "Hands on elevated bench, lower chest to bench with elbows at 45 degrees, push up.",
+    ar: "ضع يديك على بنش مرتفع، انزل بصدرك بتحكم مع زاوية مرفق 45 درجة ثم ادفع للأعلى.",
+  },
+  sets: 4,
+  reps: "10 - 15",
+  restSeconds: 60,
+  videoUrl: "https://www.youtube.com/embed/4dF1DOWzf20",
+  thumbnailUrl: "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&auto=format&fit=crop&q=80",
+  equipment: "Bench / Box",
+  targetMuscles: ["Chest", "Triceps", "Front Shoulders"],
+  notes: {
+    en: "Keep body in straight plank alignment",
+    ar: "حافظ على استقامة الجسم بالكامل كلوح مستقيم",
+  },
+  alternatives: [
+    {
+      id: "alt-knee-pushup",
+      name: { en: "Knee Push-Ups", ar: "ضغط على الركبتين" },
+      reason: {
+        en: "Easier modification to complete all sets",
+        ar: "تعديل مناسب لإكمال جميع التكرارات بنقاء",
+      },
+      equipment: "Mat",
+    },
+    {
+      id: "alt-wall-pushup",
+      name: { en: "Wall Push-Ups", ar: "ضغط مستنداً على الحائط" },
+      reason: {
+        en: "Rehabilitation / light load",
+        ar: "لحالات التأهيل أو تخفيف الحمل",
+      },
+      equipment: "Wall",
+    },
+  ],
+}
+
 const PUSH: WorkoutExercise[] = [
   {
     id: "ex-bp",
@@ -337,10 +470,34 @@ export const DEMO_WORKOUTS: DemoWorkoutProgram[] = [
     updatedAt: "2026-10-20T00:00:00.000Z",
     completion: { done: 3, total: 4 },
     days: week([
-      { id: "a-push", weekday: 0, exercises: PUSH },
-      { id: "a-pull", weekday: 1, exercises: PULL },
-      { id: "a-legs", weekday: 3, exercises: LEGS },
-      { id: "a-upper", weekday: 4, exercises: [...PUSH.slice(0, 2), ...PULL.slice(0, 1)] },
+      {
+        id: "a-full",
+        weekday: 0,
+        label: { en: "Day 1 - Full Body", ar: "يوم 1 - full body (8 تمارين)" },
+        focus: { en: "Full Body Warmup & Foundation", ar: "إحماء وتهيئة لكامل الجسم" },
+        exercises: [...WARMUP_CARDIO, ...PUSH.slice(0, 3)],
+      },
+      {
+        id: "a-legs",
+        weekday: 1,
+        label: { en: "Day 2 - Lower Body", ar: "يوم 2 - الجزء السفلي" },
+        focus: { en: "Legs & Core Stability", ar: "قوة الأرجل وعضلات الجذع" },
+        exercises: LEGS,
+      },
+      {
+        id: "a-upper",
+        weekday: 2,
+        label: { en: "Day 3 - Upper Body", ar: "يوم 3 upper body (4 تمارين)" },
+        focus: { en: "Chest, Shoulders & Arms", ar: "عضلات الصدر والكتف والذراعين" },
+        exercises: [INCLINE_PUSHUP, ...PUSH.slice(0, 2), ...PULL.slice(0, 1)],
+      },
+      {
+        id: "a-pull",
+        weekday: 3,
+        label: { en: "Day 4 - Back & Pull", ar: "يوم 4 - الظهر والسحب" },
+        focus: { en: "Back Width & Biceps", ar: "عرض الظهر والبايسبس" },
+        exercises: PULL,
+      },
     ]),
   },
   {
@@ -400,13 +557,56 @@ export const INITIAL_WORKOUT_LOGS: WorkoutSessionLog[] = [
     id: "wlog-1",
     subscriberId: "sub-alex",
     programId: "asg-alex",
-    dayId: "a-push",
+    dayId: "a-full",
     weekday: 0,
     date: "2026-10-26",
+    workoutTitle: "Full Body (Warmup & Strength)",
     durationMinutes: 52,
+    activeMinutes: 38,
+    restMinutes: 14,
     perceivedEffort: 8,
+    energyLevel: "great",
+    totalVolumeKg: 1480,
     notes: "Solid bench sets, pushed 95kg for 8 reps on final set.",
     completedAt: "2026-10-26T18:40:00.000Z",
+    exercisesCompleted: [
+      {
+        exerciseId: "ex-jump-jacks",
+        name: "Jump Jacks",
+        targetSets: 1,
+        completedSets: 1,
+        repsDone: "60s max",
+        durationSeconds: 60,
+        restSeconds: 60,
+      },
+      {
+        exerciseId: "ex-arm-circles",
+        name: "Forward Arm Circle",
+        targetSets: 1,
+        completedSets: 1,
+        repsDone: "45s max",
+        durationSeconds: 45,
+        restSeconds: 60,
+      },
+      {
+        exerciseId: "ex-high-knee",
+        name: "High Knee",
+        targetSets: 1,
+        completedSets: 1,
+        repsDone: "60s max",
+        durationSeconds: 60,
+        restSeconds: 60,
+      },
+      {
+        exerciseId: "ex-bp",
+        name: "Barbell bench press",
+        targetSets: 4,
+        completedSets: 4,
+        weightKg: 85,
+        repsDone: 10,
+        restSeconds: 90,
+      },
+    ],
   },
   {
     id: "wlog-2",
@@ -415,10 +615,35 @@ export const INITIAL_WORKOUT_LOGS: WorkoutSessionLog[] = [
     dayId: "a-pull",
     weekday: 1,
     date: "2026-10-27",
+    workoutTitle: "Back & Pull Session",
     durationMinutes: 48,
+    activeMinutes: 34,
+    restMinutes: 14,
     perceivedEffort: 7,
+    energyLevel: "good",
+    totalVolumeKg: 1220,
     notes: "Row tempo was clean, no lower back fatigue.",
     completedAt: "2026-10-27T19:15:00.000Z",
+    exercisesCompleted: [
+      {
+        exerciseId: "ex-row",
+        name: "Chest-supported row",
+        targetSets: 4,
+        completedSets: 4,
+        weightKg: 32,
+        repsDone: 10,
+        restSeconds: 90,
+      },
+      {
+        exerciseId: "ex-lat",
+        name: "Lat pulldown",
+        targetSets: 3,
+        completedSets: 3,
+        weightKg: 55,
+        repsDone: 12,
+        restSeconds: 75,
+      },
+    ],
   },
   {
     id: "wlog-3",

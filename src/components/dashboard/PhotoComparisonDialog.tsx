@@ -62,7 +62,7 @@ export function PhotoComparisonDialog({
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5">
       {/* Overlay Backdrop */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-black/60"
         onClick={onClose}
         aria-hidden
       />
@@ -72,11 +72,11 @@ export function PhotoComparisonDialog({
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-[#F0F0F0] px-5 py-4 sm:px-7">
           <div className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-2xl bg-[var(--gym-ink,#063434)] text-[var(--gym-lime,#b8fe22)]">
+            <span className="flex size-10 items-center justify-center rounded-2xl bg-[var(--gym-ink,#111111)] text-[var(--gym-lime,#fb5001)]">
               <ArrowLeftRight className="size-5" />
             </span>
             <div>
-              <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#063434)] sm:text-[20px]">
+              <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#111111)] sm:text-[20px]">
                 {isAr ? "مقارنة صور التقدم جنباً إلى جنب" : "Side-by-Side Photo Comparison"}
               </h2>
               {subscriberName ? (
@@ -111,8 +111,8 @@ export function PhotoComparisonDialog({
                   className={cn(
                     "rounded-full px-3 py-1 text-[11px] font-bold transition",
                     active
-                      ? "bg-[var(--gym-ink,#063434)] text-white shadow-xs"
-                      : "bg-white text-[#8c8c8c] hover:bg-[#F0F0F0] hover:text-[var(--gym-ink,#063434)]",
+                      ? "bg-[var(--gym-ink,#111111)] text-white shadow-xs"
+                      : "bg-white text-[#8c8c8c] hover:bg-[#F0F0F0] hover:text-[var(--gym-ink,#111111)]",
                   )}
                 >
                   {p === "all"
@@ -135,7 +135,7 @@ export function PhotoComparisonDialog({
           {filteredPhotos.length < 2 ? (
             <div className="flex min-h-60 flex-col items-center justify-center rounded-2xl bg-[#F4F4F4] p-6 text-center text-[#8c8c8c]">
               <Camera className="size-10 stroke-[1.5]" />
-              <p className="mt-3 font-heading text-[15px] font-bold text-[var(--gym-ink,#063434)]">
+              <p className="mt-3 font-heading text-[15px] font-bold text-[var(--gym-ink,#111111)]">
                 {isAr ? "تحتاج إلى صورتين على الأقل لإجراء المقارنة" : "At least 2 photos required for comparison"}
               </p>
               <p className="mt-1 text-[12px]">
@@ -147,13 +147,13 @@ export function PhotoComparisonDialog({
               {/* Card A: Earlier / Baseline */}
               <div className="flex flex-col overflow-hidden rounded-[22px] border border-black/5 bg-[#F9F9F9] p-3.5">
                 <div className="mb-2.5 flex items-center justify-between">
-                  <span className="rounded-full bg-[var(--gym-ink,#063434)] px-3 py-1 text-[11px] font-extrabold text-white">
+                  <span className="rounded-full bg-[var(--gym-ink,#111111)] px-3 py-1 text-[11px] font-extrabold text-white">
                     {isAr ? "الصورة الأولى (البداية)" : "Photo A (Earlier)"}
                   </span>
                   <select
                     value={photoA?.id}
                     onChange={(e) => setPhotoAId(e.target.value)}
-                    className="rounded-xl border border-black/10 bg-white px-2.5 py-1 text-[12px] font-bold text-[var(--gym-ink,#063434)] outline-none"
+                    className="rounded-xl border border-black/10 bg-white px-2.5 py-1 text-[12px] font-bold text-[var(--gym-ink,#111111)] outline-none"
                   >
                     {filteredPhotos.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -163,7 +163,7 @@ export function PhotoComparisonDialog({
                   </select>
                 </div>
 
-                <div className="relative flex aspect-[3/4] w-full items-center justify-center overflow-hidden rounded-2xl bg-[var(--gym-ink,#063434)] shadow-xs">
+                <div className="relative flex aspect-[3/4] w-full items-center justify-center overflow-hidden rounded-2xl bg-[var(--gym-ink,#111111)] shadow-xs">
                   {photoA?.storagePath?.startsWith("data:") || photoA?.storagePath?.startsWith("http") ? (
                     <img
                       src={photoA.storagePath}
@@ -196,13 +196,13 @@ export function PhotoComparisonDialog({
               {/* Card B: Latest / Current */}
               <div className="flex flex-col overflow-hidden rounded-[22px] border border-black/5 bg-[#F9F9F9] p-3.5">
                 <div className="mb-2.5 flex items-center justify-between">
-                  <span className="rounded-full bg-[var(--gym-lime,#b8fe22)] px-3 py-1 text-[11px] font-extrabold text-[var(--gym-ink,#063434)]">
+                  <span className="rounded-full bg-[var(--gym-lime,#fb5001)] px-3 py-1 text-[11px] font-extrabold text-[var(--gym-ink,#111111)]">
                     {isAr ? "الصورة الثانية (الحالية)" : "Photo B (Latest)"}
                   </span>
                   <select
                     value={photoB?.id}
                     onChange={(e) => setPhotoBId(e.target.value)}
-                    className="rounded-xl border border-black/10 bg-white px-2.5 py-1 text-[12px] font-bold text-[var(--gym-ink,#063434)] outline-none"
+                    className="rounded-xl border border-black/10 bg-white px-2.5 py-1 text-[12px] font-bold text-[var(--gym-ink,#111111)] outline-none"
                   >
                     {filteredPhotos.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -212,7 +212,7 @@ export function PhotoComparisonDialog({
                   </select>
                 </div>
 
-                <div className="relative flex aspect-[3/4] w-full items-center justify-center overflow-hidden rounded-2xl bg-[var(--gym-ink,#063434)] shadow-xs">
+                <div className="relative flex aspect-[3/4] w-full items-center justify-center overflow-hidden rounded-2xl bg-[var(--gym-ink,#111111)] shadow-xs">
                   {photoB?.storagePath?.startsWith("data:") || photoB?.storagePath?.startsWith("http") ? (
                     <img
                       src={photoB.storagePath}

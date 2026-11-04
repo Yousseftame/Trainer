@@ -100,6 +100,60 @@ export const DEMO_PT_RECORDS: PhysicalTherapyRecord[] = [
     updatedAt: "2026-10-25T14:30:00.000Z",
   },
   {
+    id: "pt-alex-ankle-cleared",
+    subscriberId: "sub-alex",
+    subscriberName: "Alex Haddad",
+    injuryTitle: {
+      en: "Left Ankle Grade 1 Inversion Sprain (Resolved)",
+      ar: "التواء الكاحل الأيسر من الدرجة الأولى (مكتمل الشفاء)",
+    },
+    affectedArea: "ankle",
+    severity: "mild",
+    status: "cleared",
+    diagnosisDate: "2026-04-10",
+    clearanceDate: "2026-06-20",
+    restrictions: [
+      {
+        id: "res-ankle-1",
+        prohibited: {
+          en: "Max-effort lateral bounding or box jumps",
+          ar: "القفزات الجانبية بأقصى قوة أو قفز الصندوق العالي",
+        },
+        safeAlternative: {
+          en: "Single-leg balance on bosu / controlled calf raises",
+          ar: "توازن الساق الواحدة على كرة البوسو وتمارين السمانة المضبوطة",
+        },
+        reason: {
+          en: "Avoided sudden inversion torque during initial ligament remodelling.",
+          ar: "تجنب عزم الانقلاب المفاجئ أثناء إعادة تشكيل ألياف الرباط.",
+        },
+        equipment: "Bosu / Stepper",
+      },
+    ],
+    rehabExercises: [
+      {
+        id: "rehab-ankle-1",
+        name: {
+          en: "Ankle Alphabet & Resistance Band Eversion",
+          ar: "رسم الحروف بالكاحل وتمارين الإبعاد بالرباط المطاطي",
+        },
+        sets: 3,
+        reps: "20 reps",
+        frequency: "Daily",
+        notes: {
+          en: "Strengthened peroneus longus and brevis. Full mobility achieved.",
+          ar: "تم تقوية العضلات الشظوية واستعادة المدى الحركي الكامل.",
+        },
+      },
+    ],
+    therapistNotes: {
+      en: "Full lateral stability restored. Single-leg hop test cleared with 98% symmetry. Subscriber fully cleared for all agility and running work.",
+      ar: "تم استعادة الثبات الجانبي بالكامل. فحص القفز الأحادي أظهر تطابقاً بنسبة 98%. اللاعب مصرح له بالكامل بجميع تدريبات الرشاقة والجري.",
+    },
+    createdAt: "2026-04-10T09:00:00.000Z",
+    updatedAt: "2026-06-20T11:00:00.000Z",
+  },
+  {
     id: "pt-sara-knee",
     subscriberId: "sub-sara",
     subscriberName: "Sara Mostafa",

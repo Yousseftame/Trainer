@@ -1,15 +1,15 @@
-import { cn } from "@/lib/utils"
+﻿import { cn } from "@/lib/utils"
 import type { SubscriptionStatus } from "@/types/subscription"
 import type { UserStatus } from "@/types/user"
 
 type Tone = "success" | "warning" | "danger" | "muted" | "info"
 
 const TONE_CLASS: Record<Tone, string> = {
-  success: "bg-[var(--gym-lime,#b8fe22)]/35 text-[var(--gym-ink,#063434)]",
+  success: "bg-[var(--gym-lime,#fb5001)]/35 text-[var(--gym-ink,#111111)]",
   warning: "bg-[#FFF3D6] text-[#9A6B00]",
   danger: "bg-[#FFE8E4] text-[#C44536]",
   muted: "bg-[#EEEEEE] text-[#6B7280]",
-  info: "bg-[var(--gym-ink,#063434)]/8 text-[var(--gym-ink,#063434)]",
+  info: "bg-[var(--gym-ink,#111111)]/8 text-[var(--gym-ink,#111111)]",
 }
 
 export function StatusBadge({

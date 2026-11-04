@@ -18,6 +18,7 @@ import {
   UserPlus,
   Users,
 } from "lucide-react"
+import { ConfirmActionDialog } from "@/components/dashboard/ConfirmActionDialog"
 import { ContentPreviewDialog } from "@/components/dashboard/ContentPreviewDialog"
 import { ProgramHistoryDialog } from "@/components/dashboard/ProgramHistoryDialog"
 import { ProgramLogsDialog } from "@/components/dashboard/ProgramLogsDialog"
@@ -87,6 +88,14 @@ export function WorkoutsPage() {
   }>({ open: false })
 
   const [previewAsset, setPreviewAsset] = useState<ContentAsset | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    title: string
+    description?: string
+    confirmLabel?: string
+    tone?: "danger" | "primary" | "warning"
+    onConfirm: () => Promise<void> | void
+  } | null>(null)
 
   // React Query Hooks
   const { data: allPrograms = [] } = useWorkoutProgramsQuery()
@@ -161,14 +170,20 @@ export function WorkoutsPage() {
     }
   }
 
-  async function handleDelete(program: WorkoutProgram) {
-    const confirmText = isAr
-      ? `هل أنت متأكد من حذف "${program.title[locale]}" نهائياً؟`
-      : `Are you sure you want to permanently delete "${program.title[locale]}"?`
-    if (!window.confirm(confirmText)) return
-
-    await deleteMutation.mutateAsync(program.id)
-    appToast.success(isAr ? "تم حذف البرنامج" : "Program deleted")
+  function handleDelete(program: WorkoutProgram) {
+    setConfirmDialog({
+      open: true,
+      title: isAr ? "حذف برنامج التمارين" : "Delete Workout Program",
+      description: isAr
+        ? `هل أنت متأكد من حذف "${program.title[locale]}" نهائياً؟ هذا الإجراء لا يمكن التراجع عنه.`
+        : `Are you sure you want to permanently delete "${program.title[locale]}"? This action cannot be undone.`,
+      confirmLabel: isAr ? "تأكيد الحذف" : "Delete Program",
+      tone: "danger",
+      onConfirm: async () => {
+        await deleteMutation.mutateAsync(program.id)
+        appToast.success(isAr ? "تم حذف البرنامج" : "Program deleted")
+      },
+    })
   }
 
   // Subscriber information for selected program
@@ -224,7 +239,7 @@ export function WorkoutsPage() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={t("admin.workouts.search")}
-                className="h-11 w-full rounded-full bg-[#F4F4F4] pe-4 ps-10 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none placeholder:font-normal placeholder:text-[#8c8c8c]"
+                className="h-11 w-full rounded-full bg-[#F4F4F4] pe-4 ps-10 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none placeholder:font-normal placeholder:text-[#8c8c8c]"
               />
             </label>
 
@@ -257,7 +272,7 @@ export function WorkoutsPage() {
                       mode: { type: "create-template" },
                     })
                   }
-                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#063434)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
                 >
                   <Plus className="size-4" strokeWidth={2} />
                   {t("admin.workouts.newTemplate")}
@@ -271,7 +286,7 @@ export function WorkoutsPage() {
                       mode: { type: "assign" },
                     })
                   }
-                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#063434)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
                 >
                   <UserPlus className="size-4" strokeWidth={2} />
                   {t("admin.workouts.assign")}
@@ -311,8 +326,8 @@ export function WorkoutsPage() {
                     className={cn(
                       "rounded-2xl p-3.5 text-start transition-colors",
                       active
-                        ? "bg-[var(--gym-ink,#063434)] text-white shadow-sm"
-                        : "bg-[#F4F4F4] text-[var(--gym-ink,#063434)] hover:bg-[#ececec]",
+                        ? "bg-[var(--gym-ink,#111111)] text-white shadow-sm"
+                        : "bg-[#F4F4F4] text-[var(--gym-ink,#111111)] hover:bg-[#ececec]",
                     )}
                   >
                     <div className="flex items-center justify-between gap-1">
@@ -349,7 +364,7 @@ export function WorkoutsPage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="font-heading text-[20px] font-extrabold tracking-tight text-[var(--gym-ink,#063434)]">
+                    <h2 className="font-heading text-[20px] font-extrabold tracking-tight text-[var(--gym-ink,#111111)]">
                       {selected.title[locale]}
                     </h2>
                     <StatusBadge
@@ -408,7 +423,7 @@ export function WorkoutsPage() {
                       <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#8c8c8c]">
                         {t("admin.workouts.thisWeek")}
                       </p>
-                      <p className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#063434)]">
+                      <p className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
                         {selected.completion.done}/{selected.completion.total}
                       </p>
                     </button>
@@ -426,7 +441,7 @@ export function WorkoutsPage() {
                             : { type: "edit-assignment", program: selected },
                       })
                     }
-                    className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#063434)] shadow-sm hover:bg-black/5"
+                    className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5"
                     title={isAr ? "تعديل البرنامج" : "Edit program"}
                   >
                     <Pencil className="size-4" />
@@ -442,7 +457,7 @@ export function WorkoutsPage() {
                           program: selected,
                         })
                       }
-                      className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#063434)] shadow-sm hover:bg-black/5"
+                      className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5"
                       title={isAr ? "سجل الإصدارات السابقة" : "Version history"}
                     >
                       <History className="size-4" />
@@ -453,7 +468,7 @@ export function WorkoutsPage() {
                   <button
                     type="button"
                     onClick={() => handleArchiveToggle(selected)}
-                    className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#063434)] shadow-sm hover:bg-black/5"
+                    className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5"
                     title={
                       selected.status === "archived"
                         ? isAr
@@ -486,8 +501,8 @@ export function WorkoutsPage() {
               {/* PDF Format Display */}
               {selected.format === "pdf" ? (
                 <div className="flex min-h-40 flex-col items-start justify-center rounded-[20px] bg-white p-5 shadow-sm">
-                  <FileText className="size-8 text-[var(--gym-ink,#063434)]" strokeWidth={1.6} />
-                  <p className="mt-3 font-heading text-[16px] font-bold text-[var(--gym-ink,#063434)]">
+                  <FileText className="size-8 text-[var(--gym-ink,#111111)]" strokeWidth={1.6} />
+                  <p className="mt-3 font-heading text-[16px] font-bold text-[var(--gym-ink,#111111)]">
                     {selected.pdfName?.[locale] || (isAr ? "مستند البرنامج التدريبي PDF" : "Workout Program PDF")}
                   </p>
                   <p className="mt-1 max-w-md text-[13px] text-[#8c8c8c]">
@@ -510,8 +525,8 @@ export function WorkoutsPage() {
                           className={cn(
                             "flex min-h-[72px] flex-col items-center justify-center rounded-2xl px-1 py-2 text-center transition-colors sm:min-h-[84px] overflow-hidden",
                             active
-                              ? "bg-[var(--gym-ink,#063434)] text-white shadow-sm"
-                              : "bg-white text-[var(--gym-ink,#063434)] hover:bg-white/80",
+                              ? "bg-[var(--gym-ink,#111111)] text-white shadow-sm"
+                              : "bg-white text-[var(--gym-ink,#111111)] hover:bg-white/80",
                           )}
                         >
                           <span
@@ -529,8 +544,8 @@ export function WorkoutsPage() {
                               "mt-1 size-2 rounded-full",
                               trained
                                 ? active
-                                  ? "bg-[var(--gym-lime,#b8fe22)]"
-                                  : "bg-[var(--gym-ink,#063434)]"
+                                  ? "bg-[var(--gym-lime,#fb5001)]"
+                                  : "bg-[var(--gym-ink,#111111)]"
                                 : active
                                   ? "bg-white/30"
                                   : "bg-[#D9D9D9]",
@@ -549,7 +564,7 @@ export function WorkoutsPage() {
                   {/* Day Exercise List Container */}
                   <div className="rounded-[20px] bg-white p-4 sm:p-5 shadow-sm">
                     <div className="mb-4 flex items-center justify-between gap-3">
-                      <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#063434)]">
+                      <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
                         {t(`admin.workouts.weekdays.${selectedDay?.weekday ?? 0}`, {
                           defaultValue:
                             isAr
@@ -587,7 +602,7 @@ export function WorkoutsPage() {
                             >
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
-                                  <p className="font-heading text-[15px] font-bold text-[var(--gym-ink,#063434)]">
+                                  <p className="font-heading text-[15px] font-bold text-[var(--gym-ink,#111111)]">
                                     {exName}
                                   </p>
                                   {exDesc ? (
@@ -612,7 +627,7 @@ export function WorkoutsPage() {
                                         )
                                       }
                                     }}
-                                    className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] text-[var(--gym-lime,#b8fe22)] transition hover:scale-105"
+                                    className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] text-[var(--gym-lime,#fb5001)] transition hover:scale-105"
                                     title={isAr ? "مشاهدة الفيديو التعليمي" : "Watch instructional video"}
                                   >
                                     <Play className="size-3.5 fill-current" />
@@ -620,7 +635,7 @@ export function WorkoutsPage() {
                                 ) : null}
                               </div>
 
-                              <div className="mt-3 flex flex-wrap gap-2 text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+                              <div className="mt-3 flex flex-wrap gap-2 text-[12px] font-bold text-[var(--gym-ink,#111111)]">
                                 <span className="rounded-full bg-white px-2.5 py-1">
                                   {t("admin.workouts.sets", { count: exercise.sets ?? 0 })}
                                 </span>
@@ -676,7 +691,7 @@ export function WorkoutsPage() {
                                             className="rounded-lg bg-white p-2 text-[11px] shadow-2xs border border-amber-100 flex flex-col justify-between gap-1"
                                           >
                                             <div>
-                                              <div className="flex items-center justify-between gap-1 font-bold text-[var(--gym-ink,#063434)]">
+                                              <div className="flex items-center justify-between gap-1 font-bold text-[var(--gym-ink,#111111)]">
                                                 <span>{altName}</span>
                                                 {alt.equipment ? (
                                                   <span className="rounded bg-black/5 px-1.5 py-0.5 text-[9px] font-semibold text-[#666]">
@@ -764,6 +779,19 @@ export function WorkoutsPage() {
         <ContentPreviewDialog
           asset={previewAsset}
           onClose={() => setPreviewAsset(null)}
+        />
+      ) : null}
+
+      {/* Confirm Action Dialog */}
+      {confirmDialog ? (
+        <ConfirmActionDialog
+          open={confirmDialog.open}
+          title={confirmDialog.title}
+          description={confirmDialog.description}
+          confirmLabel={confirmDialog.confirmLabel}
+          tone={confirmDialog.tone}
+          onCancel={() => setConfirmDialog(null)}
+          onConfirm={confirmDialog.onConfirm}
         />
       ) : null}
     </div>

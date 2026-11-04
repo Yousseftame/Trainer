@@ -95,7 +95,7 @@ export function SubscriberMobileNavbar({
   return (
     <nav
       aria-label="Mobile Navigation"
-      className="fixed bottom-4 inset-x-0 mx-auto z-40 flex items-center justify-center px-3.5 pointer-events-none lg:hidden"
+      className="fixed bottom-[max(1.75rem,calc(1.125rem+env(safe-area-inset-bottom,0px)))] inset-x-0 mx-auto z-40 flex items-center justify-center px-3.5 pointer-events-none lg:hidden transition-[bottom] duration-200"
     >
       <div className="w-full max-w-[390px] pointer-events-auto filter drop-shadow-[0_20px_40px_rgba(0,0,0,0.5)]">
         <GlassSurface

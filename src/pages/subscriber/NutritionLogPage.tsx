@@ -18,7 +18,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatDate } from "@/lib/format"
 
-export function NutritionLogPage() {
+export function NutritionLogPage({ subscriberId: explicitSubId }: { subscriberId?: string } = {}) {
   const { t } = useTranslation()
   const { locale } = useLocale()
   const isAr = locale === "ar"
@@ -28,6 +28,9 @@ export function NutritionLogPage() {
   const { data: subscribers = [] } = useSubscribersQuery()
 
   const currentSubscriber = useMemo(() => {
+    if (explicitSubId) {
+      return subscribers.find((s) => s.id === explicitSubId) ?? subscribers[0]
+    }
     if (!user) return subscribers[0]
     return (
       subscribers.find(
@@ -36,9 +39,10 @@ export function NutritionLogPage() {
           s.email.toLowerCase() === (user.email ?? "").toLowerCase(),
       ) ?? subscribers[0]
     )
-  }, [subscribers, user])
+  }, [subscribers, user, explicitSubId])
 
-  const { data: logs = [] } = useNutritionLogsQuery(currentSubscriber?.id)
+  const targetSubscriberId = explicitSubId || currentSubscriber?.id
+  const { data: logs = [] } = useNutritionLogsQuery(targetSubscriberId)
 
   const stats = useMemo(() => {
     const totalLoggedDays = logs.length
@@ -83,7 +87,7 @@ export function NutritionLogPage() {
 
       {/* Logs Table / List */}
       <div className="rounded-[24px] bg-white p-5 sm:p-6 shadow-xs space-y-4">
-        <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#063434)]">
+        <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#111111)]">
           {isAr ? "سجل الالتزام بالخطة الغذائية" : "Nutrition Adherence Log"}
         </h2>
 
@@ -131,7 +135,7 @@ export function NutritionLogPage() {
                   className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-[#ECECEC] bg-[#FBFBFB] p-4 transition hover:bg-white"
                 >
                   <div>
-                    <h3 className="font-heading text-[15px] font-bold text-[var(--gym-ink,#063434)]">
+                    <h3 className="font-heading text-[15px] font-bold text-[var(--gym-ink,#111111)]">
                       {formatDate(log.date, locale)}
                     </h3>
                     {log.notes ? (
@@ -143,7 +147,7 @@ export function NutritionLogPage() {
 
                   <div className="flex items-center gap-2 self-start sm:self-auto text-[12px] font-bold">
                     {log.caloriesActual ? (
-                      <span className="rounded-full bg-[#EAEAEA] px-3 py-1 text-[var(--gym-ink,#063434)]">
+                      <span className="rounded-full bg-[#EAEAEA] px-3 py-1 text-[var(--gym-ink,#111111)]">
                         {log.caloriesActual} kcal
                       </span>
                     ) : null}

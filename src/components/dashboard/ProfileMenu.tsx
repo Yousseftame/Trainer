@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react"
+﻿import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react"
 import { useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { AnimatePresence, motion } from "motion/react"
@@ -110,7 +110,7 @@ export function ProfileMenu({ onRequestSignOut }: ProfileMenuProps) {
         aria-controls={menuId}
         aria-label={t("nav.profile")}
         className={cn(
-          "inline-flex size-9 sm:size-11 shrink-0 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] text-[12px] sm:text-[13px] font-bold text-white transition-all hover:opacity-90",
+          "inline-flex size-9 sm:size-11 shrink-0 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] text-[12px] sm:text-[13px] font-bold text-white transition-all hover:opacity-90",
           open && "ring-2 ring-[var(--gym-lime,#fb5001)] ring-offset-2 ring-offset-[#F4F4F4] shadow-md",
         )}
       >
@@ -147,17 +147,17 @@ export function ProfileMenu({ onRequestSignOut }: ProfileMenuProps) {
             >
 
               <div className="flex items-center gap-3 rounded-[18px] px-3 py-3">
-                <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] text-[13px] font-bold text-[var(--gym-lime,#fb5001)]">
+                <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] text-[13px] font-bold text-[var(--gym-lime,#fb5001)]">
                   {initials(name)}
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate font-heading text-[15px] font-extrabold text-[var(--gym-ink,#063434)]">
+                  <span className="block truncate font-heading text-[15px] font-extrabold text-[var(--gym-ink,#111111)]">
                     {name}
                   </span>
                   <span className="block truncate text-[12px] font-medium text-[#8c8c8c]">
                     {account.email}
                   </span>
-                  <span className="mt-0.5 block truncate text-[11px] font-semibold text-[var(--gym-ink,#063434)]/70">
+                  <span className="mt-0.5 block truncate text-[11px] font-semibold text-[var(--gym-ink,#111111)]/70">
                     {roleLabel}
                   </span>
                 </span>
@@ -233,7 +233,7 @@ function MenuItem({
         "flex w-full items-center gap-3 rounded-[16px] px-3 py-3 text-start text-[14px] font-semibold transition-colors",
         danger
           ? "text-[#FF6A55] hover:bg-[#FFE8E4]"
-          : "text-[var(--gym-ink,#063434)] hover:bg-[#F4F4F4]",
+          : "text-[var(--gym-ink,#111111)] hover:bg-[#F4F4F4]",
       )}
     >
       <span className="inline-flex size-[18px] shrink-0 items-center justify-center">{icon}</span>
@@ -264,7 +264,7 @@ function DialogShell({
       <button
         type="button"
         aria-label={t("nav.closeMenu")}
-        className="absolute inset-0 bg-[var(--gym-ink,#063434)]/35"
+        className="absolute inset-0 bg-[var(--gym-ink,#111111)]/35"
         onClick={onClose}
       />
       <motion.div
@@ -275,19 +275,19 @@ function DialogShell({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 16 }}
         transition={{ duration: 0.22, ease: EASE }}
-        className="relative max-h-[min(640px,calc(100dvh-24px))] w-full max-w-[420px] overflow-y-auto rounded-[24px] bg-white p-5 shadow-[0_24px_70px_rgba(6,52,52,0.2)] sm:p-6"
+        className="relative max-h-[min(640px,calc(100dvh-24px))] w-full max-w-[420px] overflow-y-auto rounded-[24px] bg-white p-5 shadow-[0_24px_70px_rgba(0,0,0,0.2)] sm:p-6"
       >
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2
             id="profile-dialog-title"
-            className="font-heading text-[18px] font-extrabold tracking-tight text-[var(--gym-ink,#063434)]"
+            className="font-heading text-[18px] font-extrabold tracking-tight text-[var(--gym-ink,#111111)]"
           >
             {title}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex size-9 items-center justify-center rounded-full bg-[#F4F4F4] text-[var(--gym-ink,#063434)]"
+            className="inline-flex size-9 items-center justify-center rounded-full bg-[#F4F4F4] text-[var(--gym-ink,#111111)]"
             aria-label={t("nav.closeMenu")}
           >
             <X className="size-4" strokeWidth={1.8} />
@@ -448,7 +448,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+      <span className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
         {label}
       </span>
       <input
@@ -458,10 +458,10 @@ function Field({
         autoComplete={autoComplete}
         onChange={onChange ? (event) => onChange(event.target.value) : undefined}
         className={cn(
-          "h-11 w-full rounded-[14px] border border-[var(--gym-ink,#063434)]/12 bg-[#F4F4F4] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none",
+          "h-11 w-full rounded-[14px] border border-[var(--gym-ink,#111111)]/12 bg-[#F4F4F4] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none",
           readOnly
             ? "cursor-default text-[#8c8c8c]"
-            : "focus:border-[var(--gym-ink,#063434)]/25 focus:bg-white",
+            : "focus:border-[var(--gym-ink,#111111)]/25 focus:bg-white",
         )}
       />
     </label>
@@ -484,7 +484,7 @@ function PasswordField({
 
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+      <span className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
         {label}
       </span>
       <span className="relative block">
@@ -493,7 +493,7 @@ function PasswordField({
           value={value}
           autoComplete={autoComplete}
           onChange={(event) => onChange(event.target.value)}
-          className="h-11 w-full rounded-[14px] border border-[var(--gym-ink,#063434)]/12 bg-[#F4F4F4] pe-11 ps-3.5 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none focus:border-[var(--gym-ink,#063434)]/25 focus:bg-white"
+          className="h-11 w-full rounded-[14px] border border-[var(--gym-ink,#111111)]/12 bg-[#F4F4F4] pe-11 ps-3.5 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none focus:border-[var(--gym-ink,#111111)]/25 focus:bg-white"
         />
         <button
           type="button"
@@ -525,14 +525,14 @@ function DialogActions({
         type="button"
         onClick={onCancel}
         disabled={disabled}
-        className="inline-flex h-11 items-center justify-center rounded-full px-4 text-[13px] font-bold text-[var(--gym-ink,#063434)] hover:bg-[#F4F4F4] disabled:opacity-50"
+        className="inline-flex h-11 items-center justify-center rounded-full px-4 text-[13px] font-bold text-[var(--gym-ink,#111111)] hover:bg-[#F4F4F4] disabled:opacity-50"
       >
         {cancelLabel}
       </button>
       <button
         type="submit"
         disabled={disabled}
-        className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] px-5 text-[13px] font-bold text-white disabled:opacity-50"
+        className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white disabled:opacity-50"
       >
         {confirmLabel}
       </button>

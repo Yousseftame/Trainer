@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react"
+﻿import { useMemo, useState, type ReactNode } from "react"
 import { Link } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { AlertTriangle, Bell, ChevronRight, CreditCard, Download, Inbox, Send } from "lucide-react"
@@ -144,8 +144,8 @@ export function ReportsPage() {
               className={cn(
                 "h-11 shrink-0 border-b-2 px-3.5 text-[13px] font-semibold whitespace-nowrap transition-colors sm:px-4",
                 tab === item
-                  ? "border-[var(--gym-ink,#063434)] text-[var(--gym-ink,#063434)]"
-                  : "border-transparent text-[#8c8c8c] hover:text-[var(--gym-ink,#063434)]",
+                  ? "border-[var(--gym-ink,#111111)] text-[var(--gym-ink,#111111)]"
+                  : "border-transparent text-[#8c8c8c] hover:text-[var(--gym-ink,#111111)]",
               )}
             >
               {t(`admin.reports.tabs.${item}`)}
@@ -253,8 +253,8 @@ function InboxPane({
               className={cn(
                 "h-8 rounded-full px-3 text-[12px] font-semibold",
                 filter === item
-                  ? "bg-[var(--gym-ink,#063434)] text-white"
-                  : "text-[#8c8c8c] hover:text-[var(--gym-ink,#063434)]",
+                  ? "bg-[var(--gym-ink,#111111)] text-white"
+                  : "text-[#8c8c8c] hover:text-[var(--gym-ink,#111111)]",
               )}
             >
               {item === "all" ? t("admin.common.all") : t(`admin.reports.noticeStatus.${item}`)}
@@ -283,14 +283,14 @@ function InboxPane({
                     className={cn(
                       "flex w-full items-start gap-3 rounded-[16px] px-3 py-3 text-start transition-colors",
                       active
-                        ? "border border-[var(--gym-ink,#063434)] bg-[var(--gym-ink,#063434)]/[0.04]"
+                        ? "border border-[var(--gym-ink,#111111)] bg-[var(--gym-ink,#111111)]/[0.04]"
                         : "border border-transparent hover:bg-black/[0.02]",
                     )}
                   >
                     <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", statusDot(notice.status))} />
                     <span className="min-w-0 flex-1">
                       <span className="flex items-baseline justify-between gap-3">
-                        <span className="truncate text-[14px] font-semibold text-[var(--gym-ink,#063434)]">
+                        <span className="truncate text-[14px] font-semibold text-[var(--gym-ink,#111111)]">
                           {who?.displayName ?? t(`admin.reports.noticeKind.${notice.kind}`)}
                         </span>
                         <span className="shrink-0 text-[11px] font-medium text-[#8c8c8c]">
@@ -321,7 +321,7 @@ function InboxPane({
 
           <aside
             data-report-pane="notice"
-            className="hidden h-fit rounded-[22px] border border-[var(--gym-ink,#063434)]/15 bg-[#F4F4F4] p-5 sm:p-6 lg:sticky lg:top-4 lg:block"
+            className="hidden h-fit rounded-[22px] border border-[var(--gym-ink,#111111)]/15 bg-[#F4F4F4] p-5 sm:p-6 lg:sticky lg:top-4 lg:block"
           >
             <NoticeDetail
               notice={open}
@@ -366,7 +366,7 @@ function ActivityPane({
       <ul>
         {rows.map((row) => (
           <RowLink key={row.subscriber.id} to={APP_ROUTES.admin.subscriberDetail(row.subscriber.id)} name={row.subscriber.displayName}>
-            <span className={row.loggedThisWeek ? "text-[var(--gym-ink,#063434)]" : "text-[#8c8c8c]"}>
+            <span className={row.loggedThisWeek ? "text-[var(--gym-ink,#111111)]" : "text-[#8c8c8c]"}>
               {row.loggedThisWeek ? t("admin.reports.activity.logged") : t("admin.reports.activity.quiet")}
             </span>
             <span className="hidden sm:inline">{formatDate(row.lastCheckIn, locale)}</span>
@@ -401,7 +401,7 @@ function BillingPane({
         {packages.map((row) => (
           <li key={row.pkg.id} className="border-b border-black/[0.05] py-4">
             <div className="flex items-baseline justify-between gap-3">
-              <p className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#063434)]">
+              <p className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
                 {row.pkg.name[locale]}
               </p>
               <p className="text-[13px] font-medium text-[#8c8c8c]">{row.share}%</p>
@@ -412,7 +412,7 @@ function BillingPane({
               {t("admin.reports.billing.expiring").toLowerCase()}
             </p>
             <div className="mt-3 h-1 overflow-hidden rounded-full bg-black/[0.06]">
-              <div className="h-full rounded-full bg-[var(--gym-ink,#063434)]" style={{ width: `${row.share}%` }} />
+              <div className="h-full rounded-full bg-[var(--gym-ink,#111111)]" style={{ width: `${row.share}%` }} />
             </div>
           </li>
         ))}
@@ -436,7 +436,7 @@ function BillingPane({
               >
                 <span>{pkg?.name[locale]}</span>
                 <span>{formatDate(item.endsAt, locale)}</span>
-                <span className={days != null && days <= 7 ? "text-[#C44536]" : "text-[var(--gym-ink,#063434)]"}>
+                <span className={days != null && days <= 7 ? "text-[#C44536]" : "text-[var(--gym-ink,#111111)]"}>
                   {days != null ? t("admin.reports.daysLeft", { count: days }) : "—"}
                 </span>
               </RowLink>
@@ -545,7 +545,7 @@ function ContentPane({
         {rows.map((row) => (
           <li key={row.id} className="flex items-center justify-between gap-3 border-b border-black/[0.05] py-3.5">
             <div className="min-w-0">
-              <p className="truncate text-[14px] font-semibold text-[var(--gym-ink,#063434)]">{row.title[locale]}</p>
+              <p className="truncate text-[14px] font-semibold text-[var(--gym-ink,#111111)]">{row.title[locale]}</p>
               <p className="mt-0.5 text-[12px] text-[#8c8c8c]">
                 {row.activePrograms} {t("admin.reports.content.programs").toLowerCase()} · {row.subscribers}{" "}
                 {t("admin.reports.content.people").toLowerCase()}
@@ -576,7 +576,7 @@ function ExportPane({
       {packs.map((kind) => (
         <li key={kind} className="flex items-center justify-between gap-3 border-b border-black/[0.05] py-3.5">
           <div className="min-w-0">
-            <p className="text-[14px] font-semibold text-[var(--gym-ink,#063434)]">
+            <p className="text-[14px] font-semibold text-[var(--gym-ink,#111111)]">
               {t(`admin.reports.export.${kind}`)}
             </p>
             <p className="mt-0.5 text-[12px] leading-relaxed text-[#8c8c8c]">
@@ -586,7 +586,7 @@ function ExportPane({
           <button
             type="button"
             onClick={() => onExport(kind)}
-            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full text-[13px] font-semibold text-[var(--gym-ink,#063434)]"
+            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full text-[13px] font-semibold text-[var(--gym-ink,#111111)]"
           >
             <Download className="size-3.5" strokeWidth={1.8} />
             CSV
@@ -618,7 +618,7 @@ function NoticeDetail({
       <p className="text-[11px] font-semibold tracking-[0.08em] text-[#8c8c8c] uppercase">
         {t(`admin.reports.noticeKind.${notice.kind}`)} · {t(`admin.reports.noticeStatus.${notice.status}`)}
       </p>
-      <h2 className="mt-2 font-heading text-[18px] font-extrabold tracking-tight text-[var(--gym-ink,#063434)] xl:text-[20px]">
+      <h2 className="mt-2 font-heading text-[18px] font-extrabold tracking-tight text-[var(--gym-ink,#111111)] xl:text-[20px]">
         {notice.subject[locale]}
       </h2>
       <p className="mt-3 text-[14px] leading-[1.7] text-[#5F6B6B]">{notice.detail[locale]}</p>
@@ -632,7 +632,7 @@ function NoticeDetail({
           <button
             type="button"
             onClick={() => onSend(notice.id)}
-            className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--gym-ink,#063434)] px-4 text-[13px] font-bold text-white"
+            className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-4 text-[13px] font-bold text-white"
           >
             <Send className="size-3.5" strokeWidth={2} />
             {notice.status === "failed" ? t("admin.reports.retry") : t("admin.reports.send")}
@@ -640,7 +640,7 @@ function NoticeDetail({
         ) : null}
         <Link
           to={href}
-          className="inline-flex h-10 items-center px-2 text-[13px] font-semibold text-[var(--gym-ink,#063434)]"
+          className="inline-flex h-10 items-center px-2 text-[13px] font-semibold text-[var(--gym-ink,#111111)]"
         >
           {t("admin.common.view")}
         </Link>
@@ -670,7 +670,7 @@ function PaneHead({
       )}
       <div className="flex items-center gap-3">
         {summary && aside ? (
-          <p className="text-[13px] font-medium text-[var(--gym-ink,#063434)]">{aside}</p>
+          <p className="text-[13px] font-medium text-[var(--gym-ink,#111111)]">{aside}</p>
         ) : null}
         <CsvButton show={Boolean(canExport && onExport)} onClick={onExport} />
       </div>
@@ -685,7 +685,7 @@ function CsvButton({ show, onClick }: { show?: boolean; onClick?: () => void }) 
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-8 items-center gap-1.5 text-[12px] font-semibold text-[#8c8c8c] hover:text-[var(--gym-ink,#063434)]"
+      className="inline-flex h-8 items-center gap-1.5 text-[12px] font-semibold text-[#8c8c8c] hover:text-[var(--gym-ink,#111111)]"
     >
       <Download className="size-3.5" strokeWidth={1.8} />
       {t("admin.reports.export.download")}
@@ -708,10 +708,10 @@ function RowLink({
         to={to}
         className="flex items-center gap-3 border-b border-black/[0.05] py-3.5 text-[13px] transition-colors hover:bg-black/[0.015]"
       >
-        <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[#F4F4F4] font-heading text-[11px] font-bold text-[var(--gym-ink,#063434)]">
+        <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[#F4F4F4] font-heading text-[11px] font-bold text-[var(--gym-ink,#111111)]">
           {initials(name)}
         </span>
-        <span className="min-w-0 flex-1 truncate font-semibold text-[var(--gym-ink,#063434)]">{name}</span>
+        <span className="min-w-0 flex-1 truncate font-semibold text-[var(--gym-ink,#111111)]">{name}</span>
         <span className="flex min-w-0 flex-col items-end gap-0.5 text-[12px] text-[#5F6B6B] sm:flex-row sm:items-center sm:gap-5 sm:text-[13px]">
           {children}
         </span>
@@ -725,7 +725,7 @@ function DeltaLine({ label, value, delta }: { label: string; value: string; delt
   return (
     <span className="inline-flex items-baseline gap-1.5">
       <span className="text-[#8c8c8c]">{label}</span>
-      <span className="font-medium text-[var(--gym-ink,#063434)]">{value}</span>
+      <span className="font-medium text-[var(--gym-ink,#111111)]">{value}</span>
       {delta ? (
         <span className={delta.startsWith("−") ? "text-[#C44536]" : "text-[#8c8c8c]"}>{delta}</span>
       ) : null}

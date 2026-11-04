@@ -87,7 +87,7 @@ export function AddProgressPhotoDialog({
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       {/* Overlay Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-black/50"
         onClick={onClose}
         aria-hidden
       />
@@ -96,17 +96,17 @@ export function AddProgressPhotoDialog({
       <div className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] bg-white p-5 sm:p-7 shadow-2xl">
         <div className="flex items-center justify-between border-b border-[#F0F0F0] pb-4">
           <div className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-2xl bg-[var(--gym-ink,#063434)] text-[var(--gym-lime,#b8fe22)]">
+            <span className="flex size-10 items-center justify-center rounded-2xl bg-[var(--gym-ink,#111111)] text-[var(--gym-lime,#fb5001)]">
               <Camera className="size-5" />
             </span>
             <div>
-              <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#063434)] sm:text-[20px]">
+              <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#111111)] sm:text-[20px]">
                 {isAr ? "إضافة صورة تقدم" : "Add Progress Photo"}
               </h2>
               {subscriberName ? (
                 <p className="text-[12px] font-bold text-[#8c8c8c]">
                   {isAr ? "المشترك: " : "Subscriber: "}
-                  <span className="text-[var(--gym-ink,#063434)]">{subscriberName}</span>
+                  <span className="text-[var(--gym-ink,#111111)]">{subscriberName}</span>
                 </p>
               ) : null}
             </div>
@@ -123,7 +123,7 @@ export function AddProgressPhotoDialog({
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           {/* Pose Selector Tabs */}
           <div>
-            <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+            <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
               {isAr ? "وضعية الصورة" : "Photo Pose"}
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -137,8 +137,8 @@ export function AddProgressPhotoDialog({
                     className={cn(
                       "flex h-11 flex-col items-center justify-center rounded-2xl text-[12px] font-bold transition",
                       active
-                        ? "bg-[var(--gym-ink,#063434)] text-white shadow-xs"
-                        : "bg-[#F4F4F4] text-[var(--gym-ink,#063434)] hover:bg-[#ececec]",
+                        ? "bg-[var(--gym-ink,#111111)] text-white shadow-xs"
+                        : "bg-[#F4F4F4] text-[var(--gym-ink,#111111)] hover:bg-[#ececec]",
                     )}
                   >
                     <span>{isAr ? item.labelAr : item.labelEn}</span>
@@ -150,7 +150,7 @@ export function AddProgressPhotoDialog({
 
           {/* Date Picker */}
           <div>
-            <label className="mb-1.5 flex items-center gap-1.5 text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+            <label className="mb-1.5 flex items-center gap-1.5 text-[12px] font-bold text-[var(--gym-ink,#111111)]">
               <Calendar className="size-3.5 text-[#8c8c8c]" />
               {isAr ? "تاريخ التقاط الصورة" : "Date Taken"}
             </label>
@@ -159,13 +159,13 @@ export function AddProgressPhotoDialog({
               required
               value={takenAt}
               onChange={(e) => setTakenAt(e.target.value)}
-              className="h-11 w-full rounded-2xl bg-[#F4F4F4] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#063434)] outline-none"
+              className="h-11 w-full rounded-2xl bg-[#F4F4F4] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none"
             />
           </div>
 
           {/* Photo Upload Area */}
           <div>
-            <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+            <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
               {isAr ? "ملف الصورة" : "Photo File"}
             </label>
 
@@ -178,7 +178,7 @@ export function AddProgressPhotoDialog({
             />
 
             {previewUrl ? (
-              <div className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-2xl border border-black/10 bg-[var(--gym-ink,#063434)]">
+              <div className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-2xl border border-black/10 bg-[var(--gym-ink,#111111)]">
                 <img
                   src={previewUrl}
                   alt="Progress preview"
@@ -196,10 +196,10 @@ export function AddProgressPhotoDialog({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex aspect-[16/9] w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#D9D9D9] bg-[#F9F9F9] p-4 text-center transition hover:border-[var(--gym-ink,#063434)] hover:bg-[#F4F4F4]"
+                className="flex aspect-[16/9] w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#D9D9D9] bg-[#F9F9F9] p-4 text-center transition hover:border-[var(--gym-ink,#111111)] hover:bg-[#F4F4F4]"
               >
                 <Upload className="size-6 text-[#8c8c8c]" />
-                <p className="mt-2 text-[13px] font-bold text-[var(--gym-ink,#063434)]">
+                <p className="mt-2 text-[13px] font-bold text-[var(--gym-ink,#111111)]">
                   {isAr ? "اضغط لاختيار صورة من جهازك" : "Click to select a photo"}
                 </p>
                 <p className="mt-0.5 text-[11px] text-[#8c8c8c]">
@@ -211,7 +211,7 @@ export function AddProgressPhotoDialog({
 
           {/* Caption / Notes */}
           <div>
-            <label className="mb-1 block text-[12px] font-bold text-[var(--gym-ink,#063434)]">
+            <label className="mb-1 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
               {isAr ? "ملاحظات أو تعليق" : "Caption or Notes (Optional)"}
             </label>
             <input
@@ -219,7 +219,7 @@ export function AddProgressPhotoDialog({
               placeholder={isAr ? "مثال: بعد انتهاء الأسبوع الرابع..." : "e.g. End of 4th week..."}
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
-              className="h-11 w-full rounded-2xl bg-[#F4F4F4] px-3.5 text-[13px] font-medium text-[var(--gym-ink,#063434)] outline-none"
+              className="h-11 w-full rounded-2xl bg-[#F4F4F4] px-3.5 text-[13px] font-medium text-[var(--gym-ink,#111111)] outline-none"
             />
           </div>
 
@@ -236,7 +236,7 @@ export function AddProgressPhotoDialog({
             <button
               type="submit"
               disabled={saving || !previewUrl}
-              className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] px-6 text-[13px] font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
+              className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] px-6 text-[13px] font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
             >
               {saving ? (isAr ? "جاري الحفظ..." : "Saving...") : (isAr ? "حفظ الصورة" : "Save Photo")}
             </button>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+﻿import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import {
   Check,
@@ -388,11 +388,11 @@ export function WorkoutProgramFormDialog({
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-[#F0F0F0] px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-2xl bg-[var(--gym-ink,#063434)] text-white">
+            <div className="flex size-10 items-center justify-center rounded-2xl bg-[var(--gym-ink,#111111)] text-white">
               <Dumbbell className="size-5" />
             </div>
             <div>
-              <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#063434)]">
+              <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#111111)]">
                 {mode.type === "create-template"
                   ? isAr
                     ? "إنشاء قالب تدريب جديد"
@@ -430,7 +430,7 @@ export function WorkoutProgramFormDialog({
                 className={cn(
                   "rounded-full px-3 py-1 transition",
                   activeLangTab === "ar"
-                    ? "bg-[var(--gym-ink,#063434)] text-white shadow-sm"
+                    ? "bg-[var(--gym-ink,#111111)] text-white shadow-sm"
                     : "text-[#8c8c8c] hover:text-black",
                 )}
               >
@@ -442,7 +442,7 @@ export function WorkoutProgramFormDialog({
                 className={cn(
                   "rounded-full px-3 py-1 transition",
                   activeLangTab === "en"
-                    ? "bg-[var(--gym-ink,#063434)] text-white shadow-sm"
+                    ? "bg-[var(--gym-ink,#111111)] text-white shadow-sm"
                     : "text-[#8c8c8c] hover:text-black",
                 )}
               >
@@ -482,7 +482,7 @@ export function WorkoutProgramFormDialog({
                         disabled={mode.type === "edit-assignment"}
                         value={selectedSubscriberId}
                         onChange={(e) => setSelectedSubscriberId(e.target.value)}
-                        className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#063434)] outline-none focus:border-black appearance-none pe-8"
+                        className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#111111)] outline-none focus:border-black appearance-none pe-8"
                       >
                         <option value="">{isAr ? "اختر مشترك..." : "Select subscriber..."}</option>
                         {subscribers.map((sub) => (
@@ -504,7 +504,7 @@ export function WorkoutProgramFormDialog({
                         <select
                           value={selectedTemplateId}
                           onChange={(e) => handleTemplatePickerChange(e.target.value)}
-                          className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#063434)] outline-none focus:border-black appearance-none pe-8"
+                          className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#111111)] outline-none focus:border-black appearance-none pe-8"
                         >
                           <option value="">{isAr ? "إنشاء برنامج فارغ مخصص" : "Start from blank custom"}</option>
                           {templates.map((tpl) => (
@@ -526,9 +526,9 @@ export function WorkoutProgramFormDialog({
                           type="checkbox"
                           checked={createNewVersion}
                           onChange={(e) => setCreateNewVersion(e.target.checked)}
-                          className="size-4 rounded accent-[var(--gym-ink,#063434)]"
+                          className="size-4 rounded accent-[var(--gym-ink,#111111)]"
                         />
-                        <span className="text-[13px] font-bold text-[var(--gym-ink,#063434)]">
+                        <span className="text-[13px] font-bold text-[var(--gym-ink,#111111)]">
                           {isAr
                             ? `إنشاء إصدار جديد (v${(mode.program.version || 1) + 1}) وحفظ السجل الحالي`
                             : `Bump to new version (v${(mode.program.version || 1) + 1}) & retain history`}
@@ -543,7 +543,7 @@ export function WorkoutProgramFormDialog({
                   <div className="flex items-center justify-between text-[12px] pt-1 border-t border-[#ECECEC]">
                     <span className="text-[#8c8c8c]">
                       {isAr ? "حالة الاشتراك:" : "Subscription status:"}{" "}
-                      <strong className="text-[var(--gym-ink,#063434)]">
+                      <strong className="text-[var(--gym-ink,#111111)]">
                         {subActiveSubscription?.status ?? (isAr ? "بدون اشتراك نشط" : "No active plan")}
                       </strong>
                     </span>
@@ -580,7 +580,7 @@ export function WorkoutProgramFormDialog({
                     value={titleAr}
                     onChange={(e) => setTitleAr(e.target.value)}
                     placeholder="مثال: تضخم عضلي 4 أيام"
-                    className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#063434)] outline-none focus:border-black"
+                    className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#111111)] outline-none focus:border-black"
                   />
                 ) : (
                   <input
@@ -588,7 +588,7 @@ export function WorkoutProgramFormDialog({
                     value={titleEn}
                     onChange={(e) => setTitleEn(e.target.value)}
                     placeholder="e.g. Hypertrophy 4-day Block"
-                    className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#063434)] outline-none focus:border-black"
+                    className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#111111)] outline-none focus:border-black"
                   />
                 )}
               </div>
@@ -604,7 +604,7 @@ export function WorkoutProgramFormDialog({
                     className={cn(
                       "flex h-10 items-center justify-center gap-2 rounded-xl border text-[13px] font-bold transition",
                       format === "interactive"
-                        ? "border-[var(--gym-ink,#063434)] bg-[var(--gym-ink,#063434)] text-white"
+                        ? "border-[var(--gym-ink,#111111)] bg-[var(--gym-ink,#111111)] text-white"
                         : "border-[#E0E0E0] bg-white text-[#8c8c8c] hover:bg-black/5",
                     )}
                   >
@@ -617,7 +617,7 @@ export function WorkoutProgramFormDialog({
                     className={cn(
                       "flex h-10 items-center justify-center gap-2 rounded-xl border text-[13px] font-bold transition",
                       format === "pdf"
-                        ? "border-[var(--gym-ink,#063434)] bg-[var(--gym-ink,#063434)] text-white"
+                        ? "border-[var(--gym-ink,#111111)] bg-[var(--gym-ink,#111111)] text-white"
                         : "border-[#E0E0E0] bg-white text-[#8c8c8c] hover:bg-black/5",
                     )}
                   >
@@ -639,7 +639,7 @@ export function WorkoutProgramFormDialog({
                   value={descAr}
                   onChange={(e) => setDescAr(e.target.value)}
                   placeholder="تعليمات البرنامج، وتيرة التدريب، والإحماء..."
-                  className="w-full rounded-xl border border-[#E0E0E0] bg-white p-2.5 text-[13px] text-[var(--gym-ink,#063434)] outline-none focus:border-black"
+                  className="w-full rounded-xl border border-[#E0E0E0] bg-white p-2.5 text-[13px] text-[var(--gym-ink,#111111)] outline-none focus:border-black"
                 />
               ) : (
                 <textarea
@@ -647,7 +647,7 @@ export function WorkoutProgramFormDialog({
                   value={descEn}
                   onChange={(e) => setDescEn(e.target.value)}
                   placeholder="Program overview, progression rules, and warm-up notes..."
-                  className="w-full rounded-xl border border-[#E0E0E0] bg-white p-2.5 text-[13px] text-[var(--gym-ink,#063434)] outline-none focus:border-black"
+                  className="w-full rounded-xl border border-[#E0E0E0] bg-white p-2.5 text-[13px] text-[var(--gym-ink,#111111)] outline-none focus:border-black"
                 />
               )}
             </div>
@@ -655,7 +655,7 @@ export function WorkoutProgramFormDialog({
             {/* If format is PDF: Content library PDF Picker */}
             {format === "pdf" ? (
               <div className="rounded-2xl bg-[#F8F9FA] p-4 border border-[#EBEBEB] space-y-3">
-                <div className="flex items-center gap-2 text-[14px] font-bold text-[var(--gym-ink,#063434)]">
+                <div className="flex items-center gap-2 text-[14px] font-bold text-[var(--gym-ink,#111111)]">
                   <FileText className="size-4" />
                   {isAr ? "ربط مستند PDF من مكتبة المحتوى" : "Attach PDF from Content Library"}
                 </div>
@@ -675,7 +675,7 @@ export function WorkoutProgramFormDialog({
                             setPdfNameAr(asset.title.ar)
                           }
                         }}
-                        className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#063434)] outline-none focus:border-black appearance-none pe-8"
+                        className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#111111)] outline-none focus:border-black appearance-none pe-8"
                       >
                         <option value="">{isAr ? "ملف خارجي / يدوي" : "Custom / External file"}</option>
                         {pdfAssets.map((asset) => (
@@ -700,7 +700,7 @@ export function WorkoutProgramFormDialog({
                           : setPdfNameEn(e.target.value)
                       }
                       placeholder="e.g. Travel_Workouts_Guide.pdf"
-                      className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#063434)] outline-none focus:border-black"
+                      className="h-10 w-full rounded-xl border border-[#E0E0E0] bg-white px-3 text-[13px] font-semibold text-[var(--gym-ink,#111111)] outline-none focus:border-black"
                     />
                   </div>
                 </div>
@@ -709,7 +709,7 @@ export function WorkoutProgramFormDialog({
               /* If format is Interactive: Days & Exercises Manager */
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-[14px] font-extrabold text-[var(--gym-ink,#063434)]">
+                  <span className="text-[14px] font-extrabold text-[var(--gym-ink,#111111)]">
                     {isAr ? "جدول أيام التمارين الأسبوعي" : "Weekly Training Schedule"}
                   </span>
                   <button
@@ -744,8 +744,8 @@ export function WorkoutProgramFormDialog({
                         className={cn(
                           "flex flex-col items-center justify-center rounded-2xl py-2 px-1 text-center transition",
                           active
-                            ? "bg-[var(--gym-ink,#063434)] text-white shadow-sm"
-                            : "bg-[#F4F4F4] text-[var(--gym-ink,#063434)] hover:bg-[#EBEBEB]",
+                            ? "bg-[var(--gym-ink,#111111)] text-white shadow-sm"
+                            : "bg-[#F4F4F4] text-[var(--gym-ink,#111111)] hover:bg-[#EBEBEB]",
                         )}
                       >
                         <span className="text-[11px] font-extrabold">
@@ -776,7 +776,7 @@ export function WorkoutProgramFormDialog({
                 <div className="rounded-2xl border border-[#EBEBEB] bg-[#FAFAFA] p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="font-heading text-[15px] font-extrabold text-[var(--gym-ink,#063434)]">
+                      <h4 className="font-heading text-[15px] font-extrabold text-[var(--gym-ink,#111111)]">
                         {isAr ? WEEKDAY_NAMES_AR[selectedWeekday] : WEEKDAY_NAMES_EN[selectedWeekday]}
                       </h4>
                       <p className="text-[12px] font-medium text-[#8c8c8c]">
@@ -794,7 +794,7 @@ export function WorkoutProgramFormDialog({
                       <button
                         type="button"
                         onClick={addExerciseToCurrentDay}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-[var(--gym-ink,#063434)] px-3.5 py-1.5 text-[12px] font-bold text-white transition hover:opacity-95"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-[var(--gym-ink,#111111)] px-3.5 py-1.5 text-[12px] font-bold text-white transition hover:opacity-95"
                       >
                         <Plus className="size-3.5" />
                         {isAr ? "إضافة تمرين" : "Add exercise"}
@@ -810,7 +810,7 @@ export function WorkoutProgramFormDialog({
                         <button
                           type="button"
                           onClick={addExerciseToCurrentDay}
-                          className="mt-2 text-[12px] font-bold text-[var(--gym-ink,#063434)] underline"
+                          className="mt-2 text-[12px] font-bold text-[var(--gym-ink,#111111)] underline"
                         >
                           {isAr ? "+ إضافة أول تمرين" : "+ Add first exercise"}
                         </button>
@@ -849,7 +849,7 @@ export function WorkoutProgramFormDialog({
                               className="rounded-2xl border border-[#E5E5E5] bg-white p-4 shadow-sm space-y-3"
                             >
                               <div className="flex items-center justify-between gap-2">
-                                <span className="flex size-6 items-center justify-center rounded-full bg-[var(--gym-ink,#063434)] text-[11px] font-extrabold text-white">
+                                <span className="flex size-6 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] text-[11px] font-extrabold text-white">
                                   {idx + 1}
                                 </span>
                                 <input
@@ -867,7 +867,7 @@ export function WorkoutProgramFormDialog({
                                     })
                                   }}
                                   placeholder={isAr ? "اسم التمرين (مثال: ضغط بنش)" : "Exercise name (e.g. Barbell Bench Press)"}
-                                  className="h-9 flex-1 rounded-xl border border-[#E0E0E0] px-3 text-[13px] font-bold text-[var(--gym-ink,#063434)] outline-none focus:border-black"
+                                  className="h-9 flex-1 rounded-xl border border-[#E0E0E0] px-3 text-[13px] font-bold text-[var(--gym-ink,#111111)] outline-none focus:border-black"
                                 />
 
                                 <button
@@ -897,7 +897,7 @@ export function WorkoutProgramFormDialog({
                                         parseInt(e.target.value, 10) || 3,
                                       )
                                     }
-                                    className="h-8 w-full rounded-lg border border-[#E0E0E0] px-2 text-center text-[12px] font-bold text-[var(--gym-ink,#063434)]"
+                                    className="h-8 w-full rounded-lg border border-[#E0E0E0] px-2 text-center text-[12px] font-bold text-[var(--gym-ink,#111111)]"
                                   />
                                 </div>
 
@@ -911,7 +911,7 @@ export function WorkoutProgramFormDialog({
                                       updateExercise(ex.id, "reps", e.target.value)
                                     }
                                     placeholder="e.g. 8-10"
-                                    className="h-8 w-full rounded-lg border border-[#E0E0E0] px-2 text-center text-[12px] font-bold text-[var(--gym-ink,#063434)]"
+                                    className="h-8 w-full rounded-lg border border-[#E0E0E0] px-2 text-center text-[12px] font-bold text-[var(--gym-ink,#111111)]"
                                   />
                                 </div>
 
@@ -928,7 +928,7 @@ export function WorkoutProgramFormDialog({
                                         parseInt(e.target.value, 10),
                                       )
                                     }
-                                    className="h-8 w-full rounded-lg border border-[#E0E0E0] px-1 text-center text-[12px] font-bold text-[var(--gym-ink,#063434)]"
+                                    className="h-8 w-full rounded-lg border border-[#E0E0E0] px-1 text-center text-[12px] font-bold text-[var(--gym-ink,#111111)]"
                                   >
                                     <option value={30}>30s</option>
                                     <option value={45}>45s</option>
@@ -959,7 +959,7 @@ export function WorkoutProgramFormDialog({
                                           e.target.value || undefined,
                                         )
                                       }
-                                      className="h-8 w-full rounded-lg border border-[#E0E0E0] bg-white px-2 text-[12px] font-semibold text-[var(--gym-ink,#063434)] outline-none appearance-none pe-7"
+                                      className="h-8 w-full rounded-lg border border-[#E0E0E0] bg-white px-2 text-[12px] font-semibold text-[var(--gym-ink,#111111)] outline-none appearance-none pe-7"
                                     >
                                       <option value="">
                                         {isAr ? "بدون فيديو تعليمي" : "No video linked"}
@@ -977,7 +977,7 @@ export function WorkoutProgramFormDialog({
                                     <button
                                       type="button"
                                       onClick={() => setPreviewVideo(linkedVideo)}
-                                      className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--gym-ink,#063434)] text-white hover:opacity-90"
+                                      className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--gym-ink,#111111)] text-white hover:opacity-90"
                                       title={isAr ? "مشاهدة الفيديو" : "Preview video"}
                                     >
                                       <Play className="size-3.5 fill-current" />
@@ -1002,7 +1002,7 @@ export function WorkoutProgramFormDialog({
                                     })
                                   }}
                                   placeholder={isAr ? "إرشادات الأداء والحركة..." : "Form cues / technique notes..."}
-                                  className="h-8 w-full rounded-lg border border-[#E0E0E0] px-2 text-[11px] text-[var(--gym-ink,#063434)] outline-none focus:border-black"
+                                  className="h-8 w-full rounded-lg border border-[#E0E0E0] px-2 text-[11px] text-[var(--gym-ink,#111111)] outline-none focus:border-black"
                                 />
 
                                 <input
@@ -1046,7 +1046,7 @@ export function WorkoutProgramFormDialog({
             <button
               type="submit"
               disabled={busy}
-              className="inline-flex items-center gap-2 rounded-full bg-[var(--gym-ink,#063434)] px-6 py-2.5 text-[13px] font-bold text-white transition hover:opacity-95 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-6 py-2.5 text-[13px] font-bold text-white transition hover:opacity-95 disabled:opacity-50"
             >
               {busy ? (
                 <span>{isAr ? "جاري الحفظ..." : "Saving..."}</span>
