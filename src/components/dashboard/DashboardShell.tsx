@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar"
 import { DashboardTopbar } from "@/components/dashboard/DashboardTopbar"
 import { LogoutConfirmDialog } from "@/components/dashboard/LogoutConfirmDialog"
+import { FullPageSpinner } from "@/components/feedback/FullPageSpinner"
 import { flattenNavItems, type NavItem } from "@/config/navigation"
 import { useAuth } from "@/features/auth/auth-context"
 import { firebaseAuthErrorKey } from "@/features/auth/errors"
@@ -143,7 +144,9 @@ export function DashboardShell({ area, items, homeTo }: DashboardShellProps) {
           ref={mainRef}
           className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-6 pt-3 sm:px-6 sm:pb-8 lg:px-7 lg:pb-10"
         >
-          <Outlet />
+          <Suspense fallback={<FullPageSpinner />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
 

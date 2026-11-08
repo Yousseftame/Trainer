@@ -281,17 +281,20 @@ export function TableAction({
   label,
   onClick,
   tone = "default",
+  disabled = false,
 }: {
   label: string
   onClick?: () => void
   tone?: "default" | "danger" | "primary"
+  disabled?: boolean
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={cn(
-        "inline-flex h-8 items-center whitespace-nowrap rounded-full px-3 text-xs font-bold transition-colors duration-200",
+        "inline-flex h-8 items-center whitespace-nowrap rounded-full px-3 text-xs font-bold transition-colors duration-200 disabled:pointer-events-none disabled:opacity-45",
         tone === "danger"
           ? "text-[#FF6A55] hover:bg-[#FFE8E4]"
           : tone === "primary"

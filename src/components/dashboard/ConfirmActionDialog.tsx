@@ -87,7 +87,7 @@ export function ConfirmActionDialog({
         <motion.div
           key="confirm-action-overlay"
           dir={isRtl ? "rtl" : "ltr"}
-          className="fixed inset-0 z-[120] flex items-center justify-center p-4"
+          className="fixed inset-0 z-[130] flex items-center justify-center p-4"
           style={{
             fontFamily:
               'var(--font-arabic, "Cairo Variable", "Cairo", sans-serif)',

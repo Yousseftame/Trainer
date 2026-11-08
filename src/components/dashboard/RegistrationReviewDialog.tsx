@@ -1,7 +1,15 @@
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
-import { Check, CircleCheck, CircleX, UserPlus, X } from "lucide-react"
-import type { DemoRegistrationRequest } from "@/features/subscribers/requests-demo"
+import {
+  Check,
+  CircleCheck,
+  CircleX,
+  Eye,
+  EyeOff,
+  UserPlus,
+  X,
+} from "lucide-react"
+import type { RegistrationRequest } from "@/features/subscribers"
 import type {
   CreateRegistrationRequestInput,
   ReviewRegistrationRequestInput,
@@ -14,7 +22,7 @@ import { cn } from "@/lib/utils"
 export type RegistrationDialogState =
   | {
       mode: "approve" | "reject"
-      request: DemoRegistrationRequest
+      request: RegistrationRequest
     }
   | {
       mode: "create"
@@ -66,6 +74,8 @@ export function RegistrationReviewDialog({
   const [endsDate, setEndsDate] = useState("")
   const [reviewNotesAr, setReviewNotesAr] = useState("")
   const [reviewNotesEn, setReviewNotesEn] = useState("")
+  const [accountPassword, setAccountPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
 
   // Manual create state
   const [nameAr, setNameAr] = useState("")
@@ -80,6 +90,7 @@ export function RegistrationReviewDialog({
   useEffect(() => {
     if (!state) return
     setError(null)
+    setShowPassword(false)
     if (state.mode === "approve" || state.mode === "reject") {
       const req = state.request
       const defaultPkg =
@@ -98,6 +109,7 @@ export function RegistrationReviewDialog({
       )
       setReviewNotesAr(req.reviewNotesLocalized?.ar ?? req.reviewNotes ?? "")
       setReviewNotesEn(req.reviewNotesLocalized?.en ?? req.reviewNotes ?? "")
+      setAccountPassword("")
     } else {
       const defaultPkg =
         packages.find((p) => p.isActive && p.featured) ??
@@ -111,8 +123,18 @@ export function RegistrationReviewDialog({
       setPackageId(defaultPkg?.id ?? "")
       setGoalAr("")
       setGoalEn("")
+      setAccountPassword("")
     }
   }, [state, packages])
+
+  useEffect(() => {
+    if (!state) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && !busy) onClose()
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [state, busy, onClose])
 
   if (!state) return null
 
@@ -134,7 +156,7 @@ export function RegistrationReviewDialog({
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
-    if (!state) return
+    if (!state || busy) return
 
     if (state.mode === "create") {
       const primaryName = (nameAr.trim() || nameEn.trim()).trim()
@@ -147,8 +169,19 @@ export function RegistrationReviewDialog({
         )
         return
       }
+      if (!email.includes("@")) {
+        setError(
+          isAr
+            ? "يرجى إدخال بريد إلكتروني صحيح."
+            : "Please enter a valid email address.",
+        )
+        return
+      }
+      setError(null)
       await onCreate({
-        displayName: isAr ? nameAr.trim() || primaryName : nameEn.trim() || primaryName,
+        displayName: isAr
+          ? nameAr.trim() || primaryName
+          : nameEn.trim() || primaryName,
         name: {
           ar: nameAr.trim() || primaryName,
           en: nameEn.trim() || primaryName,
@@ -168,8 +201,39 @@ export function RegistrationReviewDialog({
 
     const trimmedAr = reviewNotesAr.trim()
     const trimmedEn = reviewNotesEn.trim()
-    const primaryReview = (isAr ? trimmedAr || trimmedEn : trimmedEn || trimmedAr) || undefined
+    const primaryReview =
+      (isAr ? trimmedAr || trimmedEn : trimmedEn || trimmedAr) || undefined
 
+    if (state.mode === "reject" && !trimmedAr && !trimmedEn) {
+      setError(
+        isAr
+          ? "يرجى كتابة سبب الرفض قبل التأكيد."
+          : "Please add a rejection reason before confirming.",
+      )
+      return
+    }
+
+    if (state.mode === "approve") {
+      const pwd = accountPassword.trim()
+      if (!pwd || pwd.length < 6) {
+        setError(
+          isAr
+            ? "كلمة مرور الحساب مطلوبة (6 أحرف على الأقل)."
+            : "Account password is required (min 6 characters).",
+        )
+        return
+      }
+      if (assignPackage && !packageId) {
+        setError(
+          isAr
+            ? "يرجى اختيار باقة الاشتراك أو إلغاء التعيين."
+            : "Choose a package or turn off package assignment.",
+        )
+        return
+      }
+    }
+
+    setError(null)
     await onReview({
       requestId: state.request.id,
       decision: state.mode === "approve" ? "approved" : "rejected",
@@ -191,6 +255,8 @@ export function RegistrationReviewDialog({
           : null,
       endsAt:
         subscriptionStatus === "active" ? fromDateInputValue(endsDate) : null,
+      password:
+        state.mode === "approve" ? accountPassword.trim() : undefined,
     })
   }
 
@@ -198,10 +264,16 @@ export function RegistrationReviewDialog({
   const isReject = state.mode === "reject"
 
   return createPortal(
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/55 p-3 backdrop-blur-[2px] sm:p-5">
+    <div
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/55 p-3 backdrop-blur-[2px] sm:p-5"
+      onClick={() => {
+        if (!busy) onClose()
+      }}
+    >
       <div
         role="dialog"
         aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
         className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl"
       >
         <div className="flex items-center justify-between border-b border-black/8 px-6 py-4 sm:px-7">
@@ -254,7 +326,8 @@ export function RegistrationReviewDialog({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex size-9 items-center justify-center rounded-full bg-[#F4F4F4] text-[#6B7280] transition hover:bg-black/10"
+            disabled={busy}
+            className="inline-flex size-9 items-center justify-center rounded-full bg-[#F4F4F4] text-[#6B7280] transition hover:bg-black/10 disabled:opacity-50"
           >
             <X className="size-4" strokeWidth={2} />
           </button>
@@ -411,6 +484,53 @@ export function RegistrationReviewDialog({
 
               {isApprove ? (
                 <div className="rounded-2xl border border-black/8 bg-[#FAFAFA] p-4">
+                  <label className="mb-4 flex flex-col gap-1.5">
+                    <span className="text-[13px] font-extrabold text-[var(--gym-ink,#111111)]">
+                      {isAr
+                        ? "كلمة مرور حساب المشترك (Auth) *"
+                        : "Subscriber login password (Auth) *"}
+                    </span>
+                    <span className="text-[12px] font-medium text-[#8c8c8c]">
+                      {isAr
+                        ? "يُنشأ حساب Firebase Auth حقيقي عند الموافقة (6 أحرف على الأقل)."
+                        : "A real Firebase Auth account is created on approval (min 6 characters)."}
+                    </span>
+                    <div className="relative mt-1" dir="ltr">
+                      <input
+                        dir="ltr"
+                        type={showPassword ? "text" : "password"}
+                        value={accountPassword}
+                        onChange={(e) => setAccountPassword(e.target.value)}
+                        placeholder="Member@123456"
+                        minLength={6}
+                        disabled={busy}
+                        autoComplete="new-password"
+                        className="h-10 w-full rounded-xl bg-white py-0 pl-3 pr-10 text-[13px] font-semibold text-[var(--gym-ink,#111111)] outline-none ring-1 ring-black/8 disabled:opacity-70"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((v) => !v)}
+                        disabled={busy}
+                        aria-label={
+                          showPassword
+                            ? isAr
+                              ? "إخفاء كلمة المرور"
+                              : "Hide password"
+                            : isAr
+                              ? "إظهار كلمة المرور"
+                              : "Show password"
+                        }
+                        className="absolute inset-y-0 right-2.5 z-10 flex items-center text-[#8c8c8c] transition hover:text-[var(--gym-ink,#111111)] disabled:opacity-50"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="size-4" strokeWidth={2} />
+                        ) : (
+                          <Eye className="size-4" strokeWidth={2} />
+                        )}
+                      </button>
+                    </div>
+                  </label>
+
                   <label className="flex cursor-pointer items-center justify-between gap-3">
                     <div>
                       <span className="block text-[13px] font-extrabold text-[var(--gym-ink,#111111)]">

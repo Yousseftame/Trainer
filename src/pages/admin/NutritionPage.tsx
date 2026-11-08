@@ -30,19 +30,20 @@ import { ProgramLogsDialog } from "@/components/dashboard/ProgramLogsDialog"
 import { FilterChip, StatCard } from "@/components/dashboard/StatCard"
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
 import {
-  NUTRITION_DISCLAIMER,
-  dayMacros,
-  mealCount,
-  resolveBilingualText,
-} from "@/features/nutrition/demo"
-import {
   useArchiveNutritionMutation,
   useAssignNutritionMutation,
   useDeleteNutritionMutation,
   useNutritionLogsQuery,
   useNutritionProgramsQuery,
+  useRestoreNutritionMutation,
   useSaveNutritionProgramMutation,
 } from "@/features/nutrition/hooks"
+import {
+  NUTRITION_DISCLAIMER,
+  dayMacros,
+  mealCount,
+  resolveBilingualText,
+} from "@/lib/program-text"
 import { useSubscribersQuery } from "@/features/subscribers/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
@@ -96,15 +97,27 @@ export function NutritionPage() {
     onConfirm: () => Promise<void> | void
   } | null>(null)
 
-  // React Query Hooks
-  const { data: allPrograms = [] } = useNutritionProgramsQuery()
+  const {
+    data: allPrograms = [],
+    isLoading: programsLoading,
+    isError: programsError,
+    refetch: refetchPrograms,
+  } = useNutritionProgramsQuery()
   const { data: subscribers = [] } = useSubscribersQuery()
   const { data: allLogs = [] } = useNutritionLogsQuery()
 
   const saveMutation = useSaveNutritionProgramMutation()
   const assignMutation = useAssignNutritionMutation()
   const archiveMutation = useArchiveNutritionMutation()
+  const restoreMutation = useRestoreNutritionMutation()
   const deleteMutation = useDeleteNutritionMutation()
+
+  const actionsBusy =
+    saveMutation.isPending ||
+    assignMutation.isPending ||
+    archiveMutation.isPending ||
+    restoreMutation.isPending ||
+    deleteMutation.isPending
 
   // Filtered List
   const list = useMemo(() => {
@@ -150,30 +163,69 @@ export function NutritionPage() {
     setWeekday(program.days[0]?.weekday ?? 0)
   }
 
-  async function handleArchiveToggle(program: NutritionProgram) {
-    if (program.status === "active") {
-      await archiveMutation.mutateAsync(program.id)
-      appToast.success(
-        isAr ? "تم نقل الخطة الغذائية إلى الأرشيف" : "Plan moved to history archive",
-      )
-    } else if (program.status === "archived") {
-      await saveMutation.mutateAsync({
-        ...program,
-        status: "active",
-      })
-      appToast.success(
-        isAr ? "تمت استعادة الخطة إلى الحالة النشطة" : "Plan restored to active",
-      )
-    }
+  function handleArchiveToggle(program: NutritionProgram) {
+    if (actionsBusy) return
+    const isRestore = program.status === "archived"
+    const name = program.title[locale]
+
+    setConfirmDialog({
+      open: true,
+      title: isRestore
+        ? isAr
+          ? "استعادة خطة التغذية"
+          : "Restore nutrition plan"
+        : isAr
+          ? "أرشفة خطة التغذية"
+          : "Archive nutrition plan",
+      description: isRestore
+        ? isAr
+          ? `استعادة "${name}"؟${
+              program.subscriberId
+                ? " سيتم أرشفة أي خطة نشطة أخرى لنفس المشترك."
+                : " ستعود كقالب قابل لإعادة الاستخدام."
+            }`
+          : `Restore "${name}"?${
+              program.subscriberId
+                ? " Any other active plan for this subscriber will be archived."
+                : " It will return as a reusable template."
+            }`
+        : isAr
+          ? `أرشفة "${name}"؟ يبقى السجل التاريخي والالتزام محفوظين.`
+          : `Archive "${name}"? History and adherence logs are kept.`,
+      confirmLabel: isRestore
+        ? isAr
+          ? "استعادة"
+          : "Restore"
+        : isAr
+          ? "تأكيد الأرشفة"
+          : "Archive",
+      tone: isRestore ? "primary" : "warning",
+      onConfirm: async () => {
+        if (isRestore) {
+          await restoreMutation.mutateAsync(program.id)
+          appToast.success(
+            isAr ? "تمت استعادة الخطة" : "Nutrition plan restored",
+          )
+        } else {
+          await archiveMutation.mutateAsync(program.id)
+          appToast.success(
+            isAr
+              ? "تم نقل الخطة الغذائية إلى الأرشيف"
+              : "Plan moved to history archive",
+          )
+        }
+      },
+    })
   }
 
   function handleDelete(program: NutritionProgram) {
+    if (actionsBusy) return
     setConfirmDialog({
       open: true,
       title: isAr ? "حذف خطة التغذية" : "Delete Nutrition Plan",
       description: isAr
-        ? `هل أنت متأكد من حذف "${program.title[locale]}" نهائياً؟ هذا الإجراء لا يمكن التراجع عنه.`
-        : `Are you sure you want to permanently delete "${program.title[locale]}"? This action cannot be undone.`,
+        ? `حذف نهائي لـ "${program.title[locale]}"؟ لا يمكن التراجع. سجلات الالتزام تبقى إن وُجدت.`
+        : `Permanently delete "${program.title[locale]}"? This cannot be undone. Adherence logs remain.`,
       confirmLabel: isAr ? "تأكيد الحذف" : "Delete Plan",
       tone: "danger",
       onConfirm: async () => {
@@ -260,13 +312,15 @@ export function NutritionPage() {
               {scope === "template" ? (
                 <button
                   type="button"
-                  onClick={() =>
+                  disabled={actionsBusy}
+                  onClick={() => {
+                    if (actionsBusy) return
                     setFormModal({
                       open: true,
                       mode: { type: "create-template" },
                     })
-                  }
-                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
+                  }}
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95 disabled:opacity-60"
                 >
                   <Plus className="size-4" strokeWidth={2} />
                   {t("admin.nutrition.newTemplate")}
@@ -274,13 +328,15 @@ export function NutritionPage() {
               ) : (
                 <button
                   type="button"
-                  onClick={() =>
+                  disabled={actionsBusy}
+                  onClick={() => {
+                    if (actionsBusy) return
                     setFormModal({
                       open: true,
                       mode: { type: "assign" },
                     })
-                  }
-                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
+                  }}
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95 disabled:opacity-60"
                 >
                   <UserPlus className="size-4" strokeWidth={2} />
                   {t("admin.nutrition.assign")}
@@ -299,7 +355,26 @@ export function NutritionPage() {
           </div>
         </div>
 
-        {list.length === 0 || !selected ? (
+        {programsError ? (
+          <div className="mt-5 flex min-h-40 flex-col items-center justify-center gap-3 rounded-[20px] bg-[#F4F4F4] px-4 py-10 text-center">
+            <p className="text-sm font-medium text-[#8c8c8c]">
+              {isAr
+                ? "تعذر تحميل خطط التغذية. حاول مرة أخرى."
+                : "Could not load nutrition plans. Please try again."}
+            </p>
+            <button
+              type="button"
+              onClick={() => void refetchPrograms()}
+              className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white"
+            >
+              {isAr ? "إعادة المحاولة" : "Retry"}
+            </button>
+          </div>
+        ) : programsLoading ? (
+          <div className="mt-5 flex min-h-40 items-center justify-center rounded-[20px] bg-[#F4F4F4] text-sm font-medium text-[#8c8c8c]">
+            {isAr ? "جاري تحميل الخطط…" : "Loading nutrition plans…"}
+          </div>
+        ) : list.length === 0 || !selected ? (
           <div className="mt-5 flex min-h-40 items-center justify-center rounded-[20px] bg-[#F4F4F4] text-sm font-medium text-[#8c8c8c]">
             {t("admin.nutrition.empty")}
           </div>
@@ -409,7 +484,9 @@ export function NutritionPage() {
                   {/* Edit button */}
                   <button
                     type="button"
-                    onClick={() =>
+                    disabled={actionsBusy}
+                    onClick={() => {
+                      if (actionsBusy) return
                       setFormModal({
                         open: true,
                         mode:
@@ -417,8 +494,8 @@ export function NutritionPage() {
                             ? { type: "edit-template", program: selected }
                             : { type: "edit-assignment", program: selected },
                       })
-                    }
-                    className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5"
+                    }}
+                    className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5 disabled:opacity-60"
                     title={isAr ? "تعديل الخطة" : "Edit plan"}
                   >
                     <Pencil className="size-4" />
@@ -428,13 +505,14 @@ export function NutritionPage() {
                   {selected.subscriberId ? (
                     <button
                       type="button"
+                      disabled={actionsBusy}
                       onClick={() =>
                         setHistoryModal({
                           open: true,
                           program: selected,
                         })
                       }
-                      className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5"
+                      className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5 disabled:opacity-60"
                       title={isAr ? "سجل الإصدارات السابقة" : "Version history"}
                     >
                       <History className="size-4" />
@@ -444,8 +522,9 @@ export function NutritionPage() {
                   {/* Archive / Restore button */}
                   <button
                     type="button"
+                    disabled={actionsBusy}
                     onClick={() => handleArchiveToggle(selected)}
-                    className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5"
+                    className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5 disabled:opacity-60"
                     title={
                       selected.status === "archived"
                         ? isAr
@@ -466,8 +545,9 @@ export function NutritionPage() {
                   {/* Delete button */}
                   <button
                     type="button"
+                    disabled={actionsBusy}
                     onClick={() => handleDelete(selected)}
-                    className="flex size-9 items-center justify-center rounded-full bg-white text-red-500 shadow-sm hover:bg-red-50"
+                    className="flex size-9 items-center justify-center rounded-full bg-white text-red-500 shadow-sm hover:bg-red-50 disabled:opacity-60"
                     title={isAr ? "حذف نهائي" : "Delete permanently"}
                   >
                     <Trash2 className="size-4" />
@@ -790,15 +870,20 @@ export function NutritionPage() {
           open={formModal.open}
           mode={formModal.mode}
           templates={allPrograms.filter((p) => p.status === "template")}
-          onClose={() => setFormModal({ open: false, mode: null })}
+          onClose={() => {
+            if (actionsBusy) return
+            setFormModal({ open: false, mode: null })
+          }}
           onSaveProgram={async (input) => {
             await saveMutation.mutateAsync(input)
+            setFormModal({ open: false, mode: null })
             appToast.success(
               isAr ? "تم حفظ الخطة بنجاح" : "Nutrition plan saved successfully",
             )
           }}
           onAssignProgram={async (input) => {
             await assignMutation.mutateAsync(input)
+            setFormModal({ open: false, mode: null })
             appToast.success(
               isAr ? "تم تعيين الخطة للمشترك بنجاح" : "Plan assigned successfully",
             )

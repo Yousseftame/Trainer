@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_STALE_TIMES } from "@/config/constants"
 import {
   archiveWorkoutProgram,
   assignWorkoutProgram,
@@ -6,6 +7,7 @@ import {
   listWorkoutLogs,
   listWorkoutPrograms,
   logWorkoutSession,
+  restoreWorkoutProgram,
   saveWorkoutProgram,
   type AssignWorkoutInput,
   type SaveWorkoutProgramInput,
@@ -15,20 +17,66 @@ import type { WorkoutProgram, WorkoutSessionLog } from "@/types/program"
 export const workoutKeys = {
   all: ["workouts"] as const,
   lists: () => [...workoutKeys.all, "list"] as const,
-  list: (scope?: string) => [...workoutKeys.lists(), { scope }] as const,
+  list: (scope?: string, subscriberId?: string) =>
+    [...workoutKeys.lists(), { scope, subscriberId }] as const,
   logs: (subscriberId?: string) =>
     [...workoutKeys.all, "logs", { subscriberId }] as const,
 }
 
-export function useWorkoutProgramsQuery(scope?: string) {
+type WorkoutProgramsQueryOptions = {
+  status?: string
+  subscriberId?: string
+  enabled?: boolean
+}
+
+export function useWorkoutProgramsQuery(
+  scopeOrOptions?: string | WorkoutProgramsQueryOptions,
+) {
+  const options: WorkoutProgramsQueryOptions =
+    typeof scopeOrOptions === "string"
+      ? { status: scopeOrOptions }
+      : (scopeOrOptions ?? {})
+
+  const status = options.status
+  const subscriberId = options.subscriberId
+
   return useQuery<WorkoutProgram[]>({
-    queryKey: workoutKeys.list(scope),
+    queryKey: workoutKeys.list(status, subscriberId),
     queryFn: async () => {
-      const items = await listWorkoutPrograms()
-      if (!scope || scope === "all") return items
-      return items.filter((p) => p.status === scope)
+      const items = await listWorkoutPrograms(subscriberId)
+      if (!status || status === "all") return items
+      return items.filter((p) => p.status === status)
     },
-    staleTime: 1000 * 30,
+    staleTime: subscriberId
+      ? QUERY_STALE_TIMES.subscriberDashboard
+      : QUERY_STALE_TIMES.adminList,
+    enabled: options.enabled ?? true,
+  })
+}
+
+type WorkoutLogsQueryOptions = {
+  subscriberId?: string
+  enabled?: boolean
+}
+
+/** Admin: call with no args (full list). Subscriber: pass { subscriberId }. */
+export function useWorkoutLogsQuery(
+  subscriberIdOrOptions?: string | WorkoutLogsQueryOptions,
+) {
+  const options: WorkoutLogsQueryOptions =
+    typeof subscriberIdOrOptions === "string"
+      ? { subscriberId: subscriberIdOrOptions, enabled: Boolean(subscriberIdOrOptions) }
+      : (subscriberIdOrOptions ?? {})
+
+  const subscriberId = options.subscriberId
+
+  return useQuery<WorkoutSessionLog[]>({
+    queryKey: workoutKeys.logs(subscriberId),
+    queryFn: () => listWorkoutLogs(subscriberId),
+    enabled: options.enabled ?? true,
+    staleTime: subscriberId
+      ? QUERY_STALE_TIMES.subscriberDashboard
+      : QUERY_STALE_TIMES.adminList,
   })
 }
 
@@ -62,6 +110,16 @@ export function useArchiveWorkoutMutation() {
   })
 }
 
+export function useRestoreWorkoutMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => restoreWorkoutProgram(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: workoutKeys.all })
+    },
+  })
+}
+
 export function useDeleteWorkoutMutation() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -69,14 +127,6 @@ export function useDeleteWorkoutMutation() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: workoutKeys.all })
     },
-  })
-}
-
-export function useWorkoutLogsQuery(subscriberId?: string) {
-  return useQuery<WorkoutSessionLog[]>({
-    queryKey: workoutKeys.logs(subscriberId),
-    queryFn: () => listWorkoutLogs(subscriberId),
-    staleTime: 1000 * 30,
   })
 }
 
@@ -90,4 +140,3 @@ export function useLogWorkoutSessionMutation() {
     },
   })
 }
-

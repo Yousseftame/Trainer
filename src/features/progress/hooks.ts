@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_STALE_TIMES } from "@/config/constants"
 import {
   deleteMeasurement,
   deletePerformance,
@@ -26,13 +27,17 @@ export function useMeasurementsQuery(subscriberId?: string) {
       ? [...PROGRESS_QUERY_KEYS.measurements, subscriberId]
       : PROGRESS_QUERY_KEYS.measurements,
     queryFn: async () => {
-      const all = await fetchMeasurements()
-      if (!subscriberId) return all
-      return all
-        .filter((m) => m.subscriberId === subscriberId)
-        .sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime())
+      const items = await fetchMeasurements(subscriberId)
+      if (!subscriberId) return items
+      return [...items].sort(
+        (a, b) =>
+          new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime(),
+      )
     },
-    staleTime: 30_000,
+    enabled: subscriberId !== undefined ? Boolean(subscriberId) : true,
+    staleTime: subscriberId
+      ? QUERY_STALE_TIMES.subscriberDashboard
+      : QUERY_STALE_TIMES.adminList,
   })
 }
 
@@ -42,13 +47,16 @@ export function usePhotosQuery(subscriberId?: string) {
       ? [...PROGRESS_QUERY_KEYS.photos, subscriberId]
       : PROGRESS_QUERY_KEYS.photos,
     queryFn: async () => {
-      const all = await fetchPhotos()
-      if (!subscriberId) return all
-      return all
-        .filter((p) => p.subscriberId === subscriberId)
-        .sort((a, b) => new Date(a.takenAt).getTime() - new Date(b.takenAt).getTime())
+      const items = await fetchPhotos(subscriberId)
+      if (!subscriberId) return items
+      return [...items].sort(
+        (a, b) => new Date(a.takenAt).getTime() - new Date(b.takenAt).getTime(),
+      )
     },
-    staleTime: 30_000,
+    enabled: subscriberId !== undefined ? Boolean(subscriberId) : true,
+    staleTime: subscriberId
+      ? QUERY_STALE_TIMES.subscriberDashboard
+      : QUERY_STALE_TIMES.adminList,
   })
 }
 
@@ -58,13 +66,17 @@ export function usePerformanceQuery(subscriberId?: string) {
       ? [...PROGRESS_QUERY_KEYS.performance, subscriberId]
       : PROGRESS_QUERY_KEYS.performance,
     queryFn: async () => {
-      const all = await fetchPerformance()
-      if (!subscriberId) return all
-      return all
-        .filter((l) => l.subscriberId === subscriberId)
-        .sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime())
+      const items = await fetchPerformance(subscriberId)
+      if (!subscriberId) return items
+      return [...items].sort(
+        (a, b) =>
+          new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime(),
+      )
     },
-    staleTime: 30_000,
+    enabled: subscriberId !== undefined ? Boolean(subscriberId) : true,
+    staleTime: subscriberId
+      ? QUERY_STALE_TIMES.subscriberDashboard
+      : QUERY_STALE_TIMES.adminList,
   })
 }
 
@@ -72,16 +84,6 @@ export function useSaveMeasurementMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: SaveMeasurementInput) => saveMeasurement(input),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: PROGRESS_QUERY_KEYS.measurements })
-    },
-  })
-}
-
-export function useDeleteMeasurementMutation() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (id: string) => deleteMeasurement(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: PROGRESS_QUERY_KEYS.measurements })
     },
@@ -98,22 +100,32 @@ export function useSavePhotoMutation() {
   })
 }
 
-export function useDeletePhotoMutation() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (id: string) => deletePhoto(id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: PROGRESS_QUERY_KEYS.photos })
-    },
-  })
-}
-
 export function useSavePerformanceMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: SavePerformanceInput) => savePerformance(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: PROGRESS_QUERY_KEYS.performance })
+    },
+  })
+}
+
+export function useDeleteMeasurementMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deleteMeasurement(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: PROGRESS_QUERY_KEYS.measurements })
+    },
+  })
+}
+
+export function useDeletePhotoMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deletePhoto(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: PROGRESS_QUERY_KEYS.photos })
     },
   })
 }
@@ -127,4 +139,3 @@ export function useDeletePerformanceMutation() {
     },
   })
 }
-

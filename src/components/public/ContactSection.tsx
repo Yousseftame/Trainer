@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from "motion/react"
 import { Check, Headphones, Mail } from "lucide-react"
 import SlideCommit from "@/components/SlideCommit.tsx"
 import { useCreateRegistrationRequestMutation } from "@/features/subscribers/hooks"
-import { DEMO_PACKAGES } from "@/features/subscriptions/demo"
 import { usePackagesQuery } from "@/features/subscriptions/hooks"
 import { useLocale } from "@/hooks/useLocale"
 import { appToast } from "@/lib/toast"
@@ -38,7 +37,7 @@ const labelClass =
 export function ContactSection() {
   const { t } = useTranslation()
   const { locale, isRtl } = useLocale()
-  const { data: packages = DEMO_PACKAGES } = usePackagesQuery()
+  const { data: packages = [] } = usePackagesQuery()
   const createRequestMutation = useCreateRegistrationRequestMutation()
   const activePackages = packages.filter((pkg) => pkg.isActive)
 
@@ -113,13 +112,15 @@ export function ContactSection() {
     const message = String(data.get("message") ?? "").trim()
 
     try {
+      const fullName = `${firstName} ${lastName}`.trim()
       await createRequestMutation.mutateAsync({
-        displayName: `${firstName} ${lastName}`.trim(),
+        displayName: fullName,
+        name: { en: fullName, ar: fullName },
         email,
         phone,
         locale,
         packageId: plan || null,
-        goal: message,
+        goal: { en: message, ar: message },
         source: "contact",
       })
     } catch {

@@ -14,9 +14,8 @@ import {
   UserCheck,
 } from "lucide-react"
 import { APP_ROUTES } from "@/config/constants"
-import { useAuth } from "@/features/auth/auth-context"
 import { useSubscriberPTRecordsQuery } from "@/features/physicalTherapy/hooks"
-import { useSubscribersQuery } from "@/features/subscribers/hooks"
+import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatDate } from "@/lib/format"
@@ -40,21 +39,15 @@ export function PhysicalTherapyPage() {
   const isAr = locale === "ar"
   useDocumentTitle(isAr ? "العلاج الطبيعي والتأهيل الحركي" : "Physical Therapy & Movement Rehab")
 
-  const { user, isAdmin } = useAuth()
-  const isStaff = isAdmin || (user?.role && user.role !== "subscriber")
-  const { data: subscribers = [] } = useSubscribersQuery()
+  const {
+    staffCanPick,
+    directory: subscribers,
+    subscriberId: activeSubscriberId,
+    selectedSubscriberId,
+    setSelectedSubscriberId,
+  } = usePanelSubscriber({ allowStaffPicker: true })
 
-  // Match logged in subscriber or let admin preview
-  const defaultSub = subscribers.find(
-    (s) =>
-      s.id === user?.uid ||
-      s.email.toLowerCase() === (user?.email || "").toLowerCase(),
-  ) || subscribers[0]
-
-  const [selectedSubscriberId, setSelectedSubscriberId] = useState<string>("")
-  const activeSubscriberId = selectedSubscriberId || defaultSub?.id || user?.uid || "sub-alex"
-
-  // Fetch all PT records for this subscriber
+  // Fetch PT records for this subscriber only
   const { data: records = [], isLoading } = useSubscriberPTRecordsQuery(activeSubscriberId)
 
   // Currently selected record ID (defaults to active/recovering record first, then latest)
@@ -124,14 +117,14 @@ export function PhysicalTherapyPage() {
           {/* Action Buttons Row */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Admin Member Switcher (Only visible to staff/admin) */}
-            {isStaff ? (
+            {staffCanPick ? (
               <div className="flex items-center gap-1.5 rounded-full bg-[#F4F4F4] px-3 py-1.5 text-[11.5px] font-bold text-[var(--gym-ink,#111111)] border border-black/8">
                 <UserCheck className="size-3.5 text-[var(--gym-lime,#fb5001)]" />
                 <span className="hidden xs:inline">
                   {isAr ? "معاينة:" : "Member:"}
                 </span>
                 <select
-                  value={activeSubscriberId}
+                  value={selectedSubscriberId || activeSubscriberId}
                   onChange={(e) => {
                     setSelectedSubscriberId(e.target.value)
                     setActiveRecordId("")
@@ -352,7 +345,7 @@ export function PhysicalTherapyPage() {
               <Dumbbell className="size-4 text-[var(--gym-orange,#fb5001)]" />
               <span>{isAr ? "الانتقال إلى جدول التمارين" : "View Workout Plan"}</span>
             </Link>
-            {isStaff ? (
+            {staffCanPick ? (
               <Link
                 to="/admin/physical-therapy"
                 className="inline-flex items-center gap-2 rounded-full bg-[#F4F4F4] px-4 py-2.5 text-[13px] font-bold text-[var(--gym-ink,#111111)] hover:bg-[#e9e9e9]"

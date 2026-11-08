@@ -2,9 +2,6 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // -------------------------------------------------------------
-    // Security & Authorization Helpers (Backend Security Boundary)
-    // -------------------------------------------------------------
     function isSignedIn() {
       return request.auth != null;
     }
@@ -19,7 +16,13 @@ service cloud.firestore {
 
     function isStaff() {
       return isSignedIn() && isNotSuspended() && (
-        request.auth.token.role in ['head_coach', 'assistant', 'trainer', 'nutritionist', 'physiotherapist']
+        request.auth.token.role in [
+          'head_coach',
+          'assistant',
+          'trainer',
+          'nutritionist',
+          'physiotherapist'
+        ]
       );
     }
 
@@ -29,47 +32,269 @@ service cloud.firestore {
       );
     }
 
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Lifecycle / identity fields must stay immutable from the client SDK.
+    // Only Admin SDK (Cloud Functions) can create accounts, flip status, or delete.
+    function subscriberIdentityLocked() {
+      return request.resource.data.id == resource.data.id &&
+        request.resource.data.id == subscriberId &&
+        request.resource.data.email == resource.data.email &&
+        request.resource.data.status == resource.data.status &&
+        request.resource.data.createdAt == resource.data.createdAt;
+    }
+
     // -------------------------------------------------------------
-    // Public Collections
+    // Public packages — catalog is public-read; writes staff-only
     // -------------------------------------------------------------
-    // Publicly readable packages so landing page & registration modal can display plans
     match /packages/{packageId} {
       allow read: if true;
-      allow write: if hasPermission('packages:manage');
+
+      allow create: if hasPermission('packages:manage') &&
+        request.resource.data.id == packageId &&
+        request.resource.data.keys().hasAll([
+          'id', 'name', 'description', 'price', 'period',
+          'durationDays', 'entitlements', 'isActive', 'createdAt', 'updatedAt'
+        ]);
+
+      allow update: if hasPermission('packages:manage') &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.id == packageId &&
+        request.resource.data.createdAt == resource.data.createdAt;
+
+      allow delete: if hasPermission('packages:manage');
     }
 
     // -------------------------------------------------------------
-    // Staff & Administrative Team Accounts
+    // Staff directory
     // -------------------------------------------------------------
-    // Staff directory can only be read by staff, and modified by Head Coach or staff:manage
     match /staff/{staffId} {
-      allow read: if isStaff();
-      allow write: if hasPermission('staff:manage');
+      allow read: if isStaff() || isSelf(staffId);
+      allow create, update: if hasPermission('staff:manage');
+      allow delete: if hasPermission('staff:manage') &&
+        resource.data.role != 'head_coach';
     }
 
     // -------------------------------------------------------------
-    // Subscribers & Sensitive Data Access
+    // Subscribers — create/status/delete ONLY via Cloud Functions
     // -------------------------------------------------------------
     match /subscribers/{subscriberId} {
-      allow read: if hasPermission('subscribers:read') || (isSignedIn() && request.auth.uid == subscriberId);
-      allow write: if hasPermission('subscribers:write');
+      allow read: if hasPermission('subscribers:read') || isSelf(subscriberId);
+
+      // Staff may edit profile/notes/metrics, never identity/status
+      allow update: if hasPermission('subscribers:write') &&
+        subscriberIdentityLocked();
+
+      // Subscriber may edit own soft profile fields only
+      allow update: if isSelf(subscriberId) &&
+        subscriberIdentityLocked();
+
+      allow create: if false;
+      allow delete: if false;
     }
 
+    // -------------------------------------------------------------
+    // Registration requests — approve/reject ONLY via Cloud Functions
+    // Public may create pending requests; nobody may update/delete from client
+    // -------------------------------------------------------------
     match /registration_requests/{requestId} {
-      allow create: if true; // Public prospects can register
-      allow read: if hasPermission('subscribers:read') || hasPermission('subscribers:approve');
-      allow update, delete: if hasPermission('subscribers:approve');
+      allow create: if
+        request.resource.data.status == 'pending' &&
+        request.resource.data.keys().hasAll([
+          'id', 'displayName', 'email', 'phone', 'locale', 'goal',
+          'source', 'status', 'createdAt'
+        ]) &&
+        request.resource.data.id == requestId &&
+        request.resource.data.source in ['contact', 'manual'];
+
+      allow read: if hasPermission('subscribers:read') ||
+        hasPermission('subscribers:approve');
+
+      // DevTools cannot approve/reject — Functions use Admin SDK
+      allow update: if false;
+      allow delete: if false;
     }
 
-    // Physical therapy & medical restrictions
+    // -------------------------------------------------------------
+    // Subscriptions — manual lifecycle only (no self-service edits)
+    // -------------------------------------------------------------
+    match /subscriptions/{subscriptionId} {
+      allow read: if hasPermission('subscriptions:manage') ||
+        hasPermission('subscribers:read') ||
+        hasPermission('reports:read') ||
+        (isSignedIn() && resource.data.subscriberId == request.auth.uid);
+
+      allow create: if hasPermission('subscriptions:manage') &&
+        request.resource.data.id == subscriptionId &&
+        request.resource.data.keys().hasAll([
+          'id', 'subscriberId', 'packageId', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        request.resource.data.status in [
+          'active', 'pending', 'expired', 'suspended', 'cancelled'
+        ];
+
+      // Subscriber identity + creation timestamp stay immutable from client
+      allow update: if hasPermission('subscriptions:manage') &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.id == subscriptionId &&
+        request.resource.data.subscriberId == resource.data.subscriberId &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.status in [
+          'active', 'pending', 'expired', 'suspended', 'cancelled'
+        ];
+
+      allow delete: if hasPermission('subscriptions:manage');
+    }
+
+    // -------------------------------------------------------------
+    // Programs & progress (permission-scoped; no open catch-all)
+    // -------------------------------------------------------------
+    // Templates have no subscriberId; assigned programs are subscriber-scoped.
+    // Template edits must never silently rewrite assigned copies (app clones on assign).
+    match /workout_programs/{id} {
+      allow read: if hasPermission('workouts:manage') ||
+        hasPermission('subscribers:read') ||
+        hasPermission('reports:read') ||
+        (isSignedIn() &&
+          resource.data.keys().hasAny(['subscriberId']) &&
+          resource.data.subscriberId == request.auth.uid);
+
+      allow create: if hasPermission('workouts:manage') &&
+        request.resource.data.id == id &&
+        request.resource.data.keys().hasAll([
+          'id', 'title', 'format', 'version', 'status', 'days',
+          'createdAt', 'updatedAt'
+        ]) &&
+        request.resource.data.status in ['template', 'active', 'archived'] &&
+        (
+          request.resource.data.status == 'template' ||
+          request.resource.data.subscriberId is string
+        );
+
+      allow update: if hasPermission('workouts:manage') &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.id == id &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.status in ['template', 'active', 'archived'];
+
+      allow delete: if hasPermission('workouts:manage');
+    }
+
+    match /nutrition_programs/{id} {
+      allow read: if hasPermission('nutrition:manage') ||
+        hasPermission('subscribers:read') ||
+        hasPermission('reports:read') ||
+        (isSignedIn() &&
+          resource.data.keys().hasAny(['subscriberId']) &&
+          resource.data.subscriberId == request.auth.uid);
+
+      allow create: if hasPermission('nutrition:manage') &&
+        request.resource.data.id == id &&
+        request.resource.data.keys().hasAll([
+          'id', 'title', 'format', 'version', 'status', 'days',
+          'createdAt', 'updatedAt'
+        ]) &&
+        request.resource.data.status in ['template', 'active', 'archived'] &&
+        (
+          request.resource.data.status == 'template' ||
+          request.resource.data.subscriberId is string
+        );
+
+      allow update: if hasPermission('nutrition:manage') &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.id == id &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.status in ['template', 'active', 'archived'];
+
+      allow delete: if hasPermission('nutrition:manage');
+    }
+
     match /physical_therapy/{recordId} {
-      allow read: if hasPermission('physicalTherapy:read') || (isSignedIn() && request.auth.uid == resource.data.subscriberId);
+      allow read: if hasPermission('physicalTherapy:read') ||
+        (isSignedIn() && resource.data.subscriberId == request.auth.uid);
       allow write: if hasPermission('physicalTherapy:manage');
     }
 
-    // Workouts, Nutrition, Content, Subscriptions, Progress
-    match /{document=**} {
-      allow read, write: if isSignedIn();
+    match /progress_measurements/{id} {
+      allow read: if hasPermission('progress:read') ||
+        (isSignedIn() && resource.data.subscriberId == request.auth.uid);
+      allow create, update: if hasPermission('progress:read') ||
+        (isSignedIn() && request.resource.data.subscriberId == request.auth.uid);
+      allow delete: if hasPermission('progress:read');
+    }
+
+    match /progress_photos/{id} {
+      allow read: if hasPermission('progress:read') ||
+        (isSignedIn() && resource.data.subscriberId == request.auth.uid);
+      allow create, update: if hasPermission('progress:read') ||
+        (isSignedIn() && request.resource.data.subscriberId == request.auth.uid);
+      allow delete: if hasPermission('progress:read');
+    }
+
+    match /content_assets/{id} {
+      allow read: if hasPermission('content:manage') ||
+        hasPermission('subscribers:read') ||
+        isSignedIn();
+      allow write: if hasPermission('content:manage');
+    }
+
+    match /progress_performance/{id} {
+      allow read: if hasPermission('progress:read') ||
+        (isSignedIn() && resource.data.subscriberId == request.auth.uid);
+      allow create, update: if hasPermission('progress:read') ||
+        (isSignedIn() && request.resource.data.subscriberId == request.auth.uid);
+      allow delete: if hasPermission('progress:read');
+    }
+
+    match /workout_logs/{id} {
+      allow read: if hasPermission('workouts:manage') ||
+        hasPermission('progress:read') ||
+        (isSignedIn() && resource.data.subscriberId == request.auth.uid);
+
+      // Subscribers may log their own sessions; never rewrite another user's logs
+      allow create: if
+        request.resource.data.id == id &&
+        request.resource.data.keys().hasAll([
+          'id', 'subscriberId', 'programId', 'completedAt'
+        ]) &&
+        (
+          hasPermission('workouts:manage') ||
+          (isSignedIn() &&
+            request.resource.data.subscriberId == request.auth.uid)
+        );
+
+      allow update: if hasPermission('workouts:manage') &&
+        request.resource.data.subscriberId == resource.data.subscriberId &&
+        request.resource.data.programId == resource.data.programId &&
+        request.resource.data.completedAt == resource.data.completedAt;
+
+      allow delete: if hasPermission('workouts:manage');
+    }
+
+    match /nutrition_logs/{id} {
+      allow read: if hasPermission('nutrition:manage') ||
+        hasPermission('progress:read') ||
+        (isSignedIn() && resource.data.subscriberId == request.auth.uid);
+
+      allow create: if
+        request.resource.data.id == id &&
+        request.resource.data.keys().hasAll([
+          'id', 'subscriberId', 'programId', 'loggedAt'
+        ]) &&
+        (
+          hasPermission('nutrition:manage') ||
+          (isSignedIn() &&
+            request.resource.data.subscriberId == request.auth.uid)
+        );
+
+      allow update: if hasPermission('nutrition:manage') &&
+        request.resource.data.subscriberId == resource.data.subscriberId &&
+        request.resource.data.programId == resource.data.programId &&
+        request.resource.data.loggedAt == resource.data.loggedAt;
+
+      allow delete: if hasPermission('nutrition:manage');
     }
   }
 }

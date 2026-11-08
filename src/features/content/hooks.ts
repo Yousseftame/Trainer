@@ -16,12 +16,17 @@ export const CONTENT_QUERY_KEYS = {
 
 export const contentKeys = CONTENT_QUERY_KEYS
 
-export function useContentAssetsQuery() {
+type ContentQueryOptions = {
+  enabled?: boolean
+}
+
+/** Fetch only when a page that needs the library is mounted. */
+export function useContentAssetsQuery(options?: ContentQueryOptions) {
   return useQuery({
     queryKey: CONTENT_QUERY_KEYS.all,
     queryFn: fetchContentAssets,
-    initialData: getContentSnapshot,
-    staleTime: QUERY_STALE_TIMES.adminList,
+    staleTime: QUERY_STALE_TIMES.catalog,
+    enabled: options?.enabled ?? true,
   })
 }
 

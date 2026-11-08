@@ -36,7 +36,6 @@ import { PhotoComparisonDialog } from "@/components/dashboard/PhotoComparisonDia
 import { FilterChip } from "@/components/dashboard/StatCard"
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
 import { APP_ROUTES } from "@/config/constants"
-import { useAuth } from "@/features/auth/auth-context"
 import { adherenceFor, latestWeek, programsFor } from "@/features/progress/demo"
 import {
   useDeleteMeasurementMutation,
@@ -49,7 +48,7 @@ import {
   useSavePerformanceMutation,
   useSavePhotoMutation,
 } from "@/features/progress/hooks"
-import { useSubscribersQuery } from "@/features/subscribers/hooks"
+import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
 import { useWorkoutProgramsQuery } from "@/features/workouts/hooks"
 import { useNutritionProgramsQuery } from "@/features/nutrition/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
@@ -90,57 +89,37 @@ export function ProgressPage() {
   const { t } = useTranslation()
   const { locale } = useLocale()
   const isAr = locale === "ar"
-  const { user, isAdmin } = useAuth()
   useDocumentTitle(isAr ? "متابعة التقدم والقياسات" : "My Progress")
 
-  const { data: subscribers = [] } = useSubscribersQuery()
-  const [adminSelectedSubscriberId, setAdminSelectedSubscriberId] =
-    useState<string>("")
+  const {
+    staffCanPick,
+    directory: subscribers,
+    subscriber: currentSubscriber,
+    subscriberId,
+    selectedSubscriberId,
+    setSelectedSubscriberId,
+  } = usePanelSubscriber({ allowStaffPicker: true })
 
-  // Security & Data Isolation Enforcement:
-  // Each subscriber must only access their own records unless authorized admin.
-  const currentSubscriber = useMemo(() => {
-    if (!user) return null
-
-    if (isAdmin) {
-      if (adminSelectedSubscriberId) {
-        return (
-          subscribers.find((s) => s.id === adminSelectedSubscriberId) ??
-          subscribers[0]
-        )
-      }
-      return subscribers[0]
-    }
-
-    return (
-      subscribers.find(
-        (s) =>
-          s.id === user.uid ||
-          s.email.toLowerCase() === (user.email ?? "").toLowerCase(),
-      ) ?? null
-    )
-  }, [user, isAdmin, adminSelectedSubscriberId, subscribers])
-
-  const subscriberId = currentSubscriber?.id ?? ""
-
-  // React Query hooks for real-time progress data
+  // React Query hooks for real-time progress data (scoped)
   const { data: measurements = [] } = useMeasurementsQuery(
     subscriberId || undefined,
   )
   const { data: photos = [] } = usePhotosQuery(subscriberId || undefined)
   const { data: lifts = [] } = usePerformanceQuery(subscriberId || undefined)
-  const { data: allWorkoutPrograms = [] } = useWorkoutProgramsQuery()
-  const { data: allNutritionPrograms = [] } = useNutritionProgramsQuery()
+  const { data: allWorkoutPrograms = [] } = useWorkoutProgramsQuery({
+    subscriberId,
+    enabled: Boolean(subscriberId),
+  })
+  const { data: allNutritionPrograms = [] } = useNutritionProgramsQuery({
+    subscriberId,
+    enabled: Boolean(subscriberId),
+  })
 
   // Assigned programs (live database records filtered for subscriber, fallback to demo)
   const assignedPrograms = useMemo(() => {
     if (!subscriberId) return { workouts: [], nutrition: [] }
-    const liveWorkouts = allWorkoutPrograms.filter(
-      (w) => w.subscriberId === subscriberId,
-    )
-    const liveNutrition = allNutritionPrograms.filter(
-      (n) => n.subscriberId === subscriberId,
-    )
+    const liveWorkouts = allWorkoutPrograms
+    const liveNutrition = allNutritionPrograms
     const demo = programsFor(subscriberId)
     return {
       workouts: liveWorkouts.length ? liveWorkouts : demo.workouts,
@@ -361,17 +340,15 @@ export function ProgressPage() {
           {/* Action Buttons Row */}
           <div className="flex items-center gap-2">
             {/* Admin Member Switcher (Only visible to admin staff) */}
-            {isAdmin ? (
+            {staffCanPick && currentSubscriber ? (
               <div className="flex items-center gap-1.5 rounded-full bg-[#F4F4F4] px-3 py-1.5 text-[11.5px] font-bold text-[var(--gym-ink,#111111)] border border-black/8">
                 <ShieldCheck className="size-3.5 text-[var(--gym-lime,#fb5001)]" />
                 <span className="hidden xs:inline">
                   {isAr ? "معاينة:" : "Member:"}
                 </span>
                 <select
-                  value={currentSubscriber.id}
-                  onChange={(e) =>
-                    setAdminSelectedSubscriberId(e.target.value)
-                  }
+                  value={selectedSubscriberId || currentSubscriber.id}
+                  onChange={(e) => setSelectedSubscriberId(e.target.value)}
                   className="rounded-lg bg-white px-2 py-0.5 text-[11.5px] font-bold outline-none"
                 >
                   {subscribers.map((s) => (

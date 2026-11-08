@@ -7,18 +7,12 @@ import {
   subscriptionStatusTone,
 } from "@/components/dashboard/StatusBadge"
 import { useAuth } from "@/features/auth/auth-context"
-import {
-  getSubscriberByEmail,
-  getSubscriberById,
-} from "@/features/subscribers/demo"
-import {
-  useSaveSubscriberMutation,
-  useSubscribersQuery,
-} from "@/features/subscribers/hooks"
-import { currentSubscriptionFor } from "@/features/subscriptions/demo"
+import { useSaveSubscriberMutation } from "@/features/subscribers/hooks"
+import { buildSubscriberRow } from "@/features/subscribers"
+import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
 import {
   usePackagesQuery,
-  useSubscriptionsQuery,
+  useSubscriberSubscriptionsQuery,
 } from "@/features/subscriptions/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
@@ -32,25 +26,13 @@ export function ProfilePage() {
   useDocumentTitle(t("nav.profile"))
 
   const isAr = locale === "ar"
-  const { data: subscribers = [] } = useSubscribersQuery()
+  const { subscriber: subscriberRecord, subscriberId } = usePanelSubscriber()
   const { data: packages = [] } = usePackagesQuery()
-  const { data: subscriptions = [] } = useSubscriptionsQuery()
+  const { data: subscriptions = [] } = useSubscriberSubscriptionsQuery(subscriberId)
   const saveSubscriberMutation = useSaveSubscriberMutation()
 
-  const subscriberRecord =
-    (user
-      ? subscribers.find(
-          (s) =>
-            s.id === user.uid ||
-            s.email.toLowerCase() === user.email.toLowerCase(),
-        ) ??
-        getSubscriberById(user.uid) ??
-        getSubscriberByEmail(user.email)
-      : undefined) ?? subscribers[0]
-
-  void subscriptions
   const currentSub = subscriberRecord
-    ? currentSubscriptionFor(subscriberRecord.id)
+    ? buildSubscriberRow(subscriberRecord, subscriptions).subscription
     : undefined
   const currentPkg = currentSub
     ? packages.find((p) => p.id === currentSub.packageId)

@@ -18,7 +18,7 @@ import { useContentAssetsQuery } from "@/features/content/hooks"
 import {
   NUTRITION_DISCLAIMER,
   dayMacros,
-} from "@/features/nutrition/demo"
+} from "@/lib/program-text"
 import type {
   AssignNutritionInput,
   SaveNutritionProgramInput,

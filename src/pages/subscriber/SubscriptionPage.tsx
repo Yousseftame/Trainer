@@ -24,14 +24,15 @@ import { useAuth } from "@/features/auth/auth-context"
 import {
   useCreateRegistrationRequestMutation,
   useRegistrationRequestsQuery,
-  useSubscribersQuery,
 } from "@/features/subscribers/hooks"
+import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
 import {
   ENTITLEMENT_KEYS,
   normalizeEntitlements,
 } from "@/features/subscriptions/entitlements"
 import {
   usePackagesQuery,
+  useSubscriberSubscriptionsQuery,
   useSubscriptionsQuery,
 } from "@/features/subscriptions/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
@@ -84,23 +85,27 @@ export function SubscriptionPage() {
   const isAr = locale === "ar"
   useDocumentTitle(t("nav.subscription"))
 
-  const isStaff = user?.role && user.role !== "subscriber"
-  const { data: subscribers = [] } = useSubscribersQuery()
+  const {
+    staffCanPick,
+    directory: subscribers,
+    subscriber: currentSubscriber,
+    subscriberId: activeSubscriberId,
+    selectedSubscriberId,
+    setSelectedSubscriberId,
+  } = usePanelSubscriber({ allowStaffPicker: true })
+
   const { data: allPackages = [] } = usePackagesQuery()
-  const { data: allSubscriptions = [] } = useSubscriptionsQuery()
-  const { data: registrationRequests = [] } = useRegistrationRequestsQuery()
+  const { data: scopedSubscriptions = [] } = useSubscriberSubscriptionsQuery(
+    staffCanPick ? undefined : activeSubscriberId,
+  )
+  // Staff preview may browse another member from the full list
+  const { data: allSubscriptions = [] } = useSubscriptionsQuery({
+    enabled: staffCanPick,
+  })
+  const { data: registrationRequests = [] } = useRegistrationRequestsQuery({
+    enabled: staffCanPick,
+  })
   const createRequestMutation = useCreateRegistrationRequestMutation()
-
-  // Match logged in subscriber or allow coach preview
-  const defaultSub = subscribers.find(
-    (s) =>
-      s.id === user?.uid ||
-      s.email.toLowerCase() === (user?.email || "").toLowerCase(),
-  ) || subscribers[0]
-
-  const [selectedSubscriberId, setSelectedSubscriberId] = useState<string>("")
-  const activeSubscriberId = selectedSubscriberId || defaultSub?.id || user?.uid || "sub-alex"
-  const currentSubscriber = subscribers.find((s) => s.id === activeSubscriberId) || defaultSub
 
   const packageMap = useMemo(
     () => new Map(allPackages.map((p) => [p.id, p])),
@@ -110,19 +115,24 @@ export function SubscriptionPage() {
   const subscriberHistory = useMemo(() => {
     const targetId = activeSubscriberId
     const targetEmail = (currentSubscriber?.email || user?.email || "").toLowerCase()
+    const pool = staffCanPick ? allSubscriptions : scopedSubscriptions
 
-    const matched = allSubscriptions.filter(
+    const matched = pool.filter(
       (item) =>
         (targetId && item.subscriberId === targetId) ||
         (targetEmail && item.subscriberEmail?.toLowerCase() === targetEmail),
     )
-    const source = matched.length
-      ? matched
-      : allSubscriptions.filter((item) => item.subscriberId === "sub-alex")
-    return [...source].sort(
+    return [...matched].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     )
-  }, [allSubscriptions, activeSubscriberId, currentSubscriber, user?.email])
+  }, [
+    allSubscriptions,
+    scopedSubscriptions,
+    staffCanPick,
+    activeSubscriberId,
+    currentSubscriber,
+    user?.email,
+  ])
 
   const current =
     subscriberHistory.find(
@@ -209,7 +219,7 @@ export function SubscriptionPage() {
   return (
     <div className="flex flex-col gap-4 sm:gap-5 pb-12">
       {/* Staff Member Switcher (Only visible to admin/staff) */}
-      {isStaff ? (
+      {staffCanPick ? (
         <div className="flex items-center justify-between rounded-[20px] bg-white p-3.5 sm:p-4 border border-black/5 shadow-2xs">
           <div className="flex items-center gap-2">
             <UserCheck className="size-4 text-[var(--gym-lime,#fb5001)]" />
@@ -218,7 +228,7 @@ export function SubscriptionPage() {
             </span>
           </div>
           <select
-            value={activeSubscriberId}
+            value={selectedSubscriberId || activeSubscriberId}
             onChange={(e) => setSelectedSubscriberId(e.target.value)}
             className="rounded-lg bg-[#F4F4F4] px-3 py-1.5 text-[12px] font-bold text-[var(--gym-ink,#111111)] outline-none cursor-pointer"
           >

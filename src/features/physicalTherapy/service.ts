@@ -3,7 +3,9 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  query,
   setDoc,
+  where,
   writeBatch,
 } from "firebase/firestore"
 import { getDb } from "@/lib/firebase/firestore"
@@ -65,12 +67,28 @@ export async function fetchPTRecords(): Promise<PhysicalTherapyRecord[]> {
 export async function fetchSubscriberPTRecords(
   subscriberId: string,
 ): Promise<PhysicalTherapyRecord[]> {
-  const all = await fetchPTRecords()
-  return all.filter(
-    (r) =>
-      r.subscriberId === subscriberId ||
-      r.subscriberId.toLowerCase() === subscriberId.toLowerCase(),
-  )
+  if (!subscriberId) return []
+  try {
+    const db = getDb()
+    const snap = await getDocs(
+      query(
+        collection(db, PT_COLLECTION),
+        where("subscriberId", "==", subscriberId),
+      ),
+    )
+    if (!snap.empty) {
+      return snap.docs.map((d) => d.data() as PhysicalTherapyRecord)
+    }
+    return []
+  } catch (err) {
+    console.warn("Firestore scoped PT read failed, falling back:", err)
+    const all = await fetchPTRecords()
+    return all.filter(
+      (r) =>
+        r.subscriberId === subscriberId ||
+        r.subscriberId.toLowerCase() === subscriberId.toLowerCase(),
+    )
+  }
 }
 
 export async function fetchSubscriberPTRecord(

@@ -1,9 +1,12 @@
+export type { CatalogPackage, DemoPackage } from "@/features/subscriptions/types"
+export type { PackageTone } from "@/types/subscription"
 export {
-  DEMO_PACKAGES,
-  DEMO_SUBSCRIPTIONS,
   getPackageById,
   subscriptionsFor,
   currentSubscriptionFor,
   activeSubscribersForPackage,
-} from "@/features/subscriptions/demo"
-export type { DemoPackage, PackageTone } from "@/features/subscriptions/demo"
+  getActiveSubscriptionFor,
+} from "@/features/subscriptions/cache"
+export * from "@/features/subscriptions/service"
+export * from "@/features/subscriptions/hooks"
+export * from "@/features/subscriptions/entitlements"

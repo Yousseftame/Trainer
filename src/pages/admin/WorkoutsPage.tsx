@@ -34,11 +34,12 @@ import {
   formatRest,
   resolveBilingualText,
   trainingDayCount,
-} from "@/features/workouts/demo"
+} from "@/lib/program-text"
 import {
   useArchiveWorkoutMutation,
   useAssignWorkoutMutation,
   useDeleteWorkoutMutation,
+  useRestoreWorkoutMutation,
   useSaveWorkoutProgramMutation,
   useWorkoutLogsQuery,
   useWorkoutProgramsQuery,
@@ -97,8 +98,12 @@ export function WorkoutsPage() {
     onConfirm: () => Promise<void> | void
   } | null>(null)
 
-  // React Query Hooks
-  const { data: allPrograms = [] } = useWorkoutProgramsQuery()
+  const {
+    data: allPrograms = [],
+    isLoading: programsLoading,
+    isError: programsError,
+    refetch: refetchPrograms,
+  } = useWorkoutProgramsQuery()
   const { data: subscribers = [] } = useSubscribersQuery()
   const { data: contentAssets = [] } = useContentAssetsQuery()
   const { data: allLogs = [] } = useWorkoutLogsQuery()
@@ -106,7 +111,15 @@ export function WorkoutsPage() {
   const saveMutation = useSaveWorkoutProgramMutation()
   const assignMutation = useAssignWorkoutMutation()
   const archiveMutation = useArchiveWorkoutMutation()
+  const restoreMutation = useRestoreWorkoutMutation()
   const deleteMutation = useDeleteWorkoutMutation()
+
+  const actionsBusy =
+    saveMutation.isPending ||
+    assignMutation.isPending ||
+    archiveMutation.isPending ||
+    restoreMutation.isPending ||
+    deleteMutation.isPending
 
   // Filtered List
   const list = useMemo(() => {
@@ -153,30 +166,69 @@ export function WorkoutsPage() {
     setWeekday(program.days.find((day) => !day.isRest)?.weekday ?? 0)
   }
 
-  async function handleArchiveToggle(program: WorkoutProgram) {
-    if (program.status === "active") {
-      await archiveMutation.mutateAsync(program.id)
-      appToast.success(
-        isAr ? "تم نقل البرنامج إلى الأرشيف" : "Program moved to history archive",
-      )
-    } else if (program.status === "archived") {
-      await saveMutation.mutateAsync({
-        ...program,
-        status: "active",
-      })
-      appToast.success(
-        isAr ? "تمت استعادة البرنامج إلى الحالة النشطة" : "Program restored to active",
-      )
-    }
+  function handleArchiveToggle(program: WorkoutProgram) {
+    if (actionsBusy) return
+    const isRestore = program.status === "archived"
+    const name = program.title[locale]
+
+    setConfirmDialog({
+      open: true,
+      title: isRestore
+        ? isAr
+          ? "استعادة البرنامج"
+          : "Restore program"
+        : isAr
+          ? "أرشفة البرنامج"
+          : "Archive program",
+      description: isRestore
+        ? isAr
+          ? `استعادة "${name}"؟${
+              program.subscriberId
+                ? " سيتم أرشفة أي برنامج نشط آخر لنفس المشترك للحفاظ على سجل واحد نشط."
+                : " ستعود كقالب قابل لإعادة الاستخدام."
+            }`
+          : `Restore "${name}"?${
+              program.subscriberId
+                ? " Any other active program for this subscriber will be archived so only one active seat remains."
+                : " It will return as a reusable template."
+            }`
+        : isAr
+          ? `أرشفة "${name}"؟ يبقى السجل التاريخي والأداء محفوظين.`
+          : `Archive "${name}"? Historical versions and performance logs are kept.`,
+      confirmLabel: isRestore
+        ? isAr
+          ? "استعادة"
+          : "Restore"
+        : isAr
+          ? "تأكيد الأرشفة"
+          : "Archive",
+      tone: isRestore ? "primary" : "warning",
+      onConfirm: async () => {
+        if (isRestore) {
+          await restoreMutation.mutateAsync(program.id)
+          appToast.success(
+            isAr ? "تمت استعادة البرنامج" : "Program restored",
+          )
+        } else {
+          await archiveMutation.mutateAsync(program.id)
+          appToast.success(
+            isAr
+              ? "تم نقل البرنامج إلى الأرشيف"
+              : "Program moved to history archive",
+          )
+        }
+      },
+    })
   }
 
   function handleDelete(program: WorkoutProgram) {
+    if (actionsBusy) return
     setConfirmDialog({
       open: true,
       title: isAr ? "حذف برنامج التمارين" : "Delete Workout Program",
       description: isAr
-        ? `هل أنت متأكد من حذف "${program.title[locale]}" نهائياً؟ هذا الإجراء لا يمكن التراجع عنه.`
-        : `Are you sure you want to permanently delete "${program.title[locale]}"? This action cannot be undone.`,
+        ? `هل أنت متأكد من حذف "${program.title[locale]}" نهائياً؟ هذا الإجراء لا يمكن التراجع عنه. سجلات الأداء التاريخية تبقى إن وُجدت.`
+        : `Permanently delete "${program.title[locale]}"? This cannot be undone. Existing performance logs remain.`,
       confirmLabel: isAr ? "تأكيد الحذف" : "Delete Program",
       tone: "danger",
       onConfirm: async () => {
@@ -266,13 +318,15 @@ export function WorkoutsPage() {
               {scope === "template" ? (
                 <button
                   type="button"
-                  onClick={() =>
+                  disabled={actionsBusy}
+                  onClick={() => {
+                    if (actionsBusy) return
                     setFormModal({
                       open: true,
                       mode: { type: "create-template" },
                     })
-                  }
-                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
+                  }}
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95 disabled:opacity-60"
                 >
                   <Plus className="size-4" strokeWidth={2} />
                   {t("admin.workouts.newTemplate")}
@@ -280,13 +334,15 @@ export function WorkoutsPage() {
               ) : (
                 <button
                   type="button"
-                  onClick={() =>
+                  disabled={actionsBusy}
+                  onClick={() => {
+                    if (actionsBusy) return
                     setFormModal({
                       open: true,
                       mode: { type: "assign" },
                     })
-                  }
-                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
+                  }}
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95 disabled:opacity-60"
                 >
                   <UserPlus className="size-4" strokeWidth={2} />
                   {t("admin.workouts.assign")}
@@ -305,7 +361,26 @@ export function WorkoutsPage() {
           </div>
         </div>
 
-        {list.length === 0 || !selected ? (
+        {programsError ? (
+          <div className="mt-5 flex min-h-40 flex-col items-center justify-center gap-3 rounded-[20px] bg-[#F4F4F4] px-4 py-10 text-center">
+            <p className="text-sm font-medium text-[#8c8c8c]">
+              {isAr
+                ? "تعذر تحميل برامج التمارين. حاول مرة أخرى."
+                : "Could not load workout programs. Please try again."}
+            </p>
+            <button
+              type="button"
+              onClick={() => void refetchPrograms()}
+              className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white"
+            >
+              {isAr ? "إعادة المحاولة" : "Retry"}
+            </button>
+          </div>
+        ) : programsLoading ? (
+          <div className="mt-5 flex min-h-40 items-center justify-center rounded-[20px] bg-[#F4F4F4] text-sm font-medium text-[#8c8c8c]">
+            {isAr ? "جاري تحميل البرامج…" : "Loading workout programs…"}
+          </div>
+        ) : list.length === 0 || !selected ? (
           <div className="mt-5 flex min-h-40 items-center justify-center rounded-[20px] bg-[#F4F4F4] text-sm font-medium text-[#8c8c8c]">
             {t("admin.workouts.empty")}
           </div>
@@ -432,7 +507,9 @@ export function WorkoutsPage() {
                   {/* Edit button */}
                   <button
                     type="button"
-                    onClick={() =>
+                    disabled={actionsBusy}
+                    onClick={() => {
+                      if (actionsBusy) return
                       setFormModal({
                         open: true,
                         mode:
@@ -440,8 +517,8 @@ export function WorkoutsPage() {
                             ? { type: "edit-template", program: selected }
                             : { type: "edit-assignment", program: selected },
                       })
-                    }
-                    className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5"
+                    }}
+                    className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5 disabled:opacity-60"
                     title={isAr ? "تعديل البرنامج" : "Edit program"}
                   >
                     <Pencil className="size-4" />
@@ -451,13 +528,14 @@ export function WorkoutsPage() {
                   {selected.subscriberId ? (
                     <button
                       type="button"
+                      disabled={actionsBusy}
                       onClick={() =>
                         setHistoryModal({
                           open: true,
                           program: selected,
                         })
                       }
-                      className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5"
+                      className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5 disabled:opacity-60"
                       title={isAr ? "سجل الإصدارات السابقة" : "Version history"}
                     >
                       <History className="size-4" />
@@ -467,8 +545,9 @@ export function WorkoutsPage() {
                   {/* Archive / Restore button */}
                   <button
                     type="button"
+                    disabled={actionsBusy}
                     onClick={() => handleArchiveToggle(selected)}
-                    className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5"
+                    className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5 disabled:opacity-60"
                     title={
                       selected.status === "archived"
                         ? isAr
@@ -489,8 +568,9 @@ export function WorkoutsPage() {
                   {/* Delete button */}
                   <button
                     type="button"
+                    disabled={actionsBusy}
                     onClick={() => handleDelete(selected)}
-                    className="flex size-9 items-center justify-center rounded-full bg-white text-red-500 shadow-sm hover:bg-red-50"
+                    className="flex size-9 items-center justify-center rounded-full bg-white text-red-500 shadow-sm hover:bg-red-50 disabled:opacity-60"
                     title={isAr ? "حذف نهائي" : "Delete permanently"}
                   >
                     <Trash2 className="size-4" />
@@ -734,15 +814,20 @@ export function WorkoutsPage() {
           open={formModal.open}
           mode={formModal.mode}
           templates={allPrograms.filter((p) => p.status === "template")}
-          onClose={() => setFormModal({ open: false, mode: null })}
+          onClose={() => {
+            if (actionsBusy) return
+            setFormModal({ open: false, mode: null })
+          }}
           onSaveProgram={async (input) => {
             await saveMutation.mutateAsync(input)
+            setFormModal({ open: false, mode: null })
             appToast.success(
               isAr ? "تم حفظ البرنامج بنجاح" : "Workout program saved successfully",
             )
           }}
           onAssignProgram={async (input) => {
             await assignMutation.mutateAsync(input)
+            setFormModal({ open: false, mode: null })
             appToast.success(
               isAr ? "تم تعيين البرنامج للمشترك بنجاح" : "Program assigned successfully",
             )

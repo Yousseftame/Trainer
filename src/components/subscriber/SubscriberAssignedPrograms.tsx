@@ -10,9 +10,8 @@ import {
   Zap,
 } from "lucide-react"
 import { APP_ROUTES } from "@/config/constants"
-import { useAuth } from "@/features/auth/auth-context"
 import { useNutritionProgramsQuery } from "@/features/nutrition/hooks"
-import { useSubscribersQuery } from "@/features/subscribers/hooks"
+import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
 import { useWorkoutProgramsQuery } from "@/features/workouts/hooks"
 import { useLocale } from "@/hooks/useLocale"
 import { cn } from "@/lib/utils"
@@ -20,29 +19,21 @@ import { cn } from "@/lib/utils"
 export function SubscriberAssignedPrograms() {
   const { locale, isRtl } = useLocale()
   const isAr = locale === "ar"
-  const { user } = useAuth()
+  const { subscriberId } = usePanelSubscriber()
 
-  const { data: subscribers = [] } = useSubscribersQuery()
-  const { data: workoutPrograms = [] } = useWorkoutProgramsQuery()
-  const { data: nutritionPrograms = [] } = useNutritionProgramsQuery()
-
-  const currentSubscriber = useMemo(() => {
-    if (!user) return subscribers[0]
-    return (
-      subscribers.find(
-        (s) =>
-          s.id === user.uid ||
-          s.email.toLowerCase() === (user.email ?? "").toLowerCase(),
-      ) ?? subscribers[0]
-    )
-  }, [subscribers, user])
+  const { data: workoutPrograms = [] } = useWorkoutProgramsQuery({
+    subscriberId,
+    enabled: Boolean(subscriberId),
+  })
+  const { data: nutritionPrograms = [] } = useNutritionProgramsQuery({
+    subscriberId,
+    enabled: Boolean(subscriberId),
+  })
 
   // Resolve assigned workout program
   const activeWorkout = useMemo(() => {
     const prog =
-      workoutPrograms.find(
-        (p) => p.subscriberId === currentSubscriber?.id && p.status === "active",
-      ) ?? workoutPrograms[0]
+      workoutPrograms.find((p) => p.status === "active") ?? workoutPrograms[0]
 
     return {
       title: prog?.title?.[locale] ?? (isAr ? "برنامج تضخيم وبناء القوة" : "Strength & Hypertrophy Split"),
@@ -54,14 +45,12 @@ export function SubscriberAssignedPrograms() {
       duration: isAr ? "55 دقيقة" : "55 min",
       progress: 68,
     }
-  }, [workoutPrograms, currentSubscriber, locale, isAr])
+  }, [workoutPrograms, locale, isAr])
 
   // Resolve assigned nutrition program
   const activeNutrition = useMemo(() => {
     const prog =
-      nutritionPrograms.find(
-        (p) => p.subscriberId === currentSubscriber?.id && p.status === "active",
-      ) ?? nutritionPrograms[0]
+      nutritionPrograms.find((p) => p.status === "active") ?? nutritionPrograms[0]
 
     return {
       title: prog?.title?.[locale] ?? (isAr ? "نظام التضخيم النظيف المتوازن" : "Clean Bulk Nutrition Plan"),
@@ -75,7 +64,7 @@ export function SubscriberAssignedPrograms() {
       water: isAr ? "3.5 لتر" : "3.5 L",
       mealsCount: 4,
     }
-  }, [nutritionPrograms, currentSubscriber, locale, isAr])
+  }, [nutritionPrograms, locale, isAr])
 
   const ArrowIcon = isRtl ? ArrowLeft : ArrowRight
 

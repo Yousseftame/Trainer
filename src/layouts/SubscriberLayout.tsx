@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar"
 import { DashboardTopbar } from "@/components/dashboard/DashboardTopbar"
 import { LogoutConfirmDialog } from "@/components/dashboard/LogoutConfirmDialog"
+import { FullPageSpinner } from "@/components/feedback/FullPageSpinner"
 import { SubscriberMobileMenuDrawer } from "@/components/subscriber/SubscriberMobileMenuDrawer"
 import { SubscriberMobileNavbar } from "@/components/subscriber/SubscriberMobileNavbar"
 import { APP_ROUTES } from "@/config/constants"
@@ -128,7 +129,9 @@ export function SubscriberLayout() {
           ref={mainRef}
           className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-32 pt-2 sm:px-6 sm:pb-36 lg:px-7 lg:pb-10"
         >
-          <Outlet />
+          <Suspense fallback={<FullPageSpinner />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
 

@@ -19,19 +19,17 @@ import { ContentPreviewDialog } from "@/components/dashboard/ContentPreviewDialo
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
 import { BRAND_LOGO_ON_DARK } from "@/components/shared/BrandLogo"
 import { APP_ROUTES } from "@/config/constants"
-import { useAuth } from "@/features/auth/auth-context"
 import {
   evaluateSubscriberContentAccess,
   type DemoContentAsset,
 } from "@/features/content/demo"
 import { useContentAssetsQuery } from "@/features/content/hooks"
 import { useNutritionProgramsQuery } from "@/features/nutrition/hooks"
-import { useSubscribersQuery } from "@/features/subscribers/hooks"
+import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
 import {
   currentSubscriptionFor,
   getPackageById,
 } from "@/features/subscriptions/demo"
-import { useSubscriptionsQuery } from "@/features/subscriptions/hooks"
 import { useWorkoutProgramsQuery } from "@/features/workouts/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
@@ -49,38 +47,29 @@ type LibraryFilter =
 export function LibraryPage() {
   const { locale } = useLocale()
   const isAr = locale === "ar"
-  const { user } = useAuth()
   useDocumentTitle(isAr ? "مكتبة المحتوى والملفات" : "Resource Library")
 
+  const { subscriber: currentSubscriber, subscriberId } = usePanelSubscriber()
   const { data: assets = [] } = useContentAssetsQuery()
-  const { data: subscribers = [] } = useSubscribersQuery()
-  const { data: subscriptions = [] } = useSubscriptionsQuery()
-  const { data: workoutPrograms = [] } = useWorkoutProgramsQuery()
-  const { data: nutritionPrograms = [] } = useNutritionProgramsQuery()
+  const { data: workoutPrograms = [] } = useWorkoutProgramsQuery({
+    subscriberId,
+    enabled: Boolean(subscriberId),
+  })
+  const { data: nutritionPrograms = [] } = useNutritionProgramsQuery({
+    subscriberId,
+    enabled: Boolean(subscriberId),
+  })
 
   const [filter, setFilter] = useState<LibraryFilter>("all")
   const [query, setQuery] = useState("")
   const [unlockedOnly, setUnlockedOnly] = useState(false)
   const [previewAsset, setPreviewAsset] = useState<DemoContentAsset | null>(null)
 
-  // 1. Identify current active subscriber
-  const currentSubscriber = useMemo(() => {
-    void subscriptions
-    if (!user) return subscribers[0]
-    return (
-      subscribers.find(
-        (s) =>
-          s.id === user.uid ||
-          s.email.toLowerCase() === (user.email ?? "").toLowerCase(),
-      ) ?? subscribers[0]
-    )
-  }, [subscribers, subscriptions, user])
-
   // 2. Identify subscription & package tier
   const subscription = useMemo(() => {
-    if (!currentSubscriber) return null
-    return currentSubscriptionFor(currentSubscriber.id)
-  }, [currentSubscriber])
+    if (!subscriberId) return null
+    return currentSubscriptionFor(subscriberId)
+  }, [subscriberId])
 
   const currentPackage = useMemo(() => {
     if (!subscription) return null
@@ -89,18 +78,12 @@ export function LibraryPage() {
 
   // 3. Identify active workout and nutrition programs
   const activeWorkoutProgram = useMemo(() => {
-    if (!currentSubscriber) return undefined
-    return workoutPrograms.find(
-      (p) => p.subscriberId === currentSubscriber.id && p.status === "active",
-    )
-  }, [workoutPrograms, currentSubscriber])
+    return workoutPrograms.find((p) => p.status === "active")
+  }, [workoutPrograms])
 
   const activeNutritionProgram = useMemo(() => {
-    if (!currentSubscriber) return undefined
-    return nutritionPrograms.find(
-      (p) => p.subscriberId === currentSubscriber.id && p.status === "active",
-    )
-  }, [nutritionPrograms, currentSubscriber])
+    return nutritionPrograms.find((p) => p.status === "active")
+  }, [nutritionPrograms])
 
   // 4. Enrich all non-reference assets with permissions and program linkages
   const enrichedAssets = useMemo(() => {

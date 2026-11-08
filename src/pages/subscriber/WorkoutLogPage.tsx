@@ -12,7 +12,6 @@ import {
 import { StatCard } from "@/components/dashboard/StatCard"
 import { WorkoutSummaryModal } from "@/components/subscriber/WorkoutSummaryModal"
 import { useAuth } from "@/features/auth/auth-context"
-import { useSubscribersQuery } from "@/features/subscribers/hooks"
 import { useWorkoutLogsQuery } from "@/features/workouts/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
@@ -27,23 +26,7 @@ export function WorkoutLogPage({ subscriberId: explicitSubId }: { subscriberId?:
   const { user } = useAuth()
   useDocumentTitle(t("nav.workoutLog"))
 
-  const { data: subscribers = [] } = useSubscribersQuery()
-
-  const currentSubscriber = useMemo(() => {
-    if (explicitSubId) {
-      return subscribers.find((s) => s.id === explicitSubId) ?? subscribers[0]
-    }
-    if (!user) return subscribers[0]
-    return (
-      subscribers.find(
-        (s) =>
-          s.id === user.uid ||
-          s.email.toLowerCase() === (user.email ?? "").toLowerCase(),
-      ) ?? subscribers[0]
-    )
-  }, [subscribers, user, explicitSubId])
-
-  const targetSubscriberId = explicitSubId || currentSubscriber?.id
+  const targetSubscriberId = explicitSubId || user?.uid
   const { data: logs = [] } = useWorkoutLogsQuery(targetSubscriberId)
 
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null)

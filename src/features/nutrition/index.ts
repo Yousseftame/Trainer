@@ -1,16 +1,14 @@
 export {
-  DEMO_NUTRITION,
-  INITIAL_NUTRITION_LOGS,
-  NUTRITION_DISCLAIMER,
-  dayMacros,
-  mealCount,
   resolveBilingualText,
-} from "@/features/nutrition/demo"
+  mealCount,
+  dayMacros,
+  NUTRITION_DISCLAIMER,
+} from "@/lib/program-text"
 export type {
-  DemoNutritionProgram,
-  DemoNutritionDay,
-  DemoMealSlot,
+  NutritionProgram as DemoNutritionProgram,
+  NutritionDay as DemoNutritionDay,
+  MealSlot as DemoMealSlot,
   MealSlotKey,
-} from "@/features/nutrition/demo"
+} from "@/types/program"
 export * from "@/features/nutrition/service"
 export * from "@/features/nutrition/hooks"

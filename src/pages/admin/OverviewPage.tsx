@@ -28,7 +28,7 @@ import {
 import adminBanner from "@/assets/admin.webp"
 import { APP_ROUTES } from "@/config/constants"
 import { useAuth } from "@/features/auth/auth-context"
-import { overviewSnapshot, type PriorityKind } from "@/features/overview"
+import { buildOverviewSnapshot, type PriorityKind } from "@/features/overview"
 import {
   useRegistrationRequestsQuery,
   useSubscribersQuery,
@@ -37,6 +37,8 @@ import {
   usePackagesQuery,
   useSubscriptionsQuery,
 } from "@/features/subscriptions/hooks"
+import { useNutritionProgramsQuery } from "@/features/nutrition/hooks"
+import { useWorkoutProgramsQuery } from "@/features/workouts/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatChartDate, formatDate, initials } from "@/lib/format"
@@ -94,14 +96,38 @@ export function OverviewPage() {
   const { data: subscriptions = [] } = useSubscriptionsQuery()
   const { data: subscribers = [] } = useSubscribersQuery()
   const { data: registrationRequests = [] } = useRegistrationRequestsQuery()
+  const { data: workoutPrograms = [] } = useWorkoutProgramsQuery({
+    enabled:
+      hasPermission("workouts:manage") ||
+      hasPermission("subscribers:read") ||
+      hasPermission("reports:read"),
+  })
+  const { data: nutritionPrograms = [] } = useNutritionProgramsQuery({
+    enabled:
+      hasPermission("nutrition:manage") ||
+      hasPermission("subscribers:read") ||
+      hasPermission("reports:read"),
+  })
 
-  const data = useMemo(() => {
-    void packages
-    void subscriptions
-    void subscribers
-    void registrationRequests
-    return overviewSnapshot()
-  }, [packages, subscriptions, subscribers, registrationRequests])
+  const data = useMemo(
+    () =>
+      buildOverviewSnapshot({
+        packages,
+        subscriptions,
+        subscribers,
+        registrationRequests,
+        workoutPrograms,
+        nutritionPrograms,
+      }),
+    [
+      packages,
+      subscriptions,
+      subscribers,
+      registrationRequests,
+      workoutPrograms,
+      nutritionPrograms,
+    ],
+  )
   const rtl = locale === "ar"
   const Chevron = rtl ? ChevronLeft : ChevronRight
   const name = user?.displayName ?? ""

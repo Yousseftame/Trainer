@@ -13,7 +13,6 @@ import { StatusBadge } from "@/components/dashboard/StatusBadge"
 import { useAuth } from "@/features/auth/auth-context"
 import { NUTRITION_DISCLAIMER } from "@/features/nutrition/demo"
 import { useNutritionLogsQuery } from "@/features/nutrition/hooks"
-import { useSubscribersQuery } from "@/features/subscribers/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatDate } from "@/lib/format"
@@ -25,23 +24,7 @@ export function NutritionLogPage({ subscriberId: explicitSubId }: { subscriberId
   const { user } = useAuth()
   useDocumentTitle(t("nav.nutritionLog"))
 
-  const { data: subscribers = [] } = useSubscribersQuery()
-
-  const currentSubscriber = useMemo(() => {
-    if (explicitSubId) {
-      return subscribers.find((s) => s.id === explicitSubId) ?? subscribers[0]
-    }
-    if (!user) return subscribers[0]
-    return (
-      subscribers.find(
-        (s) =>
-          s.id === user.uid ||
-          s.email.toLowerCase() === (user.email ?? "").toLowerCase(),
-      ) ?? subscribers[0]
-    )
-  }, [subscribers, user, explicitSubId])
-
-  const targetSubscriberId = explicitSubId || currentSubscriber?.id
+  const targetSubscriberId = explicitSubId || user?.uid
   const { data: logs = [] } = useNutritionLogsQuery(targetSubscriberId)
 
   const stats = useMemo(() => {

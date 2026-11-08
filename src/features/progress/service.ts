@@ -3,7 +3,9 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  query,
   setDoc,
+  where,
 } from "firebase/firestore"
 import { getDb } from "@/lib/firebase/firestore"
 import {
@@ -61,26 +63,33 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
 // Measurements
 // ==========================================
 
-export async function fetchMeasurements(): Promise<BodyMeasurement[]> {
+export async function fetchMeasurements(
+  subscriberId?: string,
+): Promise<BodyMeasurement[]> {
   const db = getDb()
   if (db) {
     try {
-      const snap = await getDocs(collection(db, MEASUREMENTS_COLLECTION))
+      const colRef = collection(db, MEASUREMENTS_COLLECTION)
+      const snap = subscriberId
+        ? await getDocs(query(colRef, where("subscriberId", "==", subscriberId)))
+        : await getDocs(colRef)
       if (!snap.empty) {
         const items = snap.docs.map((d) => d.data() as BodyMeasurement)
-        writeLocalCache(STORAGE_KEY_MEASUREMENTS, items)
+        if (!subscriberId) writeLocalCache(STORAGE_KEY_MEASUREMENTS, items)
         return items
       }
+      if (subscriberId) return []
     } catch (err) {
       console.warn("Firestore fetchMeasurements error, falling back to cache/demo:", err)
     }
   }
 
   const cached = readLocalCache<BodyMeasurement>(STORAGE_KEY_MEASUREMENTS)
-  if (cached && cached.length) return cached
-
-  writeLocalCache(STORAGE_KEY_MEASUREMENTS, DEMO_MEASUREMENTS)
-  return DEMO_MEASUREMENTS
+  const all = cached && cached.length ? cached : DEMO_MEASUREMENTS
+  if (!cached) writeLocalCache(STORAGE_KEY_MEASUREMENTS, DEMO_MEASUREMENTS)
+  return subscriberId
+    ? all.filter((m) => m.subscriberId === subscriberId)
+    : all
 }
 
 export type SaveMeasurementInput = {
@@ -154,26 +163,33 @@ export async function deleteMeasurement(id: string): Promise<void> {
 // Photos
 // ==========================================
 
-export async function fetchPhotos(): Promise<ProgressPhoto[]> {
+export async function fetchPhotos(
+  subscriberId?: string,
+): Promise<ProgressPhoto[]> {
   const db = getDb()
   if (db) {
     try {
-      const snap = await getDocs(collection(db, PHOTOS_COLLECTION))
+      const colRef = collection(db, PHOTOS_COLLECTION)
+      const snap = subscriberId
+        ? await getDocs(query(colRef, where("subscriberId", "==", subscriberId)))
+        : await getDocs(colRef)
       if (!snap.empty) {
         const items = snap.docs.map((d) => d.data() as ProgressPhoto)
-        writeLocalCache(STORAGE_KEY_PHOTOS, items)
+        if (!subscriberId) writeLocalCache(STORAGE_KEY_PHOTOS, items)
         return items
       }
+      if (subscriberId) return []
     } catch (err) {
       console.warn("Firestore fetchPhotos error, falling back to cache/demo:", err)
     }
   }
 
   const cached = readLocalCache<ProgressPhoto>(STORAGE_KEY_PHOTOS)
-  if (cached && cached.length) return cached
-
-  writeLocalCache(STORAGE_KEY_PHOTOS, DEMO_PHOTOS)
-  return DEMO_PHOTOS
+  const all = cached && cached.length ? cached : DEMO_PHOTOS
+  if (!cached) writeLocalCache(STORAGE_KEY_PHOTOS, DEMO_PHOTOS)
+  return subscriberId
+    ? all.filter((p) => p.subscriberId === subscriberId)
+    : all
 }
 
 export type SavePhotoInput = {
@@ -241,26 +257,33 @@ export async function deletePhoto(id: string): Promise<void> {
 // Performance / Lifts
 // ==========================================
 
-export async function fetchPerformance(): Promise<PerformanceRecord[]> {
+export async function fetchPerformance(
+  subscriberId?: string,
+): Promise<PerformanceRecord[]> {
   const db = getDb()
   if (db) {
     try {
-      const snap = await getDocs(collection(db, PERFORMANCE_COLLECTION))
+      const colRef = collection(db, PERFORMANCE_COLLECTION)
+      const snap = subscriberId
+        ? await getDocs(query(colRef, where("subscriberId", "==", subscriberId)))
+        : await getDocs(colRef)
       if (!snap.empty) {
         const items = snap.docs.map((d) => d.data() as PerformanceRecord)
-        writeLocalCache(STORAGE_KEY_PERFORMANCE, items)
+        if (!subscriberId) writeLocalCache(STORAGE_KEY_PERFORMANCE, items)
         return items
       }
+      if (subscriberId) return []
     } catch (err) {
       console.warn("Firestore fetchPerformance error, falling back to cache/demo:", err)
     }
   }
 
   const cached = readLocalCache<PerformanceRecord>(STORAGE_KEY_PERFORMANCE)
-  if (cached && cached.length) return cached
-
-  writeLocalCache(STORAGE_KEY_PERFORMANCE, DEMO_LIFTS)
-  return DEMO_LIFTS
+  const all = cached && cached.length ? cached : DEMO_LIFTS
+  if (!cached) writeLocalCache(STORAGE_KEY_PERFORMANCE, DEMO_LIFTS)
+  return subscriberId
+    ? all.filter((l) => l.subscriberId === subscriberId)
+    : all
 }
 
 export type SavePerformanceInput = {

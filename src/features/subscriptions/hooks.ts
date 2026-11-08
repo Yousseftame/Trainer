@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { DEMO_PACKAGES, DEMO_SUBSCRIPTIONS } from "@/features/subscriptions/demo"
+import { QUERY_STALE_TIMES } from "@/config/constants"
 import {
   assignSubscription,
+  fetchPackageById,
   fetchPackages,
   fetchSubscriptions,
+  fetchSubscriptionsForSubscriber,
   savePackage,
   togglePackageActive,
   updateSubscriptionLifecycle,
@@ -14,26 +16,54 @@ import {
 
 export const SUBSCRIPTION_QUERY_KEYS = {
   packages: ["packages"] as const,
+  package: (id: string) => ["packages", id] as const,
   subscriptions: ["subscriptions"] as const,
+  subscriptionsFor: (subscriberId: string) =>
+    ["subscriptions", "subscriber", subscriberId] as const,
 }
 
 export const subscriptionKeys = SUBSCRIPTION_QUERY_KEYS
 
-export function usePackagesQuery() {
+type ListQueryOptions = {
+  enabled?: boolean
+}
+
+/** Public catalog + admin packages page. Long staleTime — static-ish. */
+export function usePackagesQuery(options?: ListQueryOptions) {
   return useQuery({
     queryKey: SUBSCRIPTION_QUERY_KEYS.packages,
     queryFn: fetchPackages,
-    initialData: () => [...DEMO_PACKAGES],
-    staleTime: 30_000,
+    staleTime: QUERY_STALE_TIMES.catalog,
+    enabled: options?.enabled ?? true,
   })
 }
 
-export function useSubscriptionsQuery() {
+export function usePackageByIdQuery(packageId: string | undefined) {
+  return useQuery({
+    queryKey: SUBSCRIPTION_QUERY_KEYS.package(packageId ?? ""),
+    queryFn: () => fetchPackageById(packageId!),
+    enabled: Boolean(packageId),
+    staleTime: QUERY_STALE_TIMES.catalog,
+  })
+}
+
+/** Admin full subscriptions list — never use on subscriber panel. */
+export function useSubscriptionsQuery(options?: ListQueryOptions) {
   return useQuery({
     queryKey: SUBSCRIPTION_QUERY_KEYS.subscriptions,
     queryFn: fetchSubscriptions,
-    initialData: () => [...DEMO_SUBSCRIPTIONS],
-    staleTime: 30_000,
+    staleTime: QUERY_STALE_TIMES.adminList,
+    enabled: options?.enabled ?? true,
+  })
+}
+
+/** Subscriber-scoped subscriptions (rules-safe + cheap). */
+export function useSubscriberSubscriptionsQuery(subscriberId: string | undefined) {
+  return useQuery({
+    queryKey: SUBSCRIPTION_QUERY_KEYS.subscriptionsFor(subscriberId ?? ""),
+    queryFn: () => fetchSubscriptionsForSubscriber(subscriberId!),
+    enabled: Boolean(subscriberId),
+    staleTime: QUERY_STALE_TIMES.subscriberDashboard,
   })
 }
 
@@ -42,10 +72,8 @@ export function useSavePackageMutation() {
 
   return useMutation({
     mutationFn: (input: SavePackageInput) => savePackage(input),
-    onSuccess: (saved) => {
-      queryClient.setQueryData(SUBSCRIPTION_QUERY_KEYS.packages, [...DEMO_PACKAGES])
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: SUBSCRIPTION_QUERY_KEYS.packages })
-      return saved
     },
   })
 }
@@ -57,7 +85,6 @@ export function useTogglePackageActiveMutation() {
     mutationFn: ({ packageId, isActive }: { packageId: string; isActive: boolean }) =>
       togglePackageActive(packageId, isActive),
     onSuccess: () => {
-      queryClient.setQueryData(SUBSCRIPTION_QUERY_KEYS.packages, [...DEMO_PACKAGES])
       void queryClient.invalidateQueries({ queryKey: SUBSCRIPTION_QUERY_KEYS.packages })
     },
   })
@@ -69,10 +96,6 @@ export function useAssignSubscriptionMutation() {
   return useMutation({
     mutationFn: (input: AssignSubscriptionInput) => assignSubscription(input),
     onSuccess: () => {
-      queryClient.setQueryData(
-        SUBSCRIPTION_QUERY_KEYS.subscriptions,
-        [...DEMO_SUBSCRIPTIONS],
-      )
       void queryClient.invalidateQueries({
         queryKey: SUBSCRIPTION_QUERY_KEYS.subscriptions,
       })
@@ -89,10 +112,6 @@ export function useUpdateSubscriptionLifecycleMutation() {
     mutationFn: (input: UpdateSubscriptionLifecycleInput) =>
       updateSubscriptionLifecycle(input),
     onSuccess: () => {
-      queryClient.setQueryData(
-        SUBSCRIPTION_QUERY_KEYS.subscriptions,
-        [...DEMO_SUBSCRIPTIONS],
-      )
       void queryClient.invalidateQueries({
         queryKey: SUBSCRIPTION_QUERY_KEYS.subscriptions,
       })
@@ -101,4 +120,3 @@ export function useUpdateSubscriptionLifecycleMutation() {
     },
   })
 }
-

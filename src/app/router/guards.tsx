@@ -40,17 +40,19 @@ export function RequireRole({ allowed }: RequireRoleProps) {
     return <Navigate to={APP_ROUTES.public.login} replace />
   }
 
-  // Admins are allowed to preview subscriber routes as well
+  // Strict panel isolation: admin ↔ subscriber never share routes
   const ok =
     (allowed.includes("admin") && isAdmin) ||
-    (allowed.includes("subscriber") && (isSubscriber || isAdmin))
+    (allowed.includes("subscriber") && isSubscriber)
 
   if (!ok) {
-    // If a subscriber hits an admin-only route, redirect to subscriber dashboard
+    if (isAdmin) {
+      return <Navigate to={APP_ROUTES.admin.root} replace />
+    }
     if (isSubscriber) {
       return <Navigate to={APP_ROUTES.subscriber.root} replace />
     }
-    return <Navigate to={APP_ROUTES.admin.root} replace />
+    return <Navigate to={APP_ROUTES.public.login} replace />
   }
 
   return <Outlet />
@@ -85,9 +87,14 @@ export function RequirePermission({ permission }: RequirePermissionProps) {
     return <Navigate to={APP_ROUTES.public.login} replace />
   }
 
-  // If a subscriber ends up on an admin permission gate, guide to subscriber dashboard
-  if (isSubscriber && !isAdmin) {
+  // Subscribers never belong on /admin
+  if (isSubscriber) {
     return <Navigate to={APP_ROUTES.subscriber.root} replace />
+  }
+
+  // Non-admin identities should not linger on admin permission gates
+  if (!isAdmin) {
+    return <Navigate to={APP_ROUTES.public.login} replace />
   }
 
   if (!hasPermission(permission)) {
@@ -102,10 +109,11 @@ export function RequirePermission({ permission }: RequirePermissionProps) {
  * Authentication and role checks remain separate upstream.
  */
 export function RequireActiveSubscription() {
-  const { isAdmin, hasActiveSubscription } = useAuth()
+  const { hasActiveSubscription, isAdmin } = useAuth()
 
+  // Admins never belong on /app — bounce them home
   if (isAdmin) {
-    return <Outlet />
+    return <Navigate to={APP_ROUTES.admin.root} replace />
   }
 
   if (!hasActiveSubscription) {
@@ -127,7 +135,7 @@ export function RequirePackageEntitlement({
   const { isAdmin, user, hasActiveSubscription } = useAuth()
 
   if (isAdmin) {
-    return <Outlet />
+    return <Navigate to={APP_ROUTES.admin.root} replace />
   }
 
   if (!hasActiveSubscription || !user) {

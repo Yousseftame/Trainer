@@ -2,6 +2,7 @@
 import { useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { ChevronDown, Clock, Search, UserCheck, UserPlus, Users, UserX } from "lucide-react"
+import { ConfirmActionDialog } from "@/components/dashboard/ConfirmActionDialog"
 import { DataTable, TableAction } from "@/components/dashboard/DataTable"
 import { FilterChip, StatCard } from "@/components/dashboard/StatCard"
 import {
@@ -17,11 +18,13 @@ import {
 import { APP_ROUTES } from "@/config/constants"
 import { useAuth } from "@/features/auth/auth-context"
 import {
+  buildSubscriberRow,
   subscriberDisplayName,
-  subscriberRow,
-  type DemoSubscriber,
-} from "@/features/subscribers/demo"
+  type Subscriber,
+} from "@/features/subscribers"
 import {
+  useDeleteSubscriberMutation,
+  usePurgeDemoSubscribersMutation,
   useSaveSubscriberMutation,
   useSubscribersQuery,
   useUpdateSubscriberStatusMutation,
@@ -60,6 +63,8 @@ export function SubscribersPage() {
 
   const saveSubscriberMutation = useSaveSubscriberMutation()
   const updateStatusMutation = useUpdateSubscriberStatusMutation()
+  const deleteSubscriberMutation = useDeleteSubscriberMutation()
+  const purgeDemoMutation = usePurgeDemoSubscribersMutation()
   const assignSubMutation = useAssignSubscriptionMutation()
   const lifecycleSubMutation = useUpdateSubscriptionLifecycleMutation()
 
@@ -68,10 +73,23 @@ export function SubscribersPage() {
   const [packageFilter, setPackageFilter] = useState<string>("all")
   const [formState, setFormState] = useState<{
     open: boolean
-    subscriber: DemoSubscriber | null
+    subscriber: Subscriber | null
   }>({ open: false, subscriber: null })
   const [subDialogState, setSubDialogState] =
     useState<SubscriptionDialogState | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    title: string
+    description: string
+    confirmLabel: string
+    tone: "danger" | "primary" | "warning"
+    onConfirm: () => Promise<void>
+  } | null>(null)
+
+  const actionsBusy =
+    updateStatusMutation.isPending ||
+    deleteSubscriberMutation.isPending ||
+    purgeDemoMutation.isPending
 
   const packageMap = useMemo(
     () => new Map(packages.map((p) => [p.id, p])),
@@ -79,29 +97,29 @@ export function SubscribersPage() {
   )
 
   const rows = useMemo(() => {
-    void subscriptions
-    void packages
     const q = query.trim().toLowerCase()
-    return subscribers.map(subscriberRow).filter((row) => {
-      if (status !== "all" && row.status !== status) return false
-      if (packageFilter !== "all") {
-        if (packageFilter === "none") {
-          if (row.subscription) return false
-        } else if (row.subscription?.packageId !== packageFilter) {
-          return false
+    return subscribers
+      .map((item) => buildSubscriberRow(item, subscriptions))
+      .filter((row) => {
+        if (status !== "all" && row.status !== status) return false
+        if (packageFilter !== "all") {
+          if (packageFilter === "none") {
+            if (row.subscription) return false
+          } else if (row.subscription?.packageId !== packageFilter) {
+            return false
+          }
         }
-      }
-      if (!q) return true
-      return (
-        row.displayName.toLowerCase().includes(q) ||
-        (row.name?.en.toLowerCase().includes(q) ?? false) ||
-        (row.name?.ar.includes(q) ?? false) ||
-        row.email.toLowerCase().includes(q) ||
-        row.phone.toLowerCase().includes(q) ||
-        (row.goal?.[locale]?.toLowerCase().includes(q) ?? false)
-      )
-    })
-  }, [query, status, packageFilter, subscribers, subscriptions, packages, locale])
+        if (!q) return true
+        return (
+          row.displayName.toLowerCase().includes(q) ||
+          (row.name?.en.toLowerCase().includes(q) ?? false) ||
+          (row.name?.ar.includes(q) ?? false) ||
+          row.email.toLowerCase().includes(q) ||
+          row.phone.toLowerCase().includes(q) ||
+          (row.goal?.[locale]?.toLowerCase().includes(q) ?? false)
+        )
+      })
+  }, [query, status, packageFilter, subscribers, subscriptions, locale])
 
   const stats = useMemo(() => {
     const total = subscribers.length
@@ -113,24 +131,104 @@ export function SubscribersPage() {
     return { total, active, pending, suspended }
   }, [subscribers])
 
-  async function handleQuickToggleStatus(row: DemoSubscriber) {
+  function handleQuickToggleStatus(row: Subscriber) {
+    if (actionsBusy) return
     const nextStatus: UserStatus =
       row.status === "active" ? "suspended" : "active"
-    await updateStatusMutation.mutateAsync({
-      subscriberId: row.id,
-      status: nextStatus,
-      syncSubscription: true,
-      adminName: user?.displayName || user?.email || "Head Coach",
-    })
-    appToast.success(
-      nextStatus === "active"
+    const isSuspending = nextStatus === "suspended"
+    const name = subscriberDisplayName(row, locale)
+
+    setConfirmDialog({
+      open: true,
+      title: isSuspending
         ? locale === "ar"
-          ? "تم تفعيل حساب المشترك بنجاح"
-          : "Subscriber account activated"
+          ? "تعليق حساب المشترك"
+          : "Suspend subscriber account"
         : locale === "ar"
-          ? "تم تعليق حساب المشترك"
-          : "Subscriber account suspended",
-    )
+          ? "تفعيل حساب المشترك"
+          : "Activate subscriber account",
+      description: isSuspending
+        ? locale === "ar"
+          ? `تعليق حساب "${name}"؟ سيتم منعه من الدخول فوراً.`
+          : `Suspend "${name}"? They will be blocked from signing in immediately.`
+        : locale === "ar"
+          ? `تفعيل حساب "${name}" مجدداً؟`
+          : `Reactivate "${name}" account?`,
+      confirmLabel: isSuspending
+        ? locale === "ar"
+          ? "تعليق الحساب"
+          : "Suspend"
+        : locale === "ar"
+          ? "تفعيل الحساب"
+          : "Activate",
+      tone: isSuspending ? "warning" : "primary",
+      onConfirm: async () => {
+        await updateStatusMutation.mutateAsync({
+          subscriberId: row.id,
+          status: nextStatus,
+          syncSubscription: true,
+          adminName: user?.displayName || user?.email || "Head Coach",
+        })
+        appToast.success(
+          nextStatus === "active"
+            ? locale === "ar"
+              ? "تم تفعيل حساب المشترك بنجاح"
+              : "Subscriber account activated"
+            : locale === "ar"
+              ? "تم تعليق حساب المشترك"
+              : "Subscriber account suspended",
+        )
+      },
+    })
+  }
+
+  function handleDelete(row: Subscriber) {
+    if (actionsBusy) return
+    const name = subscriberDisplayName(row, locale)
+    setConfirmDialog({
+      open: true,
+      title:
+        locale === "ar"
+          ? "حذف حساب المشترك نهائياً"
+          : "Delete subscriber permanently",
+      description:
+        locale === "ar"
+          ? `حذف نهائي لحساب "${name}"؟ سيتم حذف مستخدم Auth وسجل Firestore ولا يمكن التراجع.`
+          : `Permanently delete "${name}"? This removes the Auth user and Firestore record and cannot be undone.`,
+      confirmLabel:
+        locale === "ar" ? "تأكيد الحذف النهائي" : "Delete permanently",
+      tone: "danger",
+      onConfirm: async () => {
+        await deleteSubscriberMutation.mutateAsync(row.id)
+        appToast.success(
+          locale === "ar"
+            ? "تم حذف حساب المشترك نهائياً"
+            : "Subscriber permanently deleted",
+        )
+      },
+    })
+  }
+
+  function handlePurgeDemo() {
+    if (actionsBusy) return
+    setConfirmDialog({
+      open: true,
+      title: locale === "ar" ? "مسح بيانات التجريب" : "Purge demo data",
+      description:
+        locale === "ar"
+          ? "مسح بيانات التجريب القديمة (معرفات وهمية) من المشتركين وطلبات التسجيل؟"
+          : "Purge legacy demo subscriber/request docs with fake IDs?",
+      confirmLabel: locale === "ar" ? "تأكيد المسح" : "Purge now",
+      tone: "warning",
+      onConfirm: async () => {
+        const result = await purgeDemoMutation.mutateAsync()
+        appToast.success(
+          locale === "ar"
+            ? `تم المسح: ${result.deletedSubscribers} مشترك، ${result.deletedRequests} طلب`
+            : `Purged ${result.deletedSubscribers} subscribers, ${result.deletedRequests} requests`,
+        )
+      },
+    })
   }
 
   return (
@@ -298,10 +396,22 @@ export function SubscribersPage() {
                   <ChevronDown className="pointer-events-none absolute end-3 size-4 text-[#8c8c8c]" />
                 </div>
 
+                {user?.role === "head_coach" ? (
+                  <button
+                    type="button"
+                    disabled={actionsBusy}
+                    onClick={() => handlePurgeDemo()}
+                    className="inline-flex h-11 shrink-0 items-center justify-center rounded-full bg-[#F4F4F4] px-3 sm:px-4 text-[12px] font-bold text-[#6B7280] transition hover:bg-black/5 disabled:opacity-60"
+                  >
+                    {locale === "ar" ? "مسح التجريب" : "Purge demo"}
+                  </button>
+                ) : null}
+
                 <button
                   type="button"
+                  disabled={actionsBusy || saveSubscriberMutation.isPending}
                   onClick={() => setFormState({ open: true, subscriber: null })}
-                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-4 sm:px-5 text-[13px] font-bold text-white transition hover:opacity-95"
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-4 sm:px-5 text-[13px] font-bold text-white transition hover:opacity-95 disabled:opacity-60"
                 >
                   <UserPlus className="size-4" strokeWidth={2} />
                   <span className="whitespace-nowrap">{t("admin.subscribers.add")}</span>
@@ -405,14 +515,17 @@ export function SubscribersPage() {
             <TableAction
               label={t("admin.common.view")}
               tone="primary"
+              disabled={actionsBusy}
               onClick={() => navigate(APP_ROUTES.admin.subscriberDetail(row.id))}
             />
             <TableAction
               label={locale === "ar" ? "تعديل" : "Edit"}
+              disabled={actionsBusy}
               onClick={() => setFormState({ open: true, subscriber: row })}
             />
             <TableAction
               label={t("admin.common.manage")}
+              disabled={actionsBusy}
               onClick={() => {
                 if (row.subscription) {
                   setSubDialogState({
@@ -443,7 +556,14 @@ export function SubscribersPage() {
                     : "Activate"
               }
               tone={row.status === "active" ? "danger" : "default"}
-              onClick={() => void handleQuickToggleStatus(row)}
+              disabled={actionsBusy}
+              onClick={() => handleQuickToggleStatus(row)}
+            />
+            <TableAction
+              label={locale === "ar" ? "حذف" : "Delete"}
+              tone="danger"
+              disabled={actionsBusy}
+              onClick={() => handleDelete(row)}
             />
           </>
         )}
@@ -455,7 +575,10 @@ export function SubscribersPage() {
         packages={packages}
         busy={saveSubscriberMutation.isPending}
         adminName={user?.displayName || user?.email || "Head Coach"}
-        onClose={() => setFormState({ open: false, subscriber: null })}
+        onClose={() => {
+          if (saveSubscriberMutation.isPending) return
+          setFormState({ open: false, subscriber: null })
+        }}
         onSave={async (payload) => {
           const isEdit = Boolean(payload.id)
           await saveSubscriberMutation.mutateAsync(payload)
@@ -495,6 +618,19 @@ export function SubscribersPage() {
               ? "تم تحديث حالة الاشتراك بنجاح"
               : "Subscription updated successfully",
           )
+        }}
+      />
+
+      <ConfirmActionDialog
+        open={Boolean(confirmDialog?.open)}
+        title={confirmDialog?.title ?? ""}
+        description={confirmDialog?.description}
+        confirmLabel={confirmDialog?.confirmLabel}
+        tone={confirmDialog?.tone ?? "danger"}
+        onCancel={() => setConfirmDialog(null)}
+        onConfirm={async () => {
+          if (!confirmDialog) return
+          await confirmDialog.onConfirm()
         }}
       />
     </div>

@@ -2,15 +2,14 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
+  query,
   setDoc,
+  where,
   writeBatch,
 } from "firebase/firestore"
 import { getDb } from "@/lib/firebase/firestore"
-import {
-  DEMO_NUTRITION,
-  INITIAL_NUTRITION_LOGS,
-} from "@/features/nutrition/demo"
 import type {
   BilingualText,
   NutritionAdherenceLog,
@@ -24,26 +23,16 @@ const NUTRITION_LOGS_COLLECTION = "nutrition_logs"
 const STORAGE_KEY_NUTRITION = "derpyfit_nutrition_programs_v1"
 const STORAGE_KEY_NUTRITION_LOGS = "derpyfit_nutrition_logs_v1"
 
-function readLocalCache<T>(key: string): T[] | null {
-  if (typeof window === "undefined") return null
+function clearLegacyLocalCaches() {
   try {
-    const raw = window.localStorage.getItem(key)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? (parsed as T[]) : null
+    window.localStorage.removeItem(STORAGE_KEY_NUTRITION)
+    window.localStorage.removeItem(STORAGE_KEY_NUTRITION_LOGS)
   } catch {
-    return null
+    // ignore
   }
 }
 
-function writeLocalCache<T>(key: string, items: T[]): void {
-  if (typeof window === "undefined") return
-  try {
-    window.localStorage.setItem(key, JSON.stringify(items))
-  } catch {
-    // Ignore storage quota limits
-  }
-}
+clearLegacyLocalCaches()
 
 function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
   const out: Record<string, unknown> = {}
@@ -55,43 +44,186 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
   return out as T
 }
 
-export async function listNutritionPrograms(): Promise<NutritionProgram[]> {
-  const db = getDb()
-  if (db) {
-    try {
-      const snap = await getDocs(collection(db, NUTRITION_PROGRAMS_COLLECTION))
-      if (!snap.empty) {
-        const items = snap.docs.map((d) => ({
-          ...(d.data() as NutritionProgram),
-          id: d.id,
-        }))
-        writeLocalCache(STORAGE_KEY_NUTRITION, items)
-        return items
-      }
+function cloneDays(days: NutritionDay[]): NutritionDay[] {
+  return JSON.parse(JSON.stringify(days)) as NutritionDay[]
+}
 
-      // Seed initial demo data to Firestore if empty
-      const batch = writeBatch(db)
-      for (const item of DEMO_NUTRITION) {
-        batch.set(
-          doc(db, NUTRITION_PROGRAMS_COLLECTION, item.id),
-          stripUndefined({ ...item }),
-        )
-      }
-      await batch.commit().catch(() => null)
-      writeLocalCache(STORAGE_KEY_NUTRITION, DEMO_NUTRITION)
-      return DEMO_NUTRITION
-    } catch {
-      // Fall through to cache
-    }
+function normalizeNutritionProgram(
+  id: string,
+  raw: Record<string, unknown>,
+): NutritionProgram {
+  const titleRaw = (raw.title ?? {}) as Record<string, string>
+  return {
+    id,
+    title: {
+      en: String(titleRaw.en ?? "Nutrition plan"),
+      ar: String(titleRaw.ar ?? titleRaw.en ?? "خطة تغذية"),
+    },
+    description:
+      raw.description && typeof raw.description === "object"
+        ? {
+            en: String(
+              (raw.description as Record<string, unknown>).en ??
+                (raw.description as Record<string, unknown>).ar ??
+                "",
+            ),
+            ar: String(
+              (raw.description as Record<string, unknown>).ar ??
+                (raw.description as Record<string, unknown>).en ??
+                "",
+            ),
+          }
+        : undefined,
+    format: raw.format === "pdf" ? "pdf" : "interactive",
+    version: Math.max(1, Number(raw.version) || 1),
+    status:
+      raw.status === "template" || raw.status === "archived"
+        ? raw.status
+        : "active",
+    subscriberId:
+      typeof raw.subscriberId === "string" ? raw.subscriberId : undefined,
+    templateId: typeof raw.templateId === "string" ? raw.templateId : undefined,
+    previousVersionId:
+      typeof raw.previousVersionId === "string"
+        ? raw.previousVersionId
+        : undefined,
+    days: Array.isArray(raw.days) ? (raw.days as NutritionDay[]) : [],
+    targetCalories:
+      typeof raw.targetCalories === "number" ? raw.targetCalories : undefined,
+    targetWaterLiters:
+      typeof raw.targetWaterLiters === "number"
+        ? raw.targetWaterLiters
+        : undefined,
+    macros:
+      raw.macros && typeof raw.macros === "object"
+        ? {
+            proteinGrams:
+              Number((raw.macros as Record<string, unknown>).proteinGrams) ||
+              0,
+            carbsGrams:
+              Number((raw.macros as Record<string, unknown>).carbsGrams) || 0,
+            fatsGrams:
+              Number((raw.macros as Record<string, unknown>).fatsGrams) || 0,
+          }
+        : undefined,
+    pdfContentId:
+      typeof raw.pdfContentId === "string" ? raw.pdfContentId : undefined,
+    pdfName:
+      raw.pdfName && typeof raw.pdfName === "object"
+        ? {
+            en: String(
+              (raw.pdfName as Record<string, unknown>).en ??
+                (raw.pdfName as Record<string, unknown>).ar ??
+                "",
+            ),
+            ar: String(
+              (raw.pdfName as Record<string, unknown>).ar ??
+                (raw.pdfName as Record<string, unknown>).en ??
+                "",
+            ),
+          }
+        : undefined,
+    notes:
+      raw.notes && typeof raw.notes === "object"
+        ? {
+            en: String(
+              (raw.notes as Record<string, unknown>).en ??
+                (raw.notes as Record<string, unknown>).ar ??
+                "",
+            ),
+            ar: String(
+              (raw.notes as Record<string, unknown>).ar ??
+                (raw.notes as Record<string, unknown>).en ??
+                "",
+            ),
+          }
+        : undefined,
+    disclaimerAcknowledged: raw.disclaimerAcknowledged !== false,
+    adherence:
+      raw.adherence && typeof raw.adherence === "object"
+        ? {
+            done: Number((raw.adherence as Record<string, unknown>).done) || 0,
+            total:
+              Number((raw.adherence as Record<string, unknown>).total) || 28,
+          }
+        : undefined,
+    createdAt:
+      typeof raw.createdAt === "string"
+        ? raw.createdAt
+        : new Date().toISOString(),
+    updatedAt:
+      typeof raw.updatedAt === "string"
+        ? raw.updatedAt
+        : new Date().toISOString(),
+    archivedAt:
+      typeof raw.archivedAt === "string" ? raw.archivedAt : undefined,
   }
+}
 
-  const cached = readLocalCache<NutritionProgram>(STORAGE_KEY_NUTRITION)
-  if (cached && cached.length > 0) {
-    return cached
+function normalizeNutritionLog(
+  id: string,
+  raw: Record<string, unknown>,
+): NutritionAdherenceLog {
+  return {
+    ...(raw as Omit<NutritionAdherenceLog, "id">),
+    id,
+    subscriberId: String(raw.subscriberId ?? ""),
+    programId: String(raw.programId ?? ""),
+    date: String(raw.date ?? ""),
+    status:
+      raw.status === "mostly" ||
+      raw.status === "deviated" ||
+      raw.status === "skipped"
+        ? raw.status
+        : "adhered",
+    loggedAt:
+      typeof raw.loggedAt === "string"
+        ? raw.loggedAt
+        : new Date().toISOString(),
   }
+}
 
-  writeLocalCache(STORAGE_KEY_NUTRITION, DEMO_NUTRITION)
-  return DEMO_NUTRITION
+/** Admin unscoped list, or subscriber-scoped. Never auto-seeds demo. */
+export async function listNutritionPrograms(
+  subscriberId?: string,
+): Promise<NutritionProgram[]> {
+  try {
+    const db = getDb()
+    const colRef = collection(db, NUTRITION_PROGRAMS_COLLECTION)
+    const snap = subscriberId
+      ? await getDocs(query(colRef, where("subscriberId", "==", subscriberId)))
+      : await getDocs(colRef)
+
+    return snap.docs
+      .map((d) =>
+        normalizeNutritionProgram(d.id, d.data() as Record<string, unknown>),
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      )
+  } catch (err) {
+    console.warn("[Firestore] Failed to read nutrition_programs:", err)
+    throw err instanceof Error ? err : new Error("Failed to load nutrition")
+  }
+}
+
+export async function fetchNutritionProgramById(
+  programId: string,
+): Promise<NutritionProgram | null> {
+  if (!programId) return null
+  try {
+    const db = getDb()
+    const snap = await getDoc(doc(db, NUTRITION_PROGRAMS_COLLECTION, programId))
+    if (!snap.exists()) return null
+    return normalizeNutritionProgram(
+      snap.id,
+      snap.data() as Record<string, unknown>,
+    )
+  } catch (err) {
+    console.warn("[Firestore] Failed to read nutrition program:", err)
+    return null
+  }
 }
 
 export type SaveNutritionProgramInput = {
@@ -117,122 +249,156 @@ export type SaveNutritionProgramInput = {
   createNewVersion?: boolean
 }
 
-export async function saveNutritionProgram(
-  input: SaveNutritionProgramInput,
-): Promise<NutritionProgram> {
-  const current = await listNutritionPrograms()
-  const now = new Date().toISOString()
+async function archiveActiveNutritionForSubscriber(
+  subscriberId: string,
+  exceptId: string,
+  now: string,
+): Promise<void> {
+  const db = getDb()
+  const snap = await getDocs(
+    query(
+      collection(db, NUTRITION_PROGRAMS_COLLECTION),
+      where("subscriberId", "==", subscriberId),
+      where("status", "==", "active"),
+    ),
+  )
+  if (snap.empty) return
 
-  // Case 1: Version bump when requested on existing assigned plan
-  if (input.id && input.createNewVersion) {
-    const existingIndex = current.findIndex((p) => p.id === input.id)
-    if (existingIndex >= 0) {
-      const existing = current[existingIndex]
-      const archivedRecord: NutritionProgram = {
+  const batch = writeBatch(db)
+  let writes = 0
+  for (const d of snap.docs) {
+    if (d.id === exceptId) continue
+    const existing = normalizeNutritionProgram(
+      d.id,
+      d.data() as Record<string, unknown>,
+    )
+    batch.set(
+      doc(db, NUTRITION_PROGRAMS_COLLECTION, d.id),
+      stripUndefined({
         ...existing,
         status: "archived",
         archivedAt: now,
         updatedAt: now,
-      }
+      }),
+    )
+    writes += 1
+  }
+  if (writes > 0) await batch.commit()
+}
 
-      const nextVersion = (existing.version || 1) + 1
-      const newActiveId = `nasg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`
-      const newActiveRecord: NutritionProgram = {
-        id: newActiveId,
-        title: input.title,
-        description: input.description,
-        format: input.format,
-        version: nextVersion,
-        status: input.status === "archived" ? "archived" : "active",
-        subscriberId: input.subscriberId || existing.subscriberId,
-        templateId: input.templateId || existing.templateId,
-        previousVersionId: existing.id,
-        days: input.days,
-        targetCalories: input.targetCalories,
-        targetWaterLiters: input.targetWaterLiters,
-        macros: input.macros,
-        pdfContentId: input.pdfContentId,
-        pdfName: input.pdfName,
-        notes: input.notes,
-        disclaimerAcknowledged: input.disclaimerAcknowledged ?? true,
-        adherence: { done: 0, total: 28 },
-        createdAt: now,
-        updatedAt: now,
-      }
+export async function saveNutritionProgram(
+  input: SaveNutritionProgramInput,
+): Promise<NutritionProgram> {
+  const now = new Date().toISOString()
+  const db = getDb()
 
-      current[existingIndex] = archivedRecord
-      current.unshift(newActiveRecord)
-      writeLocalCache(STORAGE_KEY_NUTRITION, current)
+  // Versioned edit for assigned plans (docs: retain previous nutrition plans)
+  if (input.id && input.createNewVersion) {
+    const existing = await fetchNutritionProgramById(input.id)
+    if (!existing) throw new Error("Nutrition program not found")
 
-      const db = getDb()
-      if (db) {
-        try {
-          const batch = writeBatch(db)
-          batch.set(
-            doc(db, NUTRITION_PROGRAMS_COLLECTION, archivedRecord.id),
-            stripUndefined({ ...archivedRecord }),
-          )
-          batch.set(
-            doc(db, NUTRITION_PROGRAMS_COLLECTION, newActiveRecord.id),
-            stripUndefined({ ...newActiveRecord }),
-          )
-          await batch.commit()
-        } catch {
-          // Keep local cache
-        }
-      }
-      return newActiveRecord
+    const archivedRecord: NutritionProgram = {
+      ...existing,
+      status: "archived",
+      archivedAt: now,
+      updatedAt: now,
     }
+
+    const newActiveId = doc(collection(db, NUTRITION_PROGRAMS_COLLECTION)).id
+    const newActiveRecord: NutritionProgram = {
+      id: newActiveId,
+      title: input.title,
+      description: input.description,
+      format: input.format,
+      version: (existing.version || 1) + 1,
+      status: input.status === "archived" ? "archived" : "active",
+      subscriberId: input.subscriberId || existing.subscriberId,
+      templateId: input.templateId || existing.templateId,
+      previousVersionId: existing.id,
+      days: cloneDays(input.days),
+      targetCalories: input.targetCalories,
+      targetWaterLiters: input.targetWaterLiters,
+      macros: input.macros,
+      pdfContentId: input.pdfContentId,
+      pdfName: input.pdfName,
+      notes: input.notes,
+      disclaimerAcknowledged: input.disclaimerAcknowledged ?? true,
+      adherence: { done: 0, total: 28 },
+      createdAt: now,
+      updatedAt: now,
+    }
+
+    const batch = writeBatch(db)
+    batch.set(
+      doc(db, NUTRITION_PROGRAMS_COLLECTION, archivedRecord.id),
+      stripUndefined({ ...archivedRecord }),
+    )
+    batch.set(
+      doc(db, NUTRITION_PROGRAMS_COLLECTION, newActiveRecord.id),
+      stripUndefined({ ...newActiveRecord }),
+    )
+    await batch.commit()
+    return newActiveRecord
   }
 
-  // Case 2: In-place update
   if (input.id) {
-    const existingIndex = current.findIndex((p) => p.id === input.id)
-    if (existingIndex >= 0) {
-      const existing = current[existingIndex]
-      const updated: NutritionProgram = {
-        ...existing,
-        title: input.title,
-        description: input.description,
-        format: input.format,
-        status: input.status,
-        subscriberId: input.subscriberId ?? existing.subscriberId,
-        templateId: input.templateId ?? existing.templateId,
-        days: input.days,
-        targetCalories: input.targetCalories ?? existing.targetCalories,
-        targetWaterLiters: input.targetWaterLiters ?? existing.targetWaterLiters,
-        macros: input.macros ?? existing.macros,
-        pdfContentId: input.pdfContentId ?? existing.pdfContentId,
-        pdfName: input.pdfName ?? existing.pdfName,
-        notes: input.notes,
-        disclaimerAcknowledged: input.disclaimerAcknowledged ?? existing.disclaimerAcknowledged,
-        updatedAt: now,
-      }
-      current[existingIndex] = updated
-      writeLocalCache(STORAGE_KEY_NUTRITION, current)
+    const existing = await fetchNutritionProgramById(input.id)
+    if (!existing) throw new Error("Nutrition program not found")
 
-      const db = getDb()
-      if (db) {
-        try {
-          await setDoc(
-            doc(db, NUTRITION_PROGRAMS_COLLECTION, updated.id),
-            stripUndefined({ ...updated }),
-            { merge: true },
-          )
-        } catch {
-          // Keep local cache
-        }
-      }
-      return updated
+    const updated: NutritionProgram = {
+      ...existing,
+      title: input.title,
+      description: input.description,
+      format: input.format,
+      status: input.status,
+      subscriberId: input.subscriberId ?? existing.subscriberId,
+      templateId: input.templateId ?? existing.templateId,
+      days: cloneDays(input.days),
+      targetCalories: input.targetCalories ?? existing.targetCalories,
+      targetWaterLiters: input.targetWaterLiters ?? existing.targetWaterLiters,
+      macros: input.macros ?? existing.macros,
+      pdfContentId: input.pdfContentId ?? existing.pdfContentId,
+      pdfName: input.pdfName ?? existing.pdfName,
+      notes: input.notes,
+      disclaimerAcknowledged:
+        input.disclaimerAcknowledged ?? existing.disclaimerAcknowledged,
+      updatedAt: now,
+      archivedAt:
+        input.status === "archived"
+          ? existing.archivedAt ?? now
+          : input.status === "active"
+            ? undefined
+            : existing.archivedAt,
+      adherence:
+        input.status === "active"
+          ? existing.adherence ?? { done: 0, total: 28 }
+          : existing.adherence,
     }
+
+    if (
+      existing.status === "archived" &&
+      updated.status === "active" &&
+      updated.subscriberId
+    ) {
+      await archiveActiveNutritionForSubscriber(
+        updated.subscriberId,
+        updated.id,
+        now,
+      )
+    }
+
+    await setDoc(
+      doc(db, NUTRITION_PROGRAMS_COLLECTION, updated.id),
+      stripUndefined({ ...updated }),
+    )
+    return updated
   }
 
-  // Case 3: Fresh template or assignment
-  const newId =
-    input.status === "template"
-      ? `ntpl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`
-      : `nasg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`
+  if (input.status === "active" && !input.subscriberId) {
+    throw new Error("Assigned nutrition programs require a subscriber")
+  }
 
+  const newId = doc(collection(db, NUTRITION_PROGRAMS_COLLECTION)).id
   const newRecord: NutritionProgram = {
     id: newId,
     title: input.title,
@@ -242,7 +408,7 @@ export async function saveNutritionProgram(
     status: input.status,
     subscriberId: input.subscriberId,
     templateId: input.templateId,
-    days: input.days,
+    days: cloneDays(input.days),
     targetCalories: input.targetCalories,
     targetWaterLiters: input.targetWaterLiters,
     macros: input.macros,
@@ -250,26 +416,24 @@ export async function saveNutritionProgram(
     pdfName: input.pdfName,
     notes: input.notes,
     disclaimerAcknowledged: input.disclaimerAcknowledged ?? true,
-    adherence: input.status === "active" ? { done: 0, total: 28 } : undefined,
+    adherence:
+      input.status === "active" ? { done: 0, total: 28 } : undefined,
     createdAt: now,
     updatedAt: now,
   }
 
-  current.unshift(newRecord)
-  writeLocalCache(STORAGE_KEY_NUTRITION, current)
-
-  const db = getDb()
-  if (db) {
-    try {
-      await setDoc(
-        doc(db, NUTRITION_PROGRAMS_COLLECTION, newRecord.id),
-        stripUndefined({ ...newRecord }),
-      )
-    } catch {
-      // Keep local cache
-    }
+  if (newRecord.status === "active" && newRecord.subscriberId) {
+    await archiveActiveNutritionForSubscriber(
+      newRecord.subscriberId,
+      newRecord.id,
+      now,
+    )
   }
 
+  await setDoc(
+    doc(db, NUTRITION_PROGRAMS_COLLECTION, newRecord.id),
+    stripUndefined({ ...newRecord }),
+  )
   return newRecord
 }
 
@@ -292,63 +456,48 @@ export type AssignNutritionInput = {
   notes?: BilingualText
 }
 
+/**
+ * Assign a nutrition plan — clones template days so template edits never
+ * overwrite assigned history (docs: reusable templates vs subscriber plans).
+ */
 export async function assignNutritionProgram(
   input: AssignNutritionInput,
 ): Promise<NutritionProgram> {
-  const current = await listNutritionPrograms()
+  if (!input.subscriberId) throw new Error("Subscriber is required")
+
   const now = new Date().toISOString()
-
-  // 1. Archive previous active nutrition plan for this subscriber
-  const existingActive = current.find(
-    (p) => p.subscriberId === input.subscriberId && p.status === "active",
-  )
-
   const db = getDb()
-  if (existingActive) {
-    existingActive.status = "archived"
-    existingActive.archivedAt = now
-    existingActive.updatedAt = now
-    if (db) {
-      try {
-        await setDoc(
-          doc(db, NUTRITION_PROGRAMS_COLLECTION, existingActive.id),
-          stripUndefined({ ...existingActive }),
-          { merge: true },
-        )
-      } catch {
-        // Keep local cache
-      }
-    }
-  }
 
-  // 2. Clone from template if provided
   let title = input.customTitle
-  let format = input.format || "interactive"
-  let days = input.days
+  let format: ProgramFormat = input.format || "interactive"
+  let days = input.days ? cloneDays(input.days) : []
   let targetCalories = input.targetCalories
   let targetWaterLiters = input.targetWaterLiters
   let macros = input.macros
   let pdfContentId = input.pdfContentId
   let pdfName = input.pdfName
+  let previousVersionId: string | undefined
+  let nextVersion = 1
 
   if (input.templateId) {
-    const template = current.find((p) => p.id === input.templateId)
-    if (template) {
-      if (!title) {
-        const subLabel = input.subscriberName || "Subscriber"
-        title = {
-          en: `${subLabel} — ${template.title.en}`,
-          ar: `${subLabel} — ${template.title.ar}`,
-        }
-      }
-      format = template.format
-      days = JSON.parse(JSON.stringify(template.days))
-      targetCalories = targetCalories ?? template.targetCalories
-      targetWaterLiters = targetWaterLiters ?? template.targetWaterLiters
-      macros = macros ?? template.macros
-      pdfContentId = template.pdfContentId
-      pdfName = template.pdfName
+    const template = await fetchNutritionProgramById(input.templateId)
+    if (!template || template.status !== "template") {
+      throw new Error("Nutrition template not found")
     }
+    if (!title) {
+      const subLabel = input.subscriberName || "Subscriber"
+      title = {
+        en: `${subLabel} — ${template.title.en}`,
+        ar: `${subLabel} — ${template.title.ar}`,
+      }
+    }
+    format = template.format
+    days = cloneDays(template.days)
+    targetCalories = targetCalories ?? template.targetCalories
+    targetWaterLiters = targetWaterLiters ?? template.targetWaterLiters
+    macros = macros ?? template.macros
+    pdfContentId = template.pdfContentId
+    pdfName = template.pdfName
   }
 
   if (!title) {
@@ -358,17 +507,44 @@ export async function assignNutritionProgram(
     }
   }
 
-  const newId = `nasg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`
+  const activeSnap = await getDocs(
+    query(
+      collection(db, NUTRITION_PROGRAMS_COLLECTION),
+      where("subscriberId", "==", input.subscriberId),
+      where("status", "==", "active"),
+    ),
+  )
+
+  const batch = writeBatch(db)
+  for (const d of activeSnap.docs) {
+    const existing = normalizeNutritionProgram(
+      d.id,
+      d.data() as Record<string, unknown>,
+    )
+    previousVersionId = existing.id
+    nextVersion = Math.max(nextVersion, (existing.version || 1) + 1)
+    batch.set(
+      doc(db, NUTRITION_PROGRAMS_COLLECTION, existing.id),
+      stripUndefined({
+        ...existing,
+        status: "archived",
+        archivedAt: now,
+        updatedAt: now,
+      }),
+    )
+  }
+
+  const newId = doc(collection(db, NUTRITION_PROGRAMS_COLLECTION)).id
   const newAssignment: NutritionProgram = {
     id: newId,
     title,
     format,
-    version: existingActive ? (existingActive.version || 1) + 1 : 1,
+    version: nextVersion,
     status: "active",
     subscriberId: input.subscriberId,
     templateId: input.templateId,
-    previousVersionId: existingActive?.id,
-    days: days || [],
+    previousVersionId,
+    days,
     targetCalories,
     targetWaterLiters,
     macros,
@@ -381,99 +557,110 @@ export async function assignNutritionProgram(
     updatedAt: now,
   }
 
-  current.unshift(newAssignment)
-  writeLocalCache(STORAGE_KEY_NUTRITION, current)
-
-  if (db) {
-    try {
-      await setDoc(
-        doc(db, NUTRITION_PROGRAMS_COLLECTION, newAssignment.id),
-        stripUndefined({ ...newAssignment }),
-      )
-    } catch {
-      // Keep local cache
-    }
-  }
-
+  batch.set(
+    doc(db, NUTRITION_PROGRAMS_COLLECTION, newAssignment.id),
+    stripUndefined({ ...newAssignment }),
+  )
+  await batch.commit()
   return newAssignment
 }
 
-export async function archiveNutritionProgram(id: string): Promise<void> {
-  const current = await listNutritionPrograms()
-  const target = current.find((p) => p.id === id)
-  if (!target) return
+export async function archiveNutritionProgram(
+  id: string,
+): Promise<NutritionProgram> {
+  const existing = await fetchNutritionProgramById(id)
+  if (!existing) throw new Error("Nutrition program not found")
 
-  target.status = "archived"
-  target.archivedAt = new Date().toISOString()
-  target.updatedAt = target.archivedAt
-
-  writeLocalCache(STORAGE_KEY_NUTRITION, current)
-
+  const now = new Date().toISOString()
   const db = getDb()
-  if (db) {
-    try {
-      await setDoc(
-        doc(db, NUTRITION_PROGRAMS_COLLECTION, id),
-        stripUndefined({ ...target }),
-        { merge: true },
-      )
-    } catch {
-      // Keep local cache
-    }
+  const updated: NutritionProgram = {
+    ...existing,
+    status: "archived",
+    archivedAt: now,
+    updatedAt: now,
   }
+  await setDoc(
+    doc(db, NUTRITION_PROGRAMS_COLLECTION, id),
+    stripUndefined({ ...updated }),
+  )
+  return updated
+}
+
+export async function restoreNutritionProgram(
+  id: string,
+): Promise<NutritionProgram> {
+  const existing = await fetchNutritionProgramById(id)
+  if (!existing) throw new Error("Nutrition program not found")
+
+  const now = new Date().toISOString()
+  const db = getDb()
+  const nextStatus: NutritionProgram["status"] = existing.subscriberId
+    ? "active"
+    : "template"
+
+  if (nextStatus === "active" && existing.subscriberId) {
+    await archiveActiveNutritionForSubscriber(
+      existing.subscriberId,
+      existing.id,
+      now,
+    )
+  }
+
+  const updated: NutritionProgram = {
+    ...existing,
+    status: nextStatus,
+    archivedAt: undefined,
+    updatedAt: now,
+    adherence:
+      nextStatus === "active"
+        ? existing.adherence ?? { done: 0, total: 28 }
+        : existing.adherence,
+  }
+
+  await setDoc(
+    doc(db, NUTRITION_PROGRAMS_COLLECTION, id),
+    stripUndefined({ ...updated }),
+  )
+  return updated
 }
 
 export async function deleteNutritionProgram(id: string): Promise<void> {
-  let current = await listNutritionPrograms()
-  current = current.filter((p) => p.id !== id)
-  writeLocalCache(STORAGE_KEY_NUTRITION, current)
-
   const db = getDb()
-  if (db) {
-    try {
-      await deleteDoc(doc(db, NUTRITION_PROGRAMS_COLLECTION, id))
-    } catch {
-      // Keep local cache
-    }
-  }
+  await deleteDoc(doc(db, NUTRITION_PROGRAMS_COLLECTION, id))
 }
 
 export async function listNutritionLogs(
   subscriberId?: string,
 ): Promise<NutritionAdherenceLog[]> {
-  const db = getDb()
-  if (db) {
-    try {
-      const snap = await getDocs(collection(db, NUTRITION_LOGS_COLLECTION))
-      if (!snap.empty) {
-        const items = snap.docs.map((d) => ({
-          ...(d.data() as NutritionAdherenceLog),
-          id: d.id,
-        }))
-        writeLocalCache(STORAGE_KEY_NUTRITION_LOGS, items)
-        return subscriberId
-          ? items.filter((log) => log.subscriberId === subscriberId)
-          : items
-      }
-    } catch {
-      // Fall through to cache
-    }
-  }
+  try {
+    const db = getDb()
+    const colRef = collection(db, NUTRITION_LOGS_COLLECTION)
+    const snap = subscriberId
+      ? await getDocs(query(colRef, where("subscriberId", "==", subscriberId)))
+      : await getDocs(colRef)
 
-  const cached = readLocalCache<NutritionAdherenceLog>(STORAGE_KEY_NUTRITION_LOGS)
-  const all = cached && cached.length > 0 ? cached : INITIAL_NUTRITION_LOGS
-  if (!cached) {
-    writeLocalCache(STORAGE_KEY_NUTRITION_LOGS, INITIAL_NUTRITION_LOGS)
+    return snap.docs
+      .map((d) =>
+        normalizeNutritionLog(d.id, d.data() as Record<string, unknown>),
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.loggedAt).getTime() - new Date(a.loggedAt).getTime(),
+      )
+  } catch (err) {
+    console.warn("[Firestore] Failed to read nutrition_logs:", err)
+    throw err instanceof Error
+      ? err
+      : new Error("Failed to load nutrition logs")
   }
-  return subscriberId ? all.filter((l) => l.subscriberId === subscriberId) : all
 }
 
 export async function logNutritionAdherence(
   input: Omit<NutritionAdherenceLog, "id" | "loggedAt">,
 ): Promise<NutritionAdherenceLog> {
-  const allLogs = await listNutritionLogs()
   const now = new Date().toISOString()
-  const id = `nlog-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`
+  const db = getDb()
+  const id = doc(collection(db, NUTRITION_LOGS_COLLECTION)).id
 
   const newLog: NutritionAdherenceLog = {
     ...input,
@@ -481,40 +668,32 @@ export async function logNutritionAdherence(
     loggedAt: now,
   }
 
-  allLogs.unshift(newLog)
-  writeLocalCache(STORAGE_KEY_NUTRITION_LOGS, allLogs)
+  await setDoc(
+    doc(db, NUTRITION_LOGS_COLLECTION, id),
+    stripUndefined({ ...newLog }),
+  )
 
-  // Update program adherence progress if applicable
-  const allPrograms = await listNutritionPrograms()
-  const program = allPrograms.find((p) => p.id === input.programId)
-  if (program && program.adherence && (input.status === "adhered" || input.status === "mostly")) {
-    program.adherence.done = Math.min(
-      program.adherence.total,
-      program.adherence.done + 1,
-    )
-    program.updatedAt = now
-    writeLocalCache(STORAGE_KEY_NUTRITION, allPrograms)
-  }
-
-  const db = getDb()
-  if (db) {
-    try {
-      await setDoc(
-        doc(db, NUTRITION_LOGS_COLLECTION, id),
-        stripUndefined({ ...newLog }),
-      )
-      if (program) {
-        await setDoc(
-          doc(db, NUTRITION_PROGRAMS_COLLECTION, program.id),
-          stripUndefined({ ...program }),
-          { merge: true },
-        )
+  if (
+    input.programId &&
+    (input.status === "adhered" || input.status === "mostly")
+  ) {
+    const program = await fetchNutritionProgramById(input.programId)
+    if (program?.adherence) {
+      const updated: NutritionProgram = {
+        ...program,
+        adherence: {
+          ...program.adherence,
+          done: Math.min(program.adherence.total, program.adherence.done + 1),
+        },
+        updatedAt: now,
       }
-    } catch {
-      // Keep local cache
+      await setDoc(
+        doc(db, NUTRITION_PROGRAMS_COLLECTION, program.id),
+        stripUndefined({ ...updated }),
+        { merge: true },
+      )
     }
   }
 
   return newLog
 }
-

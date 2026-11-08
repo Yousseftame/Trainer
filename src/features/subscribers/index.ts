@@ -1,7 +1,30 @@
-export { DEMO_SUBSCRIBERS, getSubscriberById, subscriberRow } from "@/features/subscribers/demo"
-export type { DemoSubscriber } from "@/features/subscribers/demo"
-export { DEMO_REGISTRATION_REQUESTS } from "@/features/subscribers/requests-demo"
 export type {
-  DemoRegistrationRequest,
+  Subscriber,
+  SubscriberRow,
+  RegistrationRequest,
   RegistrationRequestStatus,
-} from "@/features/subscribers/requests-demo"
+} from "@/features/subscribers/types"
+export {
+  subscriberDisplayName,
+  isFirebaseAuthUid,
+  clearSubscriberLocalCaches,
+} from "@/features/subscribers/types"
+export {
+  buildSubscriberRow,
+  fetchSubscribers,
+  fetchSubscriberById,
+  fetchSubscriberByEmail,
+  fetchRegistrationRequests,
+  saveSubscriber,
+  updateSubscriberAccountStatus,
+  deleteSubscriberAccount,
+  createRegistrationRequest,
+  reviewRegistrationRequest,
+  updateSubscriberCoachNotes,
+  purgeDemoSubscriberData,
+} from "@/features/subscribers/service"
+
+/** @deprecated Use Subscriber */
+export type { Subscriber as DemoSubscriber } from "@/features/subscribers/types"
+/** @deprecated Use RegistrationRequest */
+export type { RegistrationRequest as DemoRegistrationRequest } from "@/features/subscribers/types"

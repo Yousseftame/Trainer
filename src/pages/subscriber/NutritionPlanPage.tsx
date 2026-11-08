@@ -20,7 +20,6 @@ import adminBanner from "@/assets/admin.webp"
 import { StatCard } from "@/components/dashboard/StatCard"
 import { MealChangeModal } from "@/components/subscriber/MealChangeModal"
 import { MealPhotoUploadDialog } from "@/components/subscriber/MealPhotoUploadDialog"
-import { useAuth } from "@/features/auth/auth-context"
 import { useContentAssetsQuery } from "@/features/content/hooks"
 import {
   dayMacros,
@@ -31,7 +30,7 @@ import {
   useNutritionLogsQuery,
   useNutritionProgramsQuery,
 } from "@/features/nutrition/hooks"
-import { useSubscribersQuery } from "@/features/subscribers/hooks"
+import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatDate } from "@/lib/format"
@@ -50,38 +49,22 @@ export function NutritionPlanPage() {
   const { t } = useTranslation()
   const { locale, isRtl } = useLocale()
   const isAr = locale === "ar"
-  const { user } = useAuth()
   useDocumentTitle(isAr ? "النظام الغذائي" : "Nutrition Plan")
 
   const todayFormatted = formatDate(new Date().toISOString(), locale)
 
-  const { data: subscribers = [] } = useSubscribersQuery()
-  const { data: allPrograms = [] } = useNutritionProgramsQuery()
+  const { subscriber: currentSubscriber, subscriberId } = usePanelSubscriber()
+  const { data: allPrograms = [] } = useNutritionProgramsQuery({
+    subscriberId,
+    enabled: Boolean(subscriberId),
+  })
   const { data: contentAssets = [] } = useContentAssetsQuery()
 
-  const currentSubscriber = useMemo(() => {
-    if (!user) return subscribers[0]
-    return (
-      subscribers.find(
-        (s) =>
-          s.id === user.uid ||
-          s.email.toLowerCase() === (user.email ?? "").toLowerCase(),
-      ) ?? subscribers[0]
-    )
-  }, [subscribers, user])
-
   const activePlan = useMemo(() => {
-    if (!currentSubscriber) return null
-    return (
-      allPrograms.find(
-        (p) => p.subscriberId === currentSubscriber.id && p.status === "active",
-      ) ??
-      allPrograms.find((p) => p.status === "active") ??
-      null
-    )
-  }, [allPrograms, currentSubscriber])
+    return allPrograms.find((p) => p.status === "active") ?? allPrograms[0] ?? null
+  }, [allPrograms])
 
-  const { data: logs = [] } = useNutritionLogsQuery(currentSubscriber?.id)
+  const { data: logs = [] } = useNutritionLogsQuery(subscriberId)
   const logMutation = useLogNutritionAdherenceMutation()
 
   const [selectedDayIdx, setSelectedDayIdx] = useState(0)

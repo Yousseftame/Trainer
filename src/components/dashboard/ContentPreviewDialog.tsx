@@ -20,7 +20,10 @@ import {
   evaluateSubscriberContentAccess,
   type DemoContentAsset,
 } from "@/features/content/demo"
-import { useSubscribersQuery } from "@/features/subscribers/hooks"
+import {
+  useMySubscriberQuery,
+  useSubscribersQuery,
+} from "@/features/subscribers/hooks"
 import { useLocale } from "@/hooks/useLocale"
 import { formatDuration } from "@/lib/format"
 import { appToast } from "@/lib/toast"
@@ -74,19 +77,17 @@ export function ContentPreviewDialog({
   const { locale, isRtl } = useLocale()
   const isAr = locale === "ar"
   const [copied, setCopied] = useState(false)
-  const { user, isAdmin } = useAuth()
-  const { data: subscribers = [] } = useSubscribersQuery()
+  const { user, isAdmin, isSubscriber } = useAuth()
+  // Admin preview may list members; subscribers only read their own doc
+  const { data: subscribers = [] } = useSubscribersQuery({ enabled: isAdmin })
+  const { data: mySubscriber } = useMySubscriberQuery(
+    !isAdmin ? user?.uid : undefined,
+  )
 
   const currentSubscriber = useMemo(() => {
-    if (!user) return subscribers[0]
-    return (
-      subscribers.find(
-        (s) =>
-          s.id === user.uid ||
-          s.email.toLowerCase() === (user.email ?? "").toLowerCase(),
-      ) ?? subscribers[0]
-    )
-  }, [subscribers, user])
+    if (isAdmin) return subscribers[0] ?? null
+    return mySubscriber ?? null
+  }, [isAdmin, subscribers, mySubscriber])
 
   const access = useMemo(() => {
     if (isAdmin) {
@@ -206,13 +207,15 @@ export function ContentPreviewDialog({
                   : "To unlock this training material, please upgrade your subscription or ask your coach."}
               </p>
               <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                <Link
-                  to={APP_ROUTES.subscriber.subscription}
-                  onClick={onClose}
-                  className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--gym-lime,#fb5001)] hover:bg-[#e04500] px-6 text-[13px] font-extrabold text-white shadow-md transition"
-                >
-                  {isAr ? "ترقية الباقة لفتح المحتوى" : "Upgrade Subscription"}
-                </Link>
+                {isSubscriber ? (
+                  <Link
+                    to={APP_ROUTES.subscriber.subscription}
+                    onClick={onClose}
+                    className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--gym-lime,#fb5001)] hover:bg-[#e04500] px-6 text-[13px] font-extrabold text-white shadow-md transition"
+                  >
+                    {isAr ? "ترقية الباقة لفتح المحتوى" : "Upgrade Subscription"}
+                  </Link>
+                ) : null}
                 <button
                   type="button"
                   onClick={onClose}

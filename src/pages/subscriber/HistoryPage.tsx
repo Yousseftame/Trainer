@@ -15,11 +15,10 @@ import {
 import { ProgramHistoryDialog } from "@/components/dashboard/ProgramHistoryDialog"
 import { StatCard } from "@/components/dashboard/StatCard"
 import { APP_ROUTES } from "@/config/constants"
-import { useAuth } from "@/features/auth/auth-context"
 import { useNutritionLogsQuery, useNutritionProgramsQuery } from "@/features/nutrition/hooks"
 import { useSubscriberPTRecordsQuery } from "@/features/physicalTherapy/hooks"
 import { useMeasurementsQuery } from "@/features/progress/hooks"
-import { useSubscribersQuery } from "@/features/subscribers/hooks"
+import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
 import { useWorkoutLogsQuery, useWorkoutProgramsQuery } from "@/features/workouts/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
@@ -36,20 +35,13 @@ export function HistoryPage() {
   const isAr = locale === "ar"
   useDocumentTitle(isAr ? "السجل التاريخي الشامل" : "Comprehensive History & Archives")
 
-  const { user, isAdmin } = useAuth()
-  const isStaff = isAdmin || (user?.role && user.role !== "subscriber")
-
-  const { data: subscribers = [] } = useSubscribersQuery()
-
-  // Match logged in subscriber or let admin preview
-  const defaultSub = subscribers.find(
-    (s) =>
-      s.id === user?.uid ||
-      s.email.toLowerCase() === (user?.email || "").toLowerCase(),
-  ) || subscribers[0]
-
-  const [selectedSubscriberId, setSelectedSubscriberId] = useState<string>("")
-  const activeSubscriberId = selectedSubscriberId || defaultSub?.id || user?.uid || "sub-alex"
+  const {
+    staffCanPick,
+    directory: subscribers,
+    subscriberId: activeSubscriberId,
+    selectedSubscriberId,
+    setSelectedSubscriberId,
+  } = usePanelSubscriber({ allowStaffPicker: true })
 
   // Active Tab state
   const [activeTab, setActiveTab] = useState<HistoryTab>("programs")
@@ -65,27 +57,19 @@ export function HistoryPage() {
     programs: Array<WorkoutProgram | NutritionProgram>
   } | null>(null)
 
-  // Real-time queries for the active subscriber
-  const { data: allWorkoutPrograms = [] } = useWorkoutProgramsQuery()
-  const { data: allNutritionPrograms = [] } = useNutritionProgramsQuery()
+  // Scoped queries for the active subscriber only
+  const { data: subscriberWorkouts = [] } = useWorkoutProgramsQuery({
+    subscriberId: activeSubscriberId,
+    enabled: Boolean(activeSubscriberId),
+  })
+  const { data: subscriberNutrition = [] } = useNutritionProgramsQuery({
+    subscriberId: activeSubscriberId,
+    enabled: Boolean(activeSubscriberId),
+  })
   const { data: workoutLogs = [] } = useWorkoutLogsQuery(activeSubscriberId)
   const { data: nutritionLogs = [] } = useNutritionLogsQuery(activeSubscriberId)
   const { data: measurements = [] } = useMeasurementsQuery(activeSubscriberId)
   const { data: ptRecords = [] } = useSubscriberPTRecordsQuery(activeSubscriberId)
-
-  // Subscriber's workout programs (active + archived/completed)
-  const subscriberWorkouts = useMemo(() => {
-    return allWorkoutPrograms.filter(
-      (p) => p.subscriberId === activeSubscriberId || (!p.subscriberId && p.id === "asg-alex"),
-    )
-  }, [allWorkoutPrograms, activeSubscriberId])
-
-  // Subscriber's nutrition programs (active + archived/completed)
-  const subscriberNutrition = useMemo(() => {
-    return allNutritionPrograms.filter(
-      (p) => p.subscriberId === activeSubscriberId || (!p.subscriberId && p.id === "nasg-alex"),
-    )
-  }, [allNutritionPrograms, activeSubscriberId])
 
   // All combined historical programs for this subscriber
   const unifiedPrograms = useMemo(() => {
@@ -190,14 +174,14 @@ export function HistoryPage() {
           {/* Action Buttons Row */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Admin Member Switcher (Only visible to staff/admin) */}
-            {isStaff ? (
+            {staffCanPick ? (
               <div className="flex items-center gap-1.5 rounded-full bg-[#F4F4F4] px-3 py-1.5 text-[11.5px] font-bold text-[var(--gym-ink,#111111)] border border-black/8">
                 <UserCheck className="size-3.5 text-[var(--gym-lime,#fb5001)]" />
                 <span className="hidden xs:inline">
                   {isAr ? "معاينة:" : "Member:"}
                 </span>
                 <select
-                  value={activeSubscriberId}
+                  value={selectedSubscriberId || activeSubscriberId}
                   onChange={(e) => setSelectedSubscriberId(e.target.value)}
                   className="rounded-lg bg-white px-2 py-0.5 text-[11.5px] font-bold outline-none cursor-pointer"
                 >

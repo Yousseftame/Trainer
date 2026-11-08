@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
-import { Check, UserPlus, UserRoundPen, X } from "lucide-react"
-import type { DemoSubscriber } from "@/features/subscribers/demo"
+import { Check, Eye, EyeOff, UserPlus, UserRoundPen, X } from "lucide-react"
+import type { Subscriber } from "@/features/subscribers"
 import type { SaveSubscriberInput } from "@/features/subscribers/service"
 import type { DemoPackage } from "@/features/subscriptions/demo"
 import { computeEndsAtIso } from "@/features/subscriptions/entitlements"
@@ -11,7 +11,7 @@ import type { UserStatus } from "@/types/user"
 
 type SubscriberFormDialogProps = {
   open: boolean
-  subscriber?: DemoSubscriber | null
+  subscriber?: Subscriber | null
   packages?: DemoPackage[]
   busy?: boolean
   adminName?: string
@@ -50,6 +50,7 @@ export function SubscriberFormDialog({
   const [nameEn, setNameEn] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [phone, setPhone] = useState("")
   const [status, setStatus] = useState<UserStatus>("active")
   const [subLocale, setSubLocale] = useState<"ar" | "en">("ar")
@@ -78,6 +79,8 @@ export function SubscriberFormDialog({
   useEffect(() => {
     if (!open) return
     setError(null)
+    setPassword("")
+    setShowPassword(false)
     if (subscriber) {
       setNameAr(subscriber.name?.ar ?? subscriber.displayName)
       setNameEn(subscriber.name?.en ?? subscriber.displayName)
@@ -188,6 +191,14 @@ export function SubscriberFormDialog({
     if (!phone.trim()) {
       setError(
         isAr ? "يرجى إدخال رقم الهاتف." : "Please enter a phone number.",
+      )
+      return
+    }
+    if (!isEditing && !password.trim()) {
+      setError(
+        isAr
+          ? "يرجى إدخال كلمة مرور للحساب (6 خانات على الأقل)."
+          : "Please enter an account password (min 6 characters).",
       )
       return
     }
@@ -361,8 +372,16 @@ export function SubscriberFormDialog({
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  disabled={isEditing || busy}
+                  title={
+                    isEditing
+                      ? isAr
+                        ? "البريد مرتبط بهوية الحساب ولا يمكن تعديله من هنا"
+                        : "Email is tied to Auth identity and cannot be changed here"
+                      : undefined
+                  }
                   placeholder="name@example.com"
-                  className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none focus:ring-2 focus:ring-[var(--gym-lime,#fb5001)]"
+                  className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none focus:ring-2 focus:ring-[var(--gym-lime,#fb5001)] disabled:cursor-not-allowed disabled:opacity-70"
                 />
               </label>
               <label className="flex flex-col gap-1.5">
@@ -373,30 +392,65 @@ export function SubscriberFormDialog({
                   dir="ltr"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
+                  disabled={busy}
                   placeholder="+20 100 000 0000"
-                  className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none focus:ring-2 focus:ring-[var(--gym-lime,#fb5001)]"
+                  className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none focus:ring-2 focus:ring-[var(--gym-lime,#fb5001)] disabled:opacity-70"
                 />
               </label>
             </div>
 
-            {!isEditing ? (
-              <label className="flex flex-col gap-1.5">
-                <span className="text-[12px] font-bold text-[#6B7280]">
-                  {isAr
-                    ? "كلمة المرور للحساب (اختياري، الافتراضي: Member@123456)"
-                    : "Account login password (optional, default: Member@123456)"}
-                </span>
+            {/* Password — create required, edit optional reset */}
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[12px] font-bold text-[#6B7280]">
+                {isEditing
+                  ? isAr
+                    ? "كلمة المرور (اتركها فارغة للإبقاء على الحالية)"
+                    : "Password (leave blank to keep current)"
+                  : isAr
+                    ? "كلمة مرور تسجيل الدخول *"
+                    : "Login password *"}
+              </span>
+              <div className="relative" dir="ltr">
                 <input
                   dir="ltr"
-                  type="password"
-                  minLength={6}
+                  type={showPassword ? "text" : "password"}
+                  minLength={isEditing ? undefined : 6}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Member@123456"
-                  className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none focus:ring-2 focus:ring-[var(--gym-lime,#fb5001)]"
+                  disabled={busy}
+                  placeholder={
+                    isEditing
+                      ? isAr
+                        ? "••••••••"
+                        : "••••••••"
+                      : "Member@123456"
+                  }
+                  autoComplete="new-password"
+                  className="h-11 w-full rounded-2xl bg-[#F4F4F4] py-0 pl-4 pr-11 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none focus:ring-2 focus:ring-[var(--gym-lime,#fb5001)] disabled:opacity-70"
                 />
-              </label>
-            ) : null}
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  disabled={busy}
+                  aria-label={
+                    showPassword
+                      ? isAr
+                        ? "إخفاء كلمة المرور"
+                        : "Hide password"
+                      : isAr
+                        ? "إظهار كلمة المرور"
+                        : "Show password"
+                  }
+                  className="absolute inset-y-0 right-2.5 z-10 flex items-center text-[#8c8c8c] transition hover:text-[var(--gym-ink,#111111)] disabled:opacity-50"
+                >
+                  {showPassword ? (
+                    <EyeOff className="size-4" strokeWidth={2} />
+                  ) : (
+                    <Eye className="size-4" strokeWidth={2} />
+                  )}
+                </button>
+              </div>
+            </label>
 
             {/* Account Status & Preferred Language */}
             <div className="grid gap-4 sm:grid-cols-2">
@@ -407,7 +461,15 @@ export function SubscriberFormDialog({
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value as UserStatus)}
-                  className="h-11 rounded-2xl bg-[#F4F4F4] px-3.5 text-[13px] font-bold text-[var(--gym-ink,#111111)] outline-none"
+                  disabled={isEditing}
+                  title={
+                    isEditing
+                      ? isAr
+                        ? "استخدم أزرار التعليق/التفعيل لسلامة الحساب"
+                        : "Use Suspend/Activate actions for secure lifecycle changes"
+                      : undefined
+                  }
+                  className="h-11 rounded-2xl bg-[#F4F4F4] px-3.5 text-[13px] font-bold text-[var(--gym-ink,#111111)] outline-none disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   <option value="active">
                     {isAr ? "نشط (Active)" : "Active"}

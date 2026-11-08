@@ -2,10 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { Calendar, Check, RefreshCw, ShieldAlert, PauseCircle, PlayCircle, X } from "lucide-react"
 import { StatusBadge, subscriptionStatusTone } from "@/components/dashboard/StatusBadge"
-import {
-  DEMO_SUBSCRIBERS,
-  subscriberDisplayName,
-} from "@/features/subscribers/demo"
+import { subscriberDisplayName } from "@/features/subscribers"
 import { useSubscribersQuery } from "@/features/subscribers/hooks"
 import type { DemoPackage } from "@/features/subscriptions/demo"
 import {
@@ -99,7 +96,9 @@ export function SubscriptionActionDialog({
 }: SubscriptionActionDialogProps) {
   const { locale, isRtl } = useLocale()
   const isAr = locale === "ar"
-  const { data: subscribers = DEMO_SUBSCRIBERS } = useSubscribersQuery()
+  const { data: subscribers = [] } = useSubscribersQuery({
+    enabled: Boolean(state),
+  })
 
   const livePackages = useMemo(
     () => packages.filter((p) => p.isActive),
@@ -245,7 +244,7 @@ export function SubscriptionActionDialog({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!state) return
+    if (!state || busy) return
 
     const cleanAr = notesAr.trim() || notesEn.trim()
     const cleanEn = notesEn.trim() || notesAr.trim()
@@ -253,12 +252,13 @@ export function SubscriptionActionDialog({
       cleanAr || cleanEn ? { ar: cleanAr, en: cleanEn } : undefined
 
     if (state.mode === "assign") {
+      if (!subscriberId || !selectedPackage) return
       const subPerson = subscribers.find((s) => s.id === subscriberId)
       await onAssign({
         subscriberId,
         subscriberName: subPerson?.displayName,
         subscriberEmail: subPerson?.email,
-        packageId: selectedPackage?.id ?? packageId,
+        packageId: selectedPackage.id,
         status: assignStatus,
         startsAt: assignStatus === "active" ? fromDateInputValue(startDate) : null,
         endsAt: assignStatus === "active" ? fromDateInputValue(endDate) : null,
@@ -348,14 +348,21 @@ export function SubscriptionActionDialog({
                 </span>
                 <select
                   value={subscriberId}
+                  disabled={busy}
                   onChange={(e) => setSubscriberId(e.target.value)}
                   className={inputClass}
                 >
-                  {subscribers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {subscriberDisplayName(s, locale)} ({s.email})
+                  {subscribers.length === 0 ? (
+                    <option value="">
+                      {isAr ? "لا يوجد مشتركون بعد" : "No subscribers yet"}
                     </option>
-                  ))}
+                  ) : (
+                    subscribers.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {subscriberDisplayName(s, locale)} ({s.email})
+                      </option>
+                    ))
+                  )}
                 </select>
               </label>
             ) : (
@@ -434,9 +441,10 @@ export function SubscriptionActionDialog({
                       <button
                         key={item.id}
                         type="button"
+                        disabled={busy}
                         onClick={() => handleSwitchManageAction(item.id)}
                         className={cn(
-                          "inline-flex h-10 items-center justify-center gap-1.5 rounded-full border px-3 text-[12px] font-bold transition-colors",
+                          "inline-flex h-10 items-center justify-center gap-1.5 rounded-full border px-3 text-[12px] font-bold transition-colors disabled:opacity-60",
                           active
                             ? item.id === "terminate"
                               ? "border-rose-600 bg-rose-600 text-white"
@@ -464,13 +472,16 @@ export function SubscriptionActionDialog({
                 value={selectedPackage?.id ?? ""}
                 onChange={(e) => handlePackageChange(e.target.value)}
                 disabled={
-                  state.mode === "manage" &&
-                  (manageAction === "suspend" || manageAction === "terminate")
+                  busy ||
+                  (state.mode === "manage" &&
+                    (manageAction === "suspend" || manageAction === "terminate"))
                 }
                 className={cn(
                   inputClass,
-                  state.mode === "manage" &&
-                    (manageAction === "suspend" || manageAction === "terminate") &&
+                  (busy ||
+                    (state.mode === "manage" &&
+                      (manageAction === "suspend" ||
+                        manageAction === "terminate"))) &&
                     "opacity-60",
                 )}
               >
@@ -519,9 +530,10 @@ export function SubscriptionActionDialog({
                 <div className="grid grid-cols-2 gap-2.5">
                   <button
                     type="button"
+                    disabled={busy}
                     onClick={() => setAssignStatus("active")}
                     className={cn(
-                      "inline-flex h-10 items-center justify-center rounded-full border px-4 text-[13px] font-bold transition-colors",
+                      "inline-flex h-10 items-center justify-center rounded-full border px-4 text-[13px] font-bold transition-colors disabled:opacity-60",
                       assignStatus === "active"
                         ? "border-[#111111] bg-[#111111] text-white"
                         : "border-black/10 bg-[#F7F7F7] text-[#374151]",
@@ -531,9 +543,10 @@ export function SubscriptionActionDialog({
                   </button>
                   <button
                     type="button"
+                    disabled={busy}
                     onClick={() => setAssignStatus("pending")}
                     className={cn(
-                      "inline-flex h-10 items-center justify-center rounded-full border px-4 text-[13px] font-bold transition-colors",
+                      "inline-flex h-10 items-center justify-center rounded-full border px-4 text-[13px] font-bold transition-colors disabled:opacity-60",
                       assignStatus === "pending"
                         ? "border-[#111111] bg-[#111111] text-white"
                         : "border-black/10 bg-[#F7F7F7] text-[#374151]",
@@ -553,6 +566,7 @@ export function SubscriptionActionDialog({
                 </span>
                 <select
                   value={editStatus}
+                  disabled={busy}
                   onChange={(e) => setEditStatus(e.target.value as SubscriptionStatus)}
                   className={inputClass}
                 >
@@ -578,8 +592,10 @@ export function SubscriptionActionDialog({
                     value={startDate}
                     onChange={(e) => handleStartDateChange(e.target.value)}
                     disabled={
-                      state.mode === "manage" &&
-                      (manageAction === "suspend" || manageAction === "terminate")
+                      busy ||
+                      (state.mode === "manage" &&
+                        (manageAction === "suspend" ||
+                          manageAction === "terminate"))
                     }
                     className={inputClass}
                   />
@@ -591,6 +607,7 @@ export function SubscriptionActionDialog({
                   <input
                     type="date"
                     value={endDate}
+                    disabled={busy}
                     onChange={(e) => setEndDate(e.target.value)}
                     className={inputClass}
                   />
@@ -608,9 +625,10 @@ export function SubscriptionActionDialog({
                   dir="rtl"
                   rows={2}
                   value={notesAr}
+                  disabled={busy}
                   onChange={(e) => setNotesAr(e.target.value)}
                   placeholder="مثال: تم تأكيد الدفع نقداً…"
-                  className="w-full rounded-[16px] border border-black/10 bg-[#F7F7F7] px-3.5 py-2.5 text-[13px] font-medium text-[#111111] outline-none transition-colors focus:border-[#111111] focus:bg-white"
+                  className="w-full rounded-[16px] border border-black/10 bg-[#F7F7F7] px-3.5 py-2.5 text-[13px] font-medium text-[#111111] outline-none transition-colors focus:border-[#111111] focus:bg-white disabled:opacity-60"
                 />
               </label>
               <label className="flex flex-col gap-1.5">
@@ -621,9 +639,10 @@ export function SubscriptionActionDialog({
                   dir="ltr"
                   rows={2}
                   value={notesEn}
+                  disabled={busy}
                   onChange={(e) => setNotesEn(e.target.value)}
                   placeholder="e.g. Manual renewal confirmed…"
-                  className="w-full rounded-[16px] border border-black/10 bg-[#F7F7F7] px-3.5 py-2.5 text-[13px] font-medium text-[#111111] outline-none transition-colors focus:border-[#111111] focus:bg-white"
+                  className="w-full rounded-[16px] border border-black/10 bg-[#F7F7F7] px-3.5 py-2.5 text-[13px] font-medium text-[#111111] outline-none transition-colors focus:border-[#111111] focus:bg-white disabled:opacity-60"
                 />
               </label>
             </div>
@@ -640,7 +659,11 @@ export function SubscriptionActionDialog({
             </button>
             <button
               type="submit"
-              disabled={busy}
+              disabled={
+                busy ||
+                (state.mode === "assign" &&
+                  (!subscriberId || !selectedPackage || subscribers.length === 0))
+              }
               className={cn(
                 "inline-flex h-11 items-center justify-center rounded-full px-7 text-[14px] font-bold text-white transition-colors disabled:opacity-60",
                 state.mode === "manage" && manageAction === "terminate"

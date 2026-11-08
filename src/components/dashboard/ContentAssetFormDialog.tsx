@@ -21,10 +21,10 @@ import {
   type DemoContentAsset,
 } from "@/features/content/demo"
 import type { SaveContentAssetInput } from "@/features/content/service"
-import { DEMO_NUTRITION } from "@/features/nutrition/demo"
+import { useNutritionProgramsQuery } from "@/features/nutrition/hooks"
 import { subscriberDisplayName, type DemoSubscriber } from "@/features/subscribers/demo"
-import type { DemoPackage } from "@/features/subscriptions/demo"
-import { DEMO_WORKOUTS } from "@/features/workouts/demo"
+import type { CatalogPackage } from "@/features/subscriptions/types"
+import { useWorkoutProgramsQuery } from "@/features/workouts/hooks"
 import { useLocale } from "@/hooks/useLocale"
 import { cn } from "@/lib/utils"
 import type {
@@ -38,7 +38,7 @@ type ContentAssetFormDialogProps = {
   open: boolean
   initialAsset?: DemoContentAsset | null
   defaultCategory?: ContentCategory
-  packages: DemoPackage[]
+  packages: CatalogPackage[]
   subscribers: DemoSubscriber[]
   busy?: boolean
   adminName?: string
@@ -121,6 +121,12 @@ export function ContentAssetFormDialog({
   const isAr = locale === "ar"
   const isEdit = Boolean(initialAsset)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const { data: workoutPrograms = [] } = useWorkoutProgramsQuery({
+    enabled: open,
+  })
+  const { data: nutritionPrograms = [] } = useNutritionProgramsQuery({
+    enabled: open,
+  })
 
   const [category, setCategory] = useState<ContentCategory>(defaultCategory)
   const [titleAr, setTitleAr] = useState("")
@@ -148,20 +154,20 @@ export function ContentAssetFormDialog({
 
   const allPrograms = useMemo(
     () => [
-      ...DEMO_WORKOUTS.map((p) => ({
+      ...workoutPrograms.map((p) => ({
         id: p.id,
         title: p.title,
         domain: "workout" as const,
         status: p.status,
       })),
-      ...DEMO_NUTRITION.map((p) => ({
+      ...nutritionPrograms.map((p) => ({
         id: p.id,
         title: p.title,
         domain: "nutrition" as const,
         status: p.status,
       })),
     ],
-    [],
+    [workoutPrograms, nutritionPrograms],
   )
 
   useEffect(() => {

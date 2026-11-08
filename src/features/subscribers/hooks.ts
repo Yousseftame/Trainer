@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { DEMO_SUBSCRIBERS } from "@/features/subscribers/demo"
-import { DEMO_REGISTRATION_REQUESTS } from "@/features/subscribers/requests-demo"
+import { QUERY_STALE_TIMES } from "@/config/constants"
 import {
   createRegistrationRequest,
+  deleteSubscriberAccount,
   fetchRegistrationRequests,
+  fetchSubscriberById,
   fetchSubscribers,
+  purgeDemoSubscriberData,
   reviewRegistrationRequest,
   saveSubscriber,
   updateSubscriberAccountStatus,
@@ -18,24 +20,41 @@ import { SUBSCRIPTION_QUERY_KEYS } from "@/features/subscriptions/hooks"
 
 export const subscriberKeys = {
   subscribers: ["subscribers"] as const,
+  me: (uid: string) => ["subscribers", "me", uid] as const,
   requests: ["registrationRequests"] as const,
 }
 
-export function useSubscribersQuery() {
+type ListQueryOptions = {
+  /** Default true. Set false to skip admin full-list reads. */
+  enabled?: boolean
+}
+
+/** Admin full subscriber directory — only mount on admin pages that need it. */
+export function useSubscribersQuery(options?: ListQueryOptions) {
   return useQuery({
     queryKey: subscriberKeys.subscribers,
     queryFn: fetchSubscribers,
-    initialData: () => [...DEMO_SUBSCRIBERS],
-    staleTime: 30_000,
+    staleTime: QUERY_STALE_TIMES.adminList,
+    enabled: options?.enabled ?? true,
   })
 }
 
-export function useRegistrationRequestsQuery() {
+/** Single-doc read for the signed-in subscriber (Auth UID = doc id). */
+export function useMySubscriberQuery(uid: string | undefined) {
+  return useQuery({
+    queryKey: subscriberKeys.me(uid ?? ""),
+    queryFn: () => fetchSubscriberById(uid!),
+    enabled: Boolean(uid),
+    staleTime: QUERY_STALE_TIMES.subscriberDashboard,
+  })
+}
+
+export function useRegistrationRequestsQuery(options?: ListQueryOptions) {
   return useQuery({
     queryKey: subscriberKeys.requests,
     queryFn: fetchRegistrationRequests,
-    initialData: () => [...DEMO_REGISTRATION_REQUESTS],
-    staleTime: 30_000,
+    staleTime: QUERY_STALE_TIMES.adminList,
+    enabled: options?.enabled ?? true,
   })
 }
 
@@ -44,8 +63,8 @@ export function useSaveSubscriberMutation() {
   return useMutation({
     mutationFn: (input: SaveSubscriberInput) => saveSubscriber(input),
     onSuccess: () => {
-      queryClient.setQueryData(subscriberKeys.subscribers, [...DEMO_SUBSCRIBERS])
       void queryClient.invalidateQueries({ queryKey: subscriberKeys.subscribers })
+      void queryClient.invalidateQueries({ queryKey: ["subscribers", "me"] })
       void queryClient.invalidateQueries({
         queryKey: SUBSCRIPTION_QUERY_KEYS.subscriptions,
       })
@@ -59,8 +78,23 @@ export function useUpdateSubscriberStatusMutation() {
     mutationFn: (input: UpdateSubscriberStatusInput) =>
       updateSubscriberAccountStatus(input),
     onSuccess: () => {
-      queryClient.setQueryData(subscriberKeys.subscribers, [...DEMO_SUBSCRIBERS])
       void queryClient.invalidateQueries({ queryKey: subscriberKeys.subscribers })
+      void queryClient.invalidateQueries({ queryKey: ["subscribers", "me"] })
+      void queryClient.invalidateQueries({
+        queryKey: SUBSCRIPTION_QUERY_KEYS.subscriptions,
+      })
+    },
+  })
+}
+
+export function useDeleteSubscriberMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (subscriberId: string) => deleteSubscriberAccount(subscriberId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: subscriberKeys.subscribers })
+      void queryClient.invalidateQueries({ queryKey: ["subscribers", "me"] })
+      void queryClient.invalidateQueries({ queryKey: subscriberKeys.requests })
       void queryClient.invalidateQueries({
         queryKey: SUBSCRIPTION_QUERY_KEYS.subscriptions,
       })
@@ -74,10 +108,6 @@ export function useCreateRegistrationRequestMutation() {
     mutationFn: (input: CreateRegistrationRequestInput) =>
       createRegistrationRequest(input),
     onSuccess: () => {
-      queryClient.setQueryData(
-        subscriberKeys.requests,
-        [...DEMO_REGISTRATION_REQUESTS],
-      )
       void queryClient.invalidateQueries({ queryKey: subscriberKeys.requests })
     },
   })
@@ -89,15 +119,14 @@ export function useReviewRegistrationRequestMutation() {
     mutationFn: (input: ReviewRegistrationRequestInput) =>
       reviewRegistrationRequest(input),
     onSuccess: () => {
-      queryClient.setQueryData(
-        subscriberKeys.requests,
-        [...DEMO_REGISTRATION_REQUESTS],
-      )
-      queryClient.setQueryData(subscriberKeys.subscribers, [...DEMO_SUBSCRIBERS])
       void queryClient.invalidateQueries({ queryKey: subscriberKeys.requests })
       void queryClient.invalidateQueries({ queryKey: subscriberKeys.subscribers })
+      void queryClient.invalidateQueries({ queryKey: ["subscribers", "me"] })
       void queryClient.invalidateQueries({
         queryKey: SUBSCRIPTION_QUERY_KEYS.subscriptions,
+      })
+      void queryClient.invalidateQueries({
+        queryKey: SUBSCRIPTION_QUERY_KEYS.packages,
       })
     },
   })
@@ -115,7 +144,19 @@ export function useUpdateSubscriberCoachNotesMutation() {
     }) => updateSubscriberCoachNotes(subscriberId, coachNotes),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: subscriberKeys.subscribers })
+      void queryClient.invalidateQueries({ queryKey: ["subscribers", "me"] })
     },
   })
 }
 
+export function usePurgeDemoSubscribersMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => purgeDemoSubscriberData(),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: subscriberKeys.subscribers })
+      void queryClient.invalidateQueries({ queryKey: ["subscribers", "me"] })
+      void queryClient.invalidateQueries({ queryKey: subscriberKeys.requests })
+    },
+  })
+}

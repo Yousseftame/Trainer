@@ -20,9 +20,8 @@ import { ExerciseChangeModal } from "@/components/subscriber/ExerciseChangeModal
 import { WorkoutFeedbackModal } from "@/components/subscriber/WorkoutFeedbackModal"
 import { WorkoutLiveSessionModal } from "@/components/subscriber/WorkoutLiveSessionModal"
 import { WorkoutSummaryModal } from "@/components/subscriber/WorkoutSummaryModal"
-import { useAuth } from "@/features/auth/auth-context"
 import { useContentAssetsQuery } from "@/features/content/hooks"
-import { useSubscribersQuery } from "@/features/subscribers/hooks"
+import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
 import {
   formatRest,
   resolveBilingualText,
@@ -54,44 +53,25 @@ export function WorkoutPlanPage() {
   const { t } = useTranslation()
   const { locale, isRtl } = useLocale()
   const isAr = locale === "ar"
-  const { user } = useAuth()
   useDocumentTitle(isAr ? "التمارين" : "Workout Schedule")
 
   const todayFormatted = formatDate(new Date().toISOString(), locale)
 
-  const { data: subscribers = [] } = useSubscribersQuery()
-  const { data: allPrograms = [] } = useWorkoutProgramsQuery()
+  const { subscriber: currentSubscriber, subscriberId } = usePanelSubscriber()
+  const { data: allPrograms = [] } = useWorkoutProgramsQuery({
+    subscriberId,
+    enabled: Boolean(subscriberId),
+  })
   const { data: contentAssets = [] } = useContentAssetsQuery()
 
-  const currentSubscriber = useMemo(() => {
-    if (!user) return subscribers[0]
-    return (
-      subscribers.find(
-        (s) =>
-          s.id === user.uid ||
-          s.email.toLowerCase() === (user.email ?? "").toLowerCase(),
-      ) ?? subscribers[0]
-    )
-  }, [subscribers, user])
-
   const activeProgram = useMemo(() => {
-    if (!currentSubscriber) {
-      return (
-        allPrograms.find((p) => p.status === "active") ?? allPrograms[0] ?? null
-      )
-    }
     return (
-      allPrograms.find(
-        (p) => p.subscriberId === currentSubscriber.id && p.status === "active",
-      ) ??
-      allPrograms.find((p) => p.status === "active") ??
-      allPrograms[0] ??
-      null
+      allPrograms.find((p) => p.status === "active") ?? allPrograms[0] ?? null
     )
-  }, [allPrograms, currentSubscriber])
+  }, [allPrograms])
 
-  const { data: logs = [] } = useWorkoutLogsQuery(currentSubscriber?.id)
-  const { data: ptRecord } = useSubscriberPTQuery(currentSubscriber?.id)
+  const { data: logs = [] } = useWorkoutLogsQuery(subscriberId)
+  const { data: ptRecord } = useSubscriberPTQuery(subscriberId)
   const logMutation = useLogWorkoutSessionMutation()
 
   const hasActivePTContraindications = Boolean(

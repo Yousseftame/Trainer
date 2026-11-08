@@ -53,7 +53,7 @@ export const subscriberRoutes: RouteObject[] = [
     element: <RequireAuth />,
     children: [
       {
-        element: <RequireRole allowed={["subscriber", "admin"]} />,
+        element: <RequireRole allowed={["subscriber"]} />,
         children: [
           {
             element: <SubscriberLayout />,

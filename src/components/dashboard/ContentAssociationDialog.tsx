@@ -7,13 +7,13 @@ import {
   type DemoContentAsset,
 } from "@/features/content/demo"
 import type { UpdateContentAssociationsInput } from "@/features/content/service"
-import { DEMO_NUTRITION } from "@/features/nutrition/demo"
+import { useNutritionProgramsQuery } from "@/features/nutrition/hooks"
 import {
   subscriberDisplayName,
   type DemoSubscriber,
 } from "@/features/subscribers/demo"
-import type { DemoPackage } from "@/features/subscriptions/demo"
-import { DEMO_WORKOUTS } from "@/features/workouts/demo"
+import type { CatalogPackage } from "@/features/subscriptions/types"
+import { useWorkoutProgramsQuery } from "@/features/workouts/hooks"
 import { useLocale } from "@/hooks/useLocale"
 import { cn } from "@/lib/utils"
 import type { ContentVisibility } from "@/types/content"
@@ -23,7 +23,7 @@ type ContentAssociationDialogProps = {
   open: boolean
   asset: DemoContentAsset | null
   initialTab?: "programs" | "subscribers" | "packages"
-  packages: DemoPackage[]
+  packages: CatalogPackage[]
   subscribers: DemoSubscriber[]
   busy?: boolean
   onClose: () => void
@@ -54,6 +54,12 @@ export function ContentAssociationDialog({
 }: ContentAssociationDialogProps) {
   const { locale, isRtl } = useLocale()
   const isAr = locale === "ar"
+  const { data: workoutPrograms = [] } = useWorkoutProgramsQuery({
+    enabled: open,
+  })
+  const { data: nutritionPrograms = [] } = useNutritionProgramsQuery({
+    enabled: open,
+  })
 
   const [tab, setTab] = useState<"programs" | "subscribers" | "packages">(
     initialTab,
@@ -68,20 +74,20 @@ export function ContentAssociationDialog({
 
   const allPrograms = useMemo(
     () => [
-      ...DEMO_WORKOUTS.map((p) => ({
+      ...workoutPrograms.map((p) => ({
         id: p.id,
         title: p.title,
         domain: "workout" as const,
         status: p.status,
       })),
-      ...DEMO_NUTRITION.map((p) => ({
+      ...nutritionPrograms.map((p) => ({
         id: p.id,
         title: p.title,
         domain: "nutrition" as const,
         status: p.status,
       })),
     ],
-    [],
+    [workoutPrograms, nutritionPrograms],
   )
 
   useEffect(() => {

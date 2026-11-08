@@ -24,9 +24,9 @@ import {
   useReviewRegistrationRequestMutation,
 } from "@/features/subscribers/hooks"
 import type {
-  DemoRegistrationRequest,
+  RegistrationRequest,
   RegistrationRequestStatus,
-} from "@/features/subscribers/requests-demo"
+} from "@/features/subscribers"
 import { usePackagesQuery } from "@/features/subscriptions/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
@@ -57,6 +57,7 @@ export function RegistrationRequestsPage() {
   const { data: packages = [] } = usePackagesQuery()
   const reviewMutation = useReviewRegistrationRequestMutation()
   const createMutation = useCreateRegistrationRequestMutation()
+  const actionsBusy = reviewMutation.isPending || createMutation.isPending
 
   const [query, setQuery] = useState("")
   const [status, setStatus] = useState<"all" | RegistrationRequestStatus>(
@@ -153,8 +154,9 @@ export function RegistrationRequestsPage() {
               </label>
               <button
                 type="button"
+                disabled={actionsBusy}
                 onClick={() => setDialogState({ mode: "create" })}
-                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95 disabled:opacity-60"
               >
                 <Plus className="size-4" strokeWidth={2} />
                 {locale === "ar" ? "طلب يدوي جديد" : "New request"}
@@ -240,6 +242,7 @@ export function RegistrationRequestsPage() {
               <TableAction
                 label={t("admin.requests.approve")}
                 tone="primary"
+                disabled={actionsBusy}
                 onClick={() =>
                   setDialogState({ mode: "approve", request: row })
                 }
@@ -247,6 +250,7 @@ export function RegistrationRequestsPage() {
               <TableAction
                 label={t("admin.requests.reject")}
                 tone="danger"
+                disabled={actionsBusy}
                 onClick={() =>
                   setDialogState({ mode: "reject", request: row })
                 }
@@ -273,26 +277,52 @@ export function RegistrationRequestsPage() {
       <RegistrationReviewDialog
         state={dialogState}
         packages={packages}
-        busy={reviewMutation.isPending || createMutation.isPending}
+        busy={actionsBusy}
         adminName={user?.displayName || user?.email || "Head Coach"}
-        onClose={() => setDialogState(null)}
-        onReview={async (payload) => {
-          await reviewMutation.mutateAsync(payload)
+        onClose={() => {
+          if (actionsBusy) return
           setDialogState(null)
-          appToast.success(
-            payload.decision === "approved"
-              ? t("admin.requests.toast.approved")
-              : t("admin.requests.toast.rejected"),
-          )
+        }}
+        onReview={async (payload) => {
+          try {
+            const result = await reviewMutation.mutateAsync(payload)
+            setDialogState(null)
+            appToast.success(
+              payload.decision === "approved"
+                ? t("admin.requests.toast.approved")
+                : t("admin.requests.toast.rejected"),
+            )
+            if (payload.decision === "approved" && result.subscriber?.id) {
+              // Keep admin on requests; overview/subscribers refresh via query invalidation
+            }
+          } catch (err) {
+            appToast.error(
+              err instanceof Error
+                ? err.message
+                : locale === "ar"
+                  ? "تعذر إكمال مراجعة الطلب"
+                  : "Could not complete request review",
+            )
+          }
         }}
         onCreate={async (payload) => {
-          await createMutation.mutateAsync(payload)
-          setDialogState(null)
-          appToast.success(
-            locale === "ar"
-              ? "تمت إضافة طلب التسجيل بنجاح"
-              : "Registration request added",
-          )
+          try {
+            await createMutation.mutateAsync(payload)
+            setDialogState(null)
+            appToast.success(
+              locale === "ar"
+                ? "تمت إضافة طلب التسجيل بنجاح"
+                : "Registration request added",
+            )
+          } catch (err) {
+            appToast.error(
+              err instanceof Error
+                ? err.message
+                : locale === "ar"
+                  ? "تعذر إضافة طلب التسجيل"
+                  : "Could not add registration request",
+            )
+          }
         }}
       />
     </div>
@@ -303,7 +333,7 @@ function RequestDetails({
   row,
   packageName,
 }: {
-  row: DemoRegistrationRequest
+  row: RegistrationRequest
   packageName?: string
 }) {
   const { t } = useTranslation()

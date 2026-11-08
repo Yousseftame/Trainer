@@ -1,10 +1,11 @@
 export {
-  DEMO_WORKOUTS,
-  INITIAL_WORKOUT_LOGS,
-  formatRest,
   resolveBilingualText,
+  formatRest,
   trainingDayCount,
-} from "@/features/workouts/demo"
-export type { DemoWorkoutProgram, DemoWorkoutDay } from "@/features/workouts/demo"
+} from "@/lib/program-text"
+export type {
+  WorkoutProgram as DemoWorkoutProgram,
+  WorkoutDay as DemoWorkoutDay,
+} from "@/types/program"
 export * from "@/features/workouts/service"
 export * from "@/features/workouts/hooks"

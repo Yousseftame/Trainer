@@ -1,6 +1,5 @@
 import { useTranslation } from "react-i18next"
 import { ArrowRight } from "lucide-react"
-import { DEMO_PACKAGES } from "@/features/subscriptions/demo"
 import { usePackagesQuery } from "@/features/subscriptions/hooks"
 import { useLocale } from "@/hooks/useLocale"
 import { cn } from "@/lib/utils"
@@ -8,7 +7,7 @@ import { cn } from "@/lib/utils"
 export function PackagesSection() {
   const { t } = useTranslation()
   const { locale, isRtl } = useLocale()
-  const { data: packages = DEMO_PACKAGES } = usePackagesQuery()
+  const { data: packages = [] } = usePackagesQuery()
 
   const activePackages = packages.filter((pkg) => pkg.isActive)
 

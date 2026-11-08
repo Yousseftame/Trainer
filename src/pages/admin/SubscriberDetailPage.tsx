@@ -17,6 +17,7 @@ import {
   Target,
   UserRound,
 } from "lucide-react"
+import { ConfirmActionDialog } from "@/components/dashboard/ConfirmActionDialog"
 import { DataTable, TableAction } from "@/components/dashboard/DataTable"
 import { StatCard } from "@/components/dashboard/StatCard"
 import {
@@ -45,11 +46,9 @@ import {
   programsFor,
   weightDelta,
 } from "@/features/progress/demo"
+import { subscriberDisplayName } from "@/features/subscribers"
 import {
-  getSubscriberById,
-  subscriberDisplayName,
-} from "@/features/subscribers/demo"
-import {
+  useDeleteSubscriberMutation,
   useSaveSubscriberMutation,
   useSubscribersQuery,
   useUpdateSubscriberCoachNotesMutation,
@@ -93,25 +92,35 @@ export function SubscriberDetailPage() {
   const navigate = useNavigate()
   const { subscriberId = "" } = useParams()
   const { data: allSubscribers = [] } = useSubscribersQuery()
-  const subscriber =
-    allSubscribers.find((item) => item.id === subscriberId) ??
-    getSubscriberById(subscriberId)
+  const subscriber = allSubscribers.find((item) => item.id === subscriberId)
   useDocumentTitle(subscriber?.displayName ?? t("nav.subscribers"))
 
   const { data: allPackages = [] } = usePackagesQuery()
   const { data: allSubscriptions = [] } = useSubscriptionsQuery()
   const saveSubscriberMutation = useSaveSubscriberMutation()
   const updateStatusMutation = useUpdateSubscriberStatusMutation()
+  const deleteSubscriberMutation = useDeleteSubscriberMutation()
   const assignMutation = useAssignSubscriptionMutation()
   const lifecycleMutation = useUpdateSubscriptionLifecycleMutation()
   const updateCoachNotesMutation = useUpdateSubscriberCoachNotesMutation()
   const [editProfileOpen, setEditProfileOpen] = useState(false)
   const [subDialogState, setSubDialogState] =
     useState<SubscriptionDialogState | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    title: string
+    description: string
+    confirmLabel: string
+    tone: "danger" | "primary" | "warning"
+    onConfirm: () => Promise<void>
+  } | null>(null)
 
   const [editingNotes, setEditingNotes] = useState(false)
   const [noteEn, setNoteEn] = useState("")
   const [noteAr, setNoteAr] = useState("")
+
+  const actionsBusy =
+    updateStatusMutation.isPending || deleteSubscriberMutation.isPending
 
   const packageMap = useMemo(
     () => new Map(allPackages.map((p) => [p.id, p])),
@@ -216,35 +225,65 @@ export function SubscriberDetailPage() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
+              disabled={actionsBusy || saveSubscriberMutation.isPending}
               onClick={() => setEditProfileOpen(true)}
-              className="inline-flex h-11 items-center rounded-full bg-[#F4F4F4] px-5 text-[13px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/10"
+              className="inline-flex h-11 items-center rounded-full bg-[#F4F4F4] px-5 text-[13px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/10 disabled:opacity-60"
             >
               {locale === "ar" ? "تعديل البيانات" : "Edit profile"}
             </button>
             <button
               type="button"
-              disabled={updateStatusMutation.isPending}
-              onClick={async () => {
+              disabled={actionsBusy}
+              onClick={() => {
                 const nextStatus =
                   subscriber.status === "active" ? "suspended" : "active"
-                await updateStatusMutation.mutateAsync({
-                  subscriberId: subscriber.id,
-                  status: nextStatus,
-                  syncSubscription: true,
-                  adminName: user?.displayName || user?.email || "Head Coach",
-                })
-                appToast.success(
-                  nextStatus === "active"
+                const isSuspending = nextStatus === "suspended"
+                const name = subscriberDisplayName(subscriber, locale)
+                setConfirmDialog({
+                  open: true,
+                  title: isSuspending
                     ? locale === "ar"
-                      ? "تم إعادة تفعيل حساب المشترك"
-                      : "Subscriber account reactivated"
+                      ? "تعليق حساب المشترك"
+                      : "Suspend subscriber account"
                     : locale === "ar"
-                      ? "تم تعليق حساب المشترك"
-                      : "Subscriber account suspended",
-                )
+                      ? "تفعيل حساب المشترك"
+                      : "Activate subscriber account",
+                  description: isSuspending
+                    ? locale === "ar"
+                      ? `تعليق حساب "${name}"؟ سيتم منعه من الدخول فوراً.`
+                      : `Suspend "${name}"? They will be blocked from signing in immediately.`
+                    : locale === "ar"
+                      ? `تفعيل حساب "${name}" مجدداً؟`
+                      : `Reactivate "${name}" account?`,
+                  confirmLabel: isSuspending
+                    ? locale === "ar"
+                      ? "تعليق الحساب"
+                      : "Suspend"
+                    : locale === "ar"
+                      ? "تفعيل الحساب"
+                      : "Activate",
+                  tone: isSuspending ? "warning" : "primary",
+                  onConfirm: async () => {
+                    await updateStatusMutation.mutateAsync({
+                      subscriberId: subscriber.id,
+                      status: nextStatus,
+                      syncSubscription: true,
+                      adminName: user?.displayName || user?.email || "Head Coach",
+                    })
+                    appToast.success(
+                      nextStatus === "active"
+                        ? locale === "ar"
+                          ? "تم إعادة تفعيل حساب المشترك"
+                          : "Subscriber account reactivated"
+                        : locale === "ar"
+                          ? "تم تعليق حساب المشترك"
+                          : "Subscriber account suspended",
+                    )
+                  },
+                })
               }}
               className={cn(
-                "inline-flex h-11 items-center rounded-full px-5 text-[13px] font-bold transition",
+                "inline-flex h-11 items-center rounded-full px-5 text-[13px] font-bold transition disabled:opacity-60",
                 subscriber.status === "active"
                   ? "bg-[#FFE8E4] text-[#C44536] hover:bg-[#ffd6cf]"
                   : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
@@ -257,6 +296,39 @@ export function SubscriberDetailPage() {
                 : locale === "ar"
                   ? "تفعيل الحساب"
                   : "Activate account"}
+            </button>
+            <button
+              type="button"
+              disabled={actionsBusy}
+              onClick={() => {
+                const name = subscriberDisplayName(subscriber, locale)
+                setConfirmDialog({
+                  open: true,
+                  title:
+                    locale === "ar"
+                      ? "حذف حساب المشترك نهائياً"
+                      : "Delete subscriber permanently",
+                  description:
+                    locale === "ar"
+                      ? `حذف نهائي لحساب "${name}"؟ لا يمكن التراجع.`
+                      : `Permanently delete "${name}"? This cannot be undone.`,
+                  confirmLabel:
+                    locale === "ar" ? "تأكيد الحذف النهائي" : "Delete permanently",
+                  tone: "danger",
+                  onConfirm: async () => {
+                    await deleteSubscriberMutation.mutateAsync(subscriber.id)
+                    appToast.success(
+                      locale === "ar"
+                        ? "تم حذف حساب المشترك نهائياً"
+                        : "Subscriber permanently deleted",
+                    )
+                    navigate(APP_ROUTES.admin.subscribers)
+                  },
+                })
+              }}
+              className="inline-flex h-11 items-center rounded-full bg-[#C44536] px-5 text-[13px] font-bold text-white transition hover:opacity-90 disabled:opacity-60"
+            >
+              {locale === "ar" ? "حذف الحساب" : "Delete account"}
             </button>
             <Link
               to={`${APP_ROUTES.admin.progress}?subscriber=${subscriber.id}`}
@@ -801,7 +873,10 @@ export function SubscriberDetailPage() {
         packages={allPackages}
         busy={saveSubscriberMutation.isPending}
         adminName={user?.displayName || user?.email || "Head Coach"}
-        onClose={() => setEditProfileOpen(false)}
+        onClose={() => {
+          if (saveSubscriberMutation.isPending) return
+          setEditProfileOpen(false)
+        }}
         onSave={async (payload) => {
           await saveSubscriberMutation.mutateAsync(payload)
           setEditProfileOpen(false)
@@ -810,6 +885,19 @@ export function SubscriberDetailPage() {
               ? "تم تحديث بيانات المشترك بنجاح"
               : "Subscriber profile updated successfully",
           )
+        }}
+      />
+
+      <ConfirmActionDialog
+        open={Boolean(confirmDialog?.open)}
+        title={confirmDialog?.title ?? ""}
+        description={confirmDialog?.description}
+        confirmLabel={confirmDialog?.confirmLabel}
+        tone={confirmDialog?.tone ?? "danger"}
+        onCancel={() => setConfirmDialog(null)}
+        onConfirm={async () => {
+          if (!confirmDialog) return
+          await confirmDialog.onConfirm()
         }}
       />
 

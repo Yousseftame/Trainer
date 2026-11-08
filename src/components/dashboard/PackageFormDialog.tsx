@@ -154,6 +154,7 @@ export function PackageFormDialog({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (busy) return
     if (!nameAr.trim() && !nameEn.trim()) {
       setError(
         isAr
@@ -281,6 +282,7 @@ export function PackageFormDialog({
                 <input
                   dir="rtl"
                   value={nameAr}
+                  disabled={busy}
                   onChange={(e) => setNameAr(e.target.value)}
                   placeholder="مثال: تحوّل"
                   className={inputClass}
@@ -293,6 +295,7 @@ export function PackageFormDialog({
                 <input
                   dir="ltr"
                   value={nameEn}
+                  disabled={busy}
                   onChange={(e) => setNameEn(e.target.value)}
                   placeholder="e.g. Transform"
                   className={inputClass}
@@ -309,6 +312,7 @@ export function PackageFormDialog({
                 <input
                   dir="rtl"
                   value={descAr}
+                  disabled={busy}
                   onChange={(e) => setDescAr(e.target.value)}
                   placeholder="تدريب 12 أسبوعاً مع التمارين والتغذية"
                   className={inputClass}
@@ -321,6 +325,7 @@ export function PackageFormDialog({
                 <input
                   dir="ltr"
                   value={descEn}
+                  disabled={busy}
                   onChange={(e) => setDescEn(e.target.value)}
                   placeholder="12-week coaching with workouts & nutrition"
                   className={inputClass}
@@ -337,6 +342,7 @@ export function PackageFormDialog({
                 <input
                   dir="rtl"
                   value={priceAr}
+                  disabled={busy}
                   onChange={(e) => setPriceAr(e.target.value)}
                   placeholder="١٨٩ ج.م"
                   className={inputClass}
@@ -349,6 +355,7 @@ export function PackageFormDialog({
                 <input
                   dir="rtl"
                   value={periodAr}
+                  disabled={busy}
                   onChange={(e) => setPeriodAr(e.target.value)}
                   placeholder="/شهر"
                   className={inputClass}
@@ -361,6 +368,7 @@ export function PackageFormDialog({
                 <input
                   dir="ltr"
                   value={priceEn}
+                  disabled={busy}
                   onChange={(e) => setPriceEn(e.target.value)}
                   placeholder="EGP 189"
                   className={inputClass}
@@ -373,6 +381,7 @@ export function PackageFormDialog({
                 <input
                   dir="ltr"
                   value={periodEn}
+                  disabled={busy}
                   onChange={(e) => setPeriodEn(e.target.value)}
                   placeholder="/month"
                   className={inputClass}
@@ -391,16 +400,18 @@ export function PackageFormDialog({
                   min={1}
                   max={1095}
                   value={durationDays}
+                  disabled={busy}
                   onChange={(e) => setDurationDays(Math.max(1, Number(e.target.value) || 1))}
-                  className="h-10 w-24 rounded-full border border-black/10 bg-[#F7F7F7] px-3.5 text-center text-[14px] font-bold text-[#111111] outline-none focus:border-[#111111] focus:bg-white"
+                  className="h-10 w-24 rounded-full border border-black/10 bg-[#F7F7F7] px-3.5 text-center text-[14px] font-bold text-[#111111] outline-none focus:border-[#111111] focus:bg-white disabled:opacity-60"
                 />
                 {DURATION_PRESETS.map((preset) => (
                   <button
                     key={preset}
                     type="button"
+                    disabled={busy}
                     onClick={() => setDurationDays(preset)}
                     className={cn(
-                      "inline-flex h-9 items-center rounded-full px-3.5 text-[12px] font-bold transition-colors",
+                      "inline-flex h-9 items-center rounded-full px-3.5 text-[12px] font-bold transition-colors disabled:opacity-60",
                       durationDays === preset
                         ? "bg-[#111111] text-white"
                         : "bg-[#F4F4F4] text-[#374151] hover:bg-black/10",
@@ -435,9 +446,10 @@ export function PackageFormDialog({
                     <button
                       key={key}
                       type="button"
+                      disabled={busy}
                       onClick={() => toggleEntitlement(key)}
                       className={cn(
-                        "inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-[12px] font-bold transition-colors",
+                        "inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-[12px] font-bold transition-colors disabled:opacity-60",
                         enabled
                           ? "border-[#111111] bg-[#111111] text-white"
                           : "border-black/12 bg-white text-[#6B7280] hover:border-black/25",
@@ -469,9 +481,10 @@ export function PackageFormDialog({
                     <button
                       key={opt.value}
                       type="button"
+                      disabled={busy}
                       onClick={() => setTone(opt.value)}
                       className={cn(
-                        "inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-full border px-3 text-[12px] font-bold transition-colors",
+                        "inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-full border px-3 text-[12px] font-bold transition-colors disabled:opacity-60",
                         tone === opt.value
                           ? "border-[#111111] bg-[#111111] text-white"
                           : "border-black/10 bg-[#F7F7F7] text-[#374151]",
@@ -491,9 +504,10 @@ export function PackageFormDialog({
                 <div className="flex gap-2">
                   <button
                     type="button"
+                    disabled={busy}
                     onClick={() => setFeatured((v) => !v)}
                     className={cn(
-                      "inline-flex h-10 flex-1 items-center justify-center rounded-full border px-3 text-[12px] font-bold transition-colors",
+                      "inline-flex h-10 flex-1 items-center justify-center rounded-full border px-3 text-[12px] font-bold transition-colors disabled:opacity-60",
                       featured
                         ? "border-[#fb5001] bg-[#fb5001] text-white"
                         : "border-black/10 bg-[#F7F7F7] text-[#374151]",
@@ -503,9 +517,10 @@ export function PackageFormDialog({
                   </button>
                   <button
                     type="button"
+                    disabled={busy}
                     onClick={() => setIsActive((v) => !v)}
                     className={cn(
-                      "inline-flex h-10 flex-1 items-center justify-center rounded-full border px-3 text-[12px] font-bold transition-colors",
+                      "inline-flex h-10 flex-1 items-center justify-center rounded-full border px-3 text-[12px] font-bold transition-colors disabled:opacity-60",
                       isActive
                         ? "border-emerald-600 bg-emerald-600 text-white"
                         : "border-black/10 bg-[#F7F7F7] text-[#6B7280]",
@@ -531,8 +546,9 @@ export function PackageFormDialog({
                 </span>
                 <button
                   type="button"
+                  disabled={busy}
                   onClick={addFeatureRow}
-                  className="inline-flex h-8 items-center gap-1 rounded-full bg-[#F4F4F4] px-3 text-[12px] font-bold text-[#111111] hover:bg-black/10"
+                  className="inline-flex h-8 items-center gap-1 rounded-full bg-[#F4F4F4] px-3 text-[12px] font-bold text-[#111111] hover:bg-black/10 disabled:opacity-60"
                 >
                   <Plus className="size-3.5" strokeWidth={2.2} />
                   {isAr ? "إضافة ميزة" : "Add feature"}
@@ -544,6 +560,7 @@ export function PackageFormDialog({
                     <input
                       dir="rtl"
                       value={featAr}
+                      disabled={busy}
                       onChange={(e) => {
                         const val = e.target.value
                         setFeaturesAr((prev) =>
@@ -556,6 +573,7 @@ export function PackageFormDialog({
                     <input
                       dir="ltr"
                       value={featuresEn[idx] ?? ""}
+                      disabled={busy}
                       onChange={(e) => {
                         const val = e.target.value
                         setFeaturesEn((prev) =>
@@ -567,8 +585,9 @@ export function PackageFormDialog({
                     />
                     <button
                       type="button"
+                      disabled={busy}
                       onClick={() => removeFeatureRow(idx)}
-                      className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-[#8c8c8c] hover:bg-rose-50 hover:text-rose-600"
+                      className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-[#8c8c8c] hover:bg-rose-50 hover:text-rose-600 disabled:opacity-60"
                       aria-label={isAr ? "حذف الميزة" : "Remove feature"}
                     >
                       <Trash2 className="size-4" strokeWidth={1.8} />

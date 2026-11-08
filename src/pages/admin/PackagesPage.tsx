@@ -11,6 +11,7 @@ import {
   UserPlus,
   Users,
 } from "lucide-react"
+import { ConfirmActionDialog } from "@/components/dashboard/ConfirmActionDialog"
 import {
   PackageFormDialog,
 } from "@/components/dashboard/PackageFormDialog"
@@ -69,8 +70,14 @@ export function PackagesPage() {
   const { user } = useAuth()
   useDocumentTitle(t("nav.packages"))
 
-  const { data: allPackages = [] } = usePackagesQuery()
-  const { data: allSubscriptions = [] } = useSubscriptionsQuery()
+  const {
+    data: allPackages = [],
+    isLoading: packagesLoading,
+    isError: packagesError,
+    refetch: refetchPackages,
+  } = usePackagesQuery()
+  const { data: allSubscriptions = [], isLoading: subscriptionsLoading } =
+    useSubscriptionsQuery()
   const savePackageMutation = useSavePackageMutation()
   const toggleActiveMutation = useTogglePackageActiveMutation()
   const assignMutation = useAssignSubscriptionMutation()
@@ -82,6 +89,20 @@ export function PackagesPage() {
   const [editingPackage, setEditingPackage] = useState<DemoPackage | null>(null)
   const [subDialogState, setSubDialogState] =
     useState<SubscriptionDialogState | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    title: string
+    description: string
+    confirmLabel: string
+    tone: "danger" | "primary" | "warning"
+    onConfirm: () => Promise<void>
+  } | null>(null)
+
+  const actionsBusy =
+    savePackageMutation.isPending ||
+    toggleActiveMutation.isPending ||
+    assignMutation.isPending ||
+    lifecycleMutation.isPending
 
   const activeCountsByPackage = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -122,6 +143,7 @@ export function PackagesPage() {
   }, [allPackages, activeCountsByPackage])
 
   async function handleSavePackage(input: SavePackageInput) {
+    if (actionsBusy) return
     const isEdit = Boolean(input.id)
     await savePackageMutation.mutateAsync(input)
     setFormOpen(false)
@@ -137,22 +159,53 @@ export function PackagesPage() {
     )
   }
 
-  async function handleToggleArchive(pkg: DemoPackage) {
+  function handleToggleArchive(pkg: DemoPackage) {
+    if (actionsBusy) return
     const nextActive = !pkg.isActive
-    await toggleActiveMutation.mutateAsync({
-      packageId: pkg.id,
-      isActive: nextActive,
+    const name = pkg.name[locale]
+    setConfirmDialog({
+      open: true,
+      title: nextActive
+        ? locale === "ar"
+          ? "استعادة الباقة"
+          : "Restore package"
+        : locale === "ar"
+          ? "أرشفة الباقة"
+          : "Archive package",
+      description: nextActive
+        ? locale === "ar"
+          ? `استعادة باقة "${name}" ونشرها على الموقع العام؟`
+          : `Restore "${name}" and publish it on the public website?`
+        : locale === "ar"
+          ? `أرشفة باقة "${name}"؟ ستختفي من الموقع العام، والاشتراكات الحالية تبقى كما هي.`
+          : `Archive "${name}"? It will disappear from the public site; existing subscriptions stay unchanged.`,
+      confirmLabel: nextActive
+        ? locale === "ar"
+          ? "استعادة ونشر"
+          : "Restore & publish"
+        : locale === "ar"
+          ? "تأكيد الأرشفة"
+          : "Archive package",
+      tone: nextActive ? "primary" : "warning",
+      onConfirm: async () => {
+        await toggleActiveMutation.mutateAsync({
+          packageId: pkg.id,
+          isActive: nextActive,
+        })
+        appToast.success(
+          locale === "ar"
+            ? nextActive
+              ? `تم استعادة باقة "${pkg.name.ar}"`
+              : `تمت أرشفة باقة "${pkg.name.ar}"`
+            : nextActive
+              ? `Restored "${pkg.name.en}"`
+              : `Archived "${pkg.name.en}"`,
+        )
+      },
     })
-    appToast.success(
-      locale === "ar"
-        ? nextActive
-          ? `تم استعادة باقة "${pkg.name.ar}"`
-          : `تمت أرشفة باقة "${pkg.name.ar}"`
-        : nextActive
-          ? `Restored "${pkg.name.en}"`
-          : `Archived "${pkg.name.en}"`,
-    )
   }
+
+  const listLoading = packagesLoading || subscriptionsLoading
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
@@ -181,7 +234,6 @@ export function PackagesPage() {
 
       <section className="rounded-[24px] bg-white p-4 sm:p-6 lg:p-7">
         <div className="flex flex-col gap-3.5">
-          {/* Top row: Search input + Add package button */}
           <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
             <label className="relative w-full sm:max-w-[340px]">
               <Search className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-[#8c8c8c]" />
@@ -197,18 +249,19 @@ export function PackagesPage() {
             </label>
             <button
               type="button"
+              disabled={actionsBusy}
               onClick={() => {
+                if (actionsBusy) return
                 setEditingPackage(null)
                 setFormOpen(true)
               }}
-              className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition-opacity hover:opacity-90"
+              className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
             >
               <PackagePlus className="size-4" strokeWidth={2} />
               {t("admin.packages.add")}
             </button>
           </div>
 
-          {/* Bottom row: Filter chips */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {(["all", "active", "archived"] as const).map((item) => (
               <FilterChip
@@ -224,7 +277,26 @@ export function PackagesPage() {
           </div>
         </div>
 
-        {packages.length === 0 ? (
+        {packagesError ? (
+          <div className="mt-5 flex min-h-40 flex-col items-center justify-center gap-3 rounded-[20px] bg-[#F4F4F4] px-4 py-10 text-center">
+            <p className="text-sm font-medium text-[#8c8c8c]">
+              {locale === "ar"
+                ? "تعذر تحميل الباقات. حاول مرة أخرى."
+                : "Could not load packages. Please try again."}
+            </p>
+            <button
+              type="button"
+              onClick={() => void refetchPackages()}
+              className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white"
+            >
+              {locale === "ar" ? "إعادة المحاولة" : "Retry"}
+            </button>
+          </div>
+        ) : listLoading ? (
+          <div className="mt-5 flex min-h-40 items-center justify-center rounded-[20px] bg-[#F4F4F4] px-4 py-10 text-sm font-medium text-[#8c8c8c]">
+            {locale === "ar" ? "جاري تحميل الباقات…" : "Loading packages…"}
+          </div>
+        ) : packages.length === 0 ? (
           <div className="mt-5 flex min-h-40 items-center justify-center rounded-[20px] bg-[#F4F4F4] px-4 py-10 text-sm font-medium text-[#8c8c8c]">
             {t("admin.packages.empty")}
           </div>
@@ -237,17 +309,20 @@ export function PackagesPage() {
                 subscribers={activeCountsByPackage[pkg.id] ?? 0}
                 isRtl={isRtl}
                 locale={locale}
+                actionsBusy={actionsBusy}
                 onEdit={() => {
+                  if (actionsBusy) return
                   setEditingPackage(pkg)
                   setFormOpen(true)
                 }}
-                onAssign={() =>
+                onAssign={() => {
+                  if (actionsBusy) return
                   setSubDialogState({
                     mode: "assign",
                     defaultPackageId: pkg.id,
                   })
-                }
-                onToggleArchive={() => void handleToggleArchive(pkg)}
+                }}
+                onToggleArchive={() => handleToggleArchive(pkg)}
               />
             ))}
           </div>
@@ -259,6 +334,7 @@ export function PackagesPage() {
         initialPackage={editingPackage}
         busy={savePackageMutation.isPending}
         onClose={() => {
+          if (savePackageMutation.isPending) return
           setFormOpen(false)
           setEditingPackage(null)
         }}
@@ -270,7 +346,10 @@ export function PackagesPage() {
         packages={allPackages}
         busy={assignMutation.isPending || lifecycleMutation.isPending}
         adminName={user?.displayName || user?.email || "Head Coach"}
-        onClose={() => setSubDialogState(null)}
+        onClose={() => {
+          if (assignMutation.isPending || lifecycleMutation.isPending) return
+          setSubDialogState(null)
+        }}
         onAssign={async (payload) => {
           await assignMutation.mutateAsync(payload)
           setSubDialogState(null)
@@ -290,6 +369,19 @@ export function PackagesPage() {
           )
         }}
       />
+
+      <ConfirmActionDialog
+        open={Boolean(confirmDialog?.open)}
+        title={confirmDialog?.title ?? ""}
+        description={confirmDialog?.description}
+        confirmLabel={confirmDialog?.confirmLabel}
+        tone={confirmDialog?.tone ?? "warning"}
+        onCancel={() => setConfirmDialog(null)}
+        onConfirm={async () => {
+          if (!confirmDialog) return
+          await confirmDialog.onConfirm()
+        }}
+      />
     </div>
   )
 }
@@ -299,6 +391,7 @@ function PackageCard({
   subscribers,
   isRtl,
   locale,
+  actionsBusy,
   onEdit,
   onAssign,
   onToggleArchive,
@@ -307,6 +400,7 @@ function PackageCard({
   subscribers: number
   isRtl: boolean
   locale: "en" | "ar"
+  actionsBusy: boolean
   onEdit: () => void
   onAssign: () => void
   onToggleArchive: () => void
@@ -405,7 +499,6 @@ function PackageCard({
         </span>
       </div>
 
-      {/* Package Content Access Rules (Entitlements) */}
       <div className="mt-4 flex flex-wrap gap-1.5">
         {ENTITLEMENT_KEYS.map((key) => {
           const allowed = entitlements[key]
@@ -465,9 +558,10 @@ function PackageCard({
       <div className="mt-6 flex flex-wrap gap-2">
         <button
           type="button"
+          disabled={actionsBusy}
           onClick={onEdit}
           className={cn(
-            "inline-flex h-10 flex-1 items-center justify-center rounded-full px-4 text-[13px] font-bold transition-opacity hover:opacity-90",
+            "inline-flex h-10 flex-1 items-center justify-center rounded-full px-4 text-[13px] font-bold transition-opacity hover:opacity-90 disabled:opacity-60",
             isDark
               ? "bg-[var(--gym-lime,#fb5001)] text-white"
               : "bg-[var(--gym-ink,#111111)] text-white",
@@ -478,9 +572,10 @@ function PackageCard({
         {pkg.isActive ? (
           <button
             type="button"
+            disabled={actionsBusy}
             onClick={onAssign}
             className={cn(
-              "inline-flex h-10 items-center justify-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold transition-colors",
+              "inline-flex h-10 items-center justify-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold transition-colors disabled:opacity-60",
               isDark
                 ? "bg-white/12 text-white hover:bg-white/20"
                 : "bg-white text-[var(--gym-ink,#111111)] hover:bg-black/5",
@@ -493,9 +588,10 @@ function PackageCard({
         ) : null}
         <button
           type="button"
+          disabled={actionsBusy}
           onClick={onToggleArchive}
           className={cn(
-            "inline-flex h-10 items-center justify-center rounded-full px-4 text-[13px] font-bold transition-colors",
+            "inline-flex h-10 items-center justify-center rounded-full px-4 text-[13px] font-bold transition-colors disabled:opacity-60",
             isDark
               ? "bg-white/10 text-white hover:bg-white/15"
               : "bg-white text-[var(--gym-ink,#111111)] hover:bg-black/5",

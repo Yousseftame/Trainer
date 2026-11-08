@@ -1,17 +1,20 @@
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
+  query,
   setDoc,
+  where,
   writeBatch,
 } from "firebase/firestore"
 import { getDb } from "@/lib/firebase/firestore"
 import {
-  DEMO_PACKAGES,
-  DEMO_SUBSCRIPTIONS,
-  type DemoPackage,
-} from "@/features/subscriptions/demo"
-import { DEMO_SUBSCRIBERS } from "@/features/subscribers/demo"
+  setPackagesCache,
+  setSubscriptionsCache,
+} from "@/features/subscriptions/cache"
+import type { CatalogPackage } from "@/features/subscriptions/types"
+import { callSetSubscriberAccountStatus } from "@/lib/firebase/callables"
 import {
   computeEndsAtIso,
   normalizeEntitlements,
@@ -29,78 +32,47 @@ const SUBSCRIPTIONS_COLLECTION = "subscriptions"
 const PACKAGES_STORAGE_KEY = "derpyfit_packages_v1"
 const SUBSCRIPTIONS_STORAGE_KEY = "derpyfit_subscriptions_v1"
 
-function readLocalCache<T>(key: string): T[] | null {
-  if (typeof window === "undefined") return null
+function clearLegacyLocalCaches() {
   try {
-    const raw = window.localStorage.getItem(key)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? (parsed as T[]) : null
+    window.localStorage.removeItem(PACKAGES_STORAGE_KEY)
+    window.localStorage.removeItem(SUBSCRIPTIONS_STORAGE_KEY)
   } catch {
-    return null
+    // ignore
   }
 }
 
-function writeLocalCache<T>(key: string, items: T[]): void {
-  if (typeof window === "undefined") return
-  try {
-    window.localStorage.setItem(key, JSON.stringify(items))
-  } catch {
-    // Ignore storage quota errors
-  }
+function syncPackagesCache(next: CatalogPackage[]): CatalogPackage[] {
+  clearLegacyLocalCaches()
+  return setPackagesCache(next) as CatalogPackage[]
 }
 
-function syncDemoPackagesArray(next: DemoPackage[]): DemoPackage[] {
-  const sorted = [...next].sort((a, b) => a.sortOrder - b.sortOrder)
-  DEMO_PACKAGES.splice(0, DEMO_PACKAGES.length, ...sorted)
-  writeLocalCache(PACKAGES_STORAGE_KEY, sorted)
-  return sorted
-}
-
-function syncDemoSubscriptionsArray(
+function syncSubscriptionsCache(
   next: SubscriberSubscription[],
 ): SubscriberSubscription[] {
-  const sorted = [...next].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  )
-  DEMO_SUBSCRIPTIONS.splice(0, DEMO_SUBSCRIPTIONS.length, ...sorted)
-  writeLocalCache(SUBSCRIPTIONS_STORAGE_KEY, sorted)
-  return sorted
+  clearLegacyLocalCaches()
+  return setSubscriptionsCache(next)
 }
 
 async function ensureSubscriberAccountActive(subscriberId: string): Promise<void> {
-  const idx = DEMO_SUBSCRIBERS.findIndex((s) => s.id === subscriberId)
-  if (idx === -1) return
-  const sub = DEMO_SUBSCRIBERS[idx]
-  if (sub.status === "active") return
-  const updated = {
-    ...sub,
-    status: "active" as const,
-    updatedAt: new Date().toISOString(),
-  }
-  DEMO_SUBSCRIBERS.splice(idx, 1, updated)
-  writeLocalCache("derpyfit_subscribers_v1", DEMO_SUBSCRIBERS)
   try {
-    const db = getDb()
-    await setDoc(doc(db, "subscribers", updated.id), stripUndefined({ ...updated }))
-  } catch {
-    // Kept in local cache
+    await callSetSubscriberAccountStatus({
+      subscriberId,
+      status: "active",
+      syncSubscription: false,
+      notes: "Activated with subscription assignment",
+    })
+  } catch (err) {
+    console.warn(
+      "[Subscriptions] Could not activate subscriber account via Functions:",
+      err,
+    )
   }
 }
 
-// Initialize in-memory arrays from localStorage immediately on module load
-const cachedPackages = readLocalCache<DemoPackage>(PACKAGES_STORAGE_KEY)
-if (cachedPackages?.length) {
-  DEMO_PACKAGES.splice(0, DEMO_PACKAGES.length, ...cachedPackages)
-}
-const cachedSubscriptions = readLocalCache<SubscriberSubscription>(
-  SUBSCRIPTIONS_STORAGE_KEY,
-)
-if (cachedSubscriptions?.length) {
-  DEMO_SUBSCRIPTIONS.splice(0, DEMO_SUBSCRIPTIONS.length, ...cachedSubscriptions)
-}
+// Clear stale local caches so admin packages/subscriptions stay Firestore-sourced
+clearLegacyLocalCaches()
 
-function normalizePackageDoc(id: string, raw: Record<string, unknown>): DemoPackage {
+function normalizePackageDoc(id: string, raw: Record<string, unknown>): CatalogPackage {
   const nameRaw = (raw.name ?? {}) as Record<string, string>
   const descRaw = (raw.description ?? {}) as Record<string, string>
   const priceRaw = (raw.price ?? {}) as Record<string, string>
@@ -138,8 +110,14 @@ function normalizePackageDoc(id: string, raw: Record<string, unknown>): DemoPack
     entitlements: normalizeEntitlements(
       raw.entitlements as Partial<PackageEntitlements> | undefined,
     ),
-    createdAt: typeof raw.createdAt === "string" ? raw.createdAt : undefined,
-    updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : undefined,
+    createdAt:
+      typeof raw.createdAt === "string"
+        ? raw.createdAt
+        : new Date().toISOString(),
+    updatedAt:
+      typeof raw.updatedAt === "string"
+        ? raw.updatedAt
+        : new Date().toISOString(),
   }
 }
 
@@ -217,39 +195,17 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
   return out as T
 }
 
-export async function fetchPackages(): Promise<DemoPackage[]> {
+export async function fetchPackages(): Promise<CatalogPackage[]> {
   try {
     const db = getDb()
     const snap = await getDocs(collection(db, PACKAGES_COLLECTION))
-
-    if (snap.empty) {
-      const seed = [...DEMO_PACKAGES]
-      try {
-        const batch = writeBatch(db)
-        for (const pkg of seed) {
-          batch.set(
-            doc(db, PACKAGES_COLLECTION, pkg.id),
-            stripUndefined({
-              ...pkg,
-              createdAt: pkg.createdAt ?? new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            }),
-          )
-        }
-        await batch.commit()
-      } catch (err) {
-        console.warn("[Firestore] Failed to seed packages collection:", err)
-      }
-      return syncDemoPackagesArray(seed)
-    }
-
     const list = snap.docs.map((d) =>
       normalizePackageDoc(d.id, d.data() as Record<string, unknown>),
     )
-    return syncDemoPackagesArray(list)
+    return syncPackagesCache(list)
   } catch (err) {
     console.warn("[Firestore] Failed to read packages collection:", err)
-    return syncDemoPackagesArray([...DEMO_PACKAGES])
+    throw err instanceof Error ? err : new Error("Failed to load packages")
   }
 }
 
@@ -257,36 +213,60 @@ export async function fetchSubscriptions(): Promise<SubscriberSubscription[]> {
   try {
     const db = getDb()
     const snap = await getDocs(collection(db, SUBSCRIPTIONS_COLLECTION))
-
-    if (snap.empty) {
-      const seed = DEMO_SUBSCRIPTIONS.map((s) =>
-        normalizeSubscriptionDoc(s.id, s as unknown as Record<string, unknown>),
-      )
-      try {
-        const batch = writeBatch(db)
-        for (const item of seed) {
-          batch.set(
-            doc(db, SUBSCRIPTIONS_COLLECTION, item.id),
-            stripUndefined({ ...item }),
-          )
-        }
-        await batch.commit()
-      } catch (err) {
-        console.warn("[Firestore] Failed to seed subscriptions collection:", err)
-      }
-      return syncDemoSubscriptionsArray(seed)
-    }
-
     const list = snap.docs.map((d) =>
       normalizeSubscriptionDoc(d.id, d.data() as Record<string, unknown>),
     )
-    return syncDemoSubscriptionsArray(list)
+    return syncSubscriptionsCache(list)
   } catch (err) {
     console.warn("[Firestore] Failed to read subscriptions collection:", err)
-    const normalized = DEMO_SUBSCRIPTIONS.map((s) =>
-      normalizeSubscriptionDoc(s.id, s as unknown as Record<string, unknown>),
+    throw err instanceof Error ? err : new Error("Failed to load subscriptions")
+  }
+}
+
+/** Scoped read — subscriber panel / detail views (1 query, own docs only). */
+export async function fetchSubscriptionsForSubscriber(
+  subscriberId: string,
+): Promise<SubscriberSubscription[]> {
+  if (!subscriberId) return []
+  try {
+    const db = getDb()
+    const snap = await getDocs(
+      query(
+        collection(db, SUBSCRIPTIONS_COLLECTION),
+        where("subscriberId", "==", subscriberId),
+      ),
     )
-    return syncDemoSubscriptionsArray(normalized)
+    return snap.docs
+      .map((d) =>
+        normalizeSubscriptionDoc(d.id, d.data() as Record<string, unknown>),
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )
+  } catch (err) {
+    console.warn("[Firestore] Failed to read subscriptions for subscriber:", err)
+    throw err instanceof Error
+      ? err
+      : new Error("Failed to load subscriber subscriptions")
+  }
+}
+
+export async function fetchPackageById(
+  packageId: string,
+): Promise<CatalogPackage | null> {
+  if (!packageId) return null
+  try {
+    const db = getDb()
+    const snap = await getDoc(doc(db, PACKAGES_COLLECTION, packageId))
+    if (!snap.exists()) return null
+    return normalizePackageDoc(
+      snap.id,
+      snap.data() as Record<string, unknown>,
+    )
+  } catch (err) {
+    console.warn("[Firestore] Failed to read package:", err)
+    return null
   }
 }
 
@@ -305,23 +285,33 @@ export type SavePackageInput = {
   entitlements: PackageEntitlements
 }
 
-export async function savePackage(input: SavePackageInput): Promise<DemoPackage> {
+export async function savePackage(input: SavePackageInput): Promise<CatalogPackage> {
   const now = new Date().toISOString()
-  const existing = input.id
-    ? DEMO_PACKAGES.find((item) => item.id === input.id)
-    : undefined
+  const db = getDb()
 
+  let existing: CatalogPackage | undefined
+  if (input.id) {
+    const snap = await getDoc(doc(db, PACKAGES_COLLECTION, input.id))
+    if (snap.exists()) {
+      existing = normalizePackageDoc(
+        snap.id,
+        snap.data() as Record<string, unknown>,
+      )
+    }
+  }
+
+  const current = await fetchPackages()
   const id =
     existing?.id ??
     input.id ??
-    `pkg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+    doc(collection(db, PACKAGES_COLLECTION)).id
 
   const sortOrder =
     input.sortOrder ??
     existing?.sortOrder ??
-    (DEMO_PACKAGES.reduce((max, p) => Math.max(max, p.sortOrder), 0) + 1)
+    (current.reduce((max, p) => Math.max(max, p.sortOrder), 0) + 1)
 
-  const record: DemoPackage = {
+  const record: CatalogPackage = {
     id,
     name: {
       en: input.name.en.trim() || input.name.ar.trim(),
@@ -354,50 +344,62 @@ export async function savePackage(input: SavePackageInput): Promise<DemoPackage>
     updatedAt: now,
   }
 
-  // If this package is marked featured, unfeature others if desired or keep updated list
-  const nextList = existing
-    ? DEMO_PACKAGES.map((item) => (item.id === id ? record : item))
-    : [...DEMO_PACKAGES, record]
+  const nextList = (
+    current.some((item) => item.id === id)
+      ? current.map((item) => (item.id === id ? record : item))
+      : [...current, record]
+  ).map((item) =>
+    record.featured && item.id !== id && item.featured
+      ? { ...item, featured: false, updatedAt: now }
+      : item,
+  )
 
-  syncDemoPackagesArray(nextList)
-
-  try {
-    const db = getDb()
-    await setDoc(doc(db, PACKAGES_COLLECTION, id), stripUndefined({ ...record }))
-  } catch (err) {
-    console.warn("[Firestore] Failed to write package:", err)
+  const batch = writeBatch(db)
+  batch.set(doc(db, PACKAGES_COLLECTION, id), stripUndefined({ ...record }))
+  if (record.featured) {
+    for (const item of nextList) {
+      if (item.id !== id && !item.featured && item.updatedAt === now) {
+        batch.set(
+          doc(db, PACKAGES_COLLECTION, item.id),
+          stripUndefined({ ...item }),
+        )
+      }
+    }
   }
+  await batch.commit()
 
-  return record
+  return syncPackagesCache(nextList).find((item) => item.id === id) ?? record
 }
 
 export async function togglePackageActive(
   packageId: string,
   isActive: boolean,
-): Promise<DemoPackage> {
-  const existing = DEMO_PACKAGES.find((item) => item.id === packageId)
-  if (!existing) {
+): Promise<CatalogPackage> {
+  const db = getDb()
+  const snap = await getDoc(doc(db, PACKAGES_COLLECTION, packageId))
+  if (!snap.exists()) {
     throw new Error("Package not found")
   }
 
-  const updated: DemoPackage = {
+  const existing = normalizePackageDoc(
+    snap.id,
+    snap.data() as Record<string, unknown>,
+  )
+  const updated: CatalogPackage = {
     ...existing,
     isActive,
     updatedAt: new Date().toISOString(),
   }
 
-  const nextList = DEMO_PACKAGES.map((item) =>
-    item.id === packageId ? updated : item,
+  await setDoc(
+    doc(db, PACKAGES_COLLECTION, packageId),
+    stripUndefined({ ...updated }),
   )
-  syncDemoPackagesArray(nextList)
 
-  try {
-    const db = getDb()
-    await setDoc(doc(db, PACKAGES_COLLECTION, packageId), stripUndefined({ ...updated }))
-  } catch (err) {
-    console.warn("[Firestore] Failed to toggle package:", err)
-  }
-
+  const current = await fetchPackages()
+  syncPackagesCache(
+    current.map((item) => (item.id === packageId ? updated : item)),
+  )
   return updated
 }
 
@@ -419,7 +421,8 @@ export async function assignSubscription(
   input: AssignSubscriptionInput,
 ): Promise<SubscriberSubscription> {
   const now = new Date().toISOString()
-  const pkg = DEMO_PACKAGES.find((item) => item.id === input.packageId)
+  const db = getDb()
+  const pkg = await fetchPackageById(input.packageId)
   if (!pkg) {
     throw new Error("Package not found")
   }
@@ -440,7 +443,7 @@ export async function assignSubscription(
       : undefined
 
   const newSub: SubscriberSubscription = {
-    id: `sub-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    id: doc(collection(db, SUBSCRIPTIONS_COLLECTION)).id,
     subscriberId: input.subscriberId,
     subscriberName: input.subscriberName,
     subscriberEmail: input.subscriberEmail,
@@ -458,13 +461,16 @@ export async function assignSubscription(
     updatedAt: now,
   }
 
-  // Expire any previous active/suspended subscription for this subscriber so history is preserved
+  const current = await fetchSubscriptions()
+  // Expire any previous active/suspended/pending seat so history is preserved
   const updatedPrevious: SubscriberSubscription[] = []
-  const nextList = DEMO_SUBSCRIPTIONS.map((item) => {
+  const nextList = current.map((item) => {
     if (
       isActivating &&
       item.subscriberId === input.subscriberId &&
-      (item.status === "active" || item.status === "suspended" || item.status === "pending")
+      (item.status === "active" ||
+        item.status === "suspended" ||
+        item.status === "pending")
     ) {
       const closed: SubscriberSubscription = {
         ...item,
@@ -478,22 +484,23 @@ export async function assignSubscription(
     return item
   })
 
-  syncDemoSubscriptionsArray([newSub, ...nextList])
+  const batch = writeBatch(db)
+  for (const prev of updatedPrevious) {
+    batch.set(
+      doc(db, SUBSCRIPTIONS_COLLECTION, prev.id),
+      stripUndefined({ ...prev }),
+    )
+  }
+  batch.set(
+    doc(db, SUBSCRIPTIONS_COLLECTION, newSub.id),
+    stripUndefined({ ...newSub }),
+  )
+  await batch.commit()
+
+  syncSubscriptionsCache([newSub, ...nextList])
 
   if (isActivating) {
     await ensureSubscriberAccountActive(input.subscriberId)
-  }
-
-  try {
-    const db = getDb()
-    const batch = writeBatch(db)
-    for (const prev of updatedPrevious) {
-      batch.set(doc(db, SUBSCRIPTIONS_COLLECTION, prev.id), stripUndefined({ ...prev }))
-    }
-    batch.set(doc(db, SUBSCRIPTIONS_COLLECTION, newSub.id), stripUndefined({ ...newSub }))
-    await batch.commit()
-  } catch (err) {
-    console.warn("[Firestore] Failed to assign subscription:", err)
   }
 
   return newSub
@@ -515,26 +522,29 @@ export async function updateSubscriptionLifecycle(
   input: UpdateSubscriptionLifecycleInput,
 ): Promise<SubscriberSubscription> {
   const now = new Date().toISOString()
-  const existing = DEMO_SUBSCRIPTIONS.find((item) => item.id === input.subscriptionId)
+  const current = await fetchSubscriptions()
+  const existing = current.find((item) => item.id === input.subscriptionId)
   if (!existing) {
     throw new Error("Subscription not found")
   }
 
-  const pkg =
-    DEMO_PACKAGES.find((item) => item.id === (input.packageId ?? existing.packageId)) ??
-    DEMO_PACKAGES[0]
+  const targetPackageId = input.packageId ?? existing.packageId
+  const pkg = await fetchPackageById(targetPackageId)
+  if (!pkg) {
+    throw new Error("Package not found")
+  }
 
   // "renew" creates a brand new active cycle and keeps the previous record in history as "expired"
   if (input.action === "renew") {
     const startsAtIso = input.startsAt || now
     const endsAtIso =
-      input.endsAt || computeEndsAtIso(startsAtIso, pkg?.durationDays ?? 30)
+      input.endsAt || computeEndsAtIso(startsAtIso, pkg.durationDays)
 
     return assignSubscription({
       subscriberId: existing.subscriberId,
       subscriberName: existing.subscriberName,
       subscriberEmail: existing.subscriberEmail,
-      packageId: pkg?.id ?? existing.packageId,
+      packageId: pkg.id,
       status: "active",
       startsAt: startsAtIso,
       endsAt: endsAtIso,
@@ -554,8 +564,7 @@ export async function updateSubscriptionLifecycle(
     nextStatus = "active"
     nextStartsAt = input.startsAt || existing.startsAt || now
     nextEndsAt =
-      input.endsAt ||
-      computeEndsAtIso(nextStartsAt, pkg?.durationDays ?? 30)
+      input.endsAt || computeEndsAtIso(nextStartsAt, pkg.durationDays)
     nextActivatedBy = input.activatedBy || existing.activatedBy || "Head Coach"
   } else if (input.action === "suspend") {
     nextStatus = "suspended"
@@ -572,7 +581,7 @@ export async function updateSubscriptionLifecycle(
       nextStartsAt = now
     }
     if (nextStatus === "active" && !nextEndsAt) {
-      nextEndsAt = computeEndsAtIso(nextStartsAt ?? now, pkg?.durationDays ?? 30)
+      nextEndsAt = computeEndsAtIso(nextStartsAt ?? now, pkg.durationDays)
     }
   }
 
@@ -589,11 +598,9 @@ export async function updateSubscriptionLifecycle(
 
   const updated: SubscriberSubscription = {
     ...existing,
-    packageId: pkg?.id ?? existing.packageId,
-    packageName: pkg ? { ...pkg.name } : existing.packageName,
-    entitlementsSnapshot: pkg
-      ? normalizeEntitlements(pkg.entitlements)
-      : existing.entitlementsSnapshot,
+    packageId: pkg.id,
+    packageName: { ...pkg.name },
+    entitlementsSnapshot: normalizeEntitlements(pkg.entitlements),
     status: nextStatus,
     startsAt: nextStartsAt,
     endsAt: nextEndsAt,
@@ -604,7 +611,7 @@ export async function updateSubscriptionLifecycle(
   }
 
   const closedOthers: SubscriberSubscription[] = []
-  const nextList = DEMO_SUBSCRIPTIONS.map((item) => {
+  const nextList = current.map((item) => {
     if (item.id === updated.id) return updated
     // Ensure only one active subscription per subscriber
     if (
@@ -624,22 +631,24 @@ export async function updateSubscriptionLifecycle(
     return item
   })
 
-  syncDemoSubscriptionsArray(nextList)
+  const db = getDb()
+  const batch = writeBatch(db)
+  for (const other of closedOthers) {
+    batch.set(
+      doc(db, SUBSCRIPTIONS_COLLECTION, other.id),
+      stripUndefined({ ...other }),
+    )
+  }
+  batch.set(
+    doc(db, SUBSCRIPTIONS_COLLECTION, updated.id),
+    stripUndefined({ ...updated }),
+  )
+  await batch.commit()
+
+  syncSubscriptionsCache(nextList)
 
   if (updated.status === "active") {
     await ensureSubscriberAccountActive(updated.subscriberId)
-  }
-
-  try {
-    const db = getDb()
-    const batch = writeBatch(db)
-    for (const other of closedOthers) {
-      batch.set(doc(db, SUBSCRIPTIONS_COLLECTION, other.id), stripUndefined({ ...other }))
-    }
-    batch.set(doc(db, SUBSCRIPTIONS_COLLECTION, updated.id), stripUndefined({ ...updated }))
-    await batch.commit()
-  } catch (err) {
-    console.warn("[Firestore] Failed to update subscription lifecycle:", err)
   }
 
   return updated
