@@ -1,8 +1,12 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { Activity, AlertTriangle, Check, Plus, Trash2, X } from "lucide-react"
+import { buildRestrictionMatchTokens } from "@/features/physicalTherapy/paths"
+import type { SavePTRecordInput } from "@/features/physicalTherapy/service"
+import { subscriberDisplayName } from "@/features/subscribers/types"
 import { useSubscribersQuery } from "@/features/subscribers/hooks"
 import { useLocale } from "@/hooks/useLocale"
+import { allocateFirestoreId } from "@/lib/firebase/ids"
 import { appToast } from "@/lib/toast"
 import type {
   PhysicalTherapyRecord,
@@ -17,11 +21,30 @@ interface PTRecordFormDialogProps {
   open: boolean
   onClose: () => void
   initialRecord?: PhysicalTherapyRecord | null
-  onSave: (record: Partial<PhysicalTherapyRecord> & {
-    subscriberId: string
-    injuryTitle: PhysicalTherapyRecord["injuryTitle"]
-    affectedArea: PhysicalTherapyRecord["affectedArea"]
-  }) => Promise<unknown>
+  /** Prefill subscriber when creating from subscriber detail */
+  defaultSubscriberId?: string
+  onSave: (record: SavePTRecordInput) => Promise<unknown>
+}
+
+function blankRestriction(): PTMovementRestriction {
+  return {
+    id: allocateFirestoreId("pt_restrictions"),
+    prohibited: { en: "", ar: "" },
+    safeAlternative: { en: "", ar: "" },
+    reason: { en: "", ar: "" },
+    equipment: "",
+  }
+}
+
+function blankRehab(): PTRehabExercise {
+  return {
+    id: allocateFirestoreId("pt_rehab"),
+    name: { en: "", ar: "" },
+    sets: 3,
+    reps: "12-15 reps",
+    frequency: "3x / week",
+    notes: { en: "", ar: "" },
+  }
 }
 
 const AFFECTED_AREAS: { key: PTAffectedArea; en: string; ar: string }[] = [
@@ -40,64 +63,78 @@ export function PTRecordFormDialog({
   open,
   onClose,
   initialRecord,
+  defaultSubscriberId,
   onSave,
 }: PTRecordFormDialogProps) {
   const { locale } = useLocale()
   const isAr = locale === "ar"
 
-  const { data: subscribers = [] } = useSubscribersQuery()
+  const { data: subscribers = [] } = useSubscribersQuery({ enabled: open })
 
-  const [subscriberId, setSubscriberId] = useState(initialRecord?.subscriberId || subscribers[0]?.id || "")
-  const [injuryEn, setInjuryEn] = useState(initialRecord?.injuryTitle.en || "")
-  const [injuryAr, setInjuryAr] = useState(initialRecord?.injuryTitle.ar || "")
-  const [affectedArea, setAffectedArea] = useState<PTAffectedArea>(initialRecord?.affectedArea || "shoulder")
-  const [severity, setSeverity] = useState<PTSeverity>(initialRecord?.severity || "mild")
-  const [status, setStatus] = useState<PTStatus>(initialRecord?.status || "active")
-  const [diagnosisDate, setDiagnosisDate] = useState(initialRecord?.diagnosisDate || new Date().toISOString().slice(0, 10))
-  const [nextEvaluationDate, setNextEvaluationDate] = useState(initialRecord?.nextEvaluationDate || "")
-  const [notesEn, setNotesEn] = useState(initialRecord?.therapistNotes?.en || "")
-  const [notesAr, setNotesAr] = useState(initialRecord?.therapistNotes?.ar || "")
-
-  const [restrictions, setRestrictions] = useState<PTMovementRestriction[]>(
-    initialRecord?.restrictions || [
-      {
-        id: "res-1",
-        prohibited: { en: "", ar: "" },
-        safeAlternative: { en: "", ar: "" },
-        reason: { en: "", ar: "" },
-        equipment: "",
-      },
-    ],
+  const [subscriberId, setSubscriberId] = useState("")
+  const [injuryEn, setInjuryEn] = useState("")
+  const [injuryAr, setInjuryAr] = useState("")
+  const [affectedArea, setAffectedArea] = useState<PTAffectedArea>("shoulder")
+  const [severity, setSeverity] = useState<PTSeverity>("mild")
+  const [status, setStatus] = useState<PTStatus>("active")
+  const [diagnosisDate, setDiagnosisDate] = useState(
+    new Date().toISOString().slice(0, 10),
   )
-
-  const [rehabExercises, setRehabExercises] = useState<PTRehabExercise[]>(
-    initialRecord?.rehabExercises || [
-      {
-        id: "reh-1",
-        name: { en: "", ar: "" },
-        sets: 3,
-        reps: "15 reps",
-        frequency: "Daily",
-        notes: { en: "", ar: "" },
-      },
-    ],
-  )
-
+  const [nextEvaluationDate, setNextEvaluationDate] = useState("")
+  const [notesEn, setNotesEn] = useState("")
+  const [notesAr, setNotesAr] = useState("")
+  const [restrictions, setRestrictions] = useState<PTMovementRestriction[]>([
+    blankRestriction(),
+  ])
+  const [rehabExercises, setRehabExercises] = useState<PTRehabExercise[]>([
+    blankRehab(),
+  ])
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    setSaving(false)
+    if (initialRecord) {
+      setSubscriberId(initialRecord.subscriberId)
+      setInjuryEn(initialRecord.injuryTitle.en || "")
+      setInjuryAr(initialRecord.injuryTitle.ar || "")
+      setAffectedArea(initialRecord.affectedArea)
+      setSeverity(initialRecord.severity)
+      setStatus(initialRecord.status)
+      setDiagnosisDate(initialRecord.diagnosisDate)
+      setNextEvaluationDate(initialRecord.nextEvaluationDate || "")
+      setNotesEn(initialRecord.therapistNotes?.en || "")
+      setNotesAr(initialRecord.therapistNotes?.ar || "")
+      setRestrictions(
+        initialRecord.restrictions.length
+          ? initialRecord.restrictions
+          : [blankRestriction()],
+      )
+      setRehabExercises(
+        initialRecord.rehabExercises.length
+          ? initialRecord.rehabExercises
+          : [blankRehab()],
+      )
+    } else {
+      setSubscriberId(defaultSubscriberId || subscribers[0]?.id || "")
+      setInjuryEn("")
+      setInjuryAr("")
+      setAffectedArea("shoulder")
+      setSeverity("mild")
+      setStatus("active")
+      setDiagnosisDate(new Date().toISOString().slice(0, 10))
+      setNextEvaluationDate("")
+      setNotesEn("")
+      setNotesAr("")
+      setRestrictions([blankRestriction()])
+      setRehabExercises([blankRehab()])
+    }
+  }, [open, initialRecord, defaultSubscriberId, subscribers])
 
   if (!open) return null
 
   function addRestriction() {
-    setRestrictions((prev) => [
-      ...prev,
-      {
-        id: `res-${Date.now().toString(36)}`,
-        prohibited: { en: "", ar: "" },
-        safeAlternative: { en: "", ar: "" },
-        reason: { en: "", ar: "" },
-        equipment: "",
-      },
-    ])
+    setRestrictions((prev) => [...prev, blankRestriction()])
   }
 
   function removeRestriction(index: number) {
@@ -105,17 +142,7 @@ export function PTRecordFormDialog({
   }
 
   function addRehabExercise() {
-    setRehabExercises((prev) => [
-      ...prev,
-      {
-        id: `reh-${Date.now().toString(36)}`,
-        name: { en: "", ar: "" },
-        sets: 3,
-        reps: "12-15 reps",
-        frequency: "3x / week",
-        notes: { en: "", ar: "" },
-      },
-    ])
+    setRehabExercises((prev) => [...prev, blankRehab()])
   }
 
   function removeRehabExercise(index: number) {
@@ -129,18 +156,40 @@ export function PTRecordFormDialog({
       return
     }
     if (!injuryEn.trim() && !injuryAr.trim()) {
-      appToast.error(isAr ? "يرجى إدخال اسم الإصابة أو الحالة" : "Please enter the injury name")
+      appToast.error(
+        isAr
+          ? "يرجى إدخال اسم الإصابة أو الحالة"
+          : "Please enter the injury name",
+      )
+      return
+    }
+    if (!diagnosisDate) {
+      appToast.error(
+        isAr ? "يرجى إدخال تاريخ التشخيص" : "Please enter the diagnosis date",
+      )
       return
     }
 
-    const sub = subscribers.find((s) => s.id === subscriberId)
+    const cleanRestrictions = restrictions
+      .filter((r) => r.prohibited.en.trim() || r.prohibited.ar.trim())
+      .map((r) => ({
+        ...r,
+        prohibited: {
+          en: r.prohibited.en.trim() || r.prohibited.ar.trim(),
+          ar: r.prohibited.ar.trim() || r.prohibited.en.trim(),
+        },
+        safeAlternative: {
+          en: r.safeAlternative.en.trim() || r.safeAlternative.ar.trim(),
+          ar: r.safeAlternative.ar.trim() || r.safeAlternative.en.trim(),
+        },
+        matchTokens: buildRestrictionMatchTokens(r.prohibited),
+      }))
 
     setSaving(true)
     try {
       await onSave({
         id: initialRecord?.id,
         subscriberId,
-        subscriberName: sub?.displayName,
         injuryTitle: {
           en: injuryEn.trim() || injuryAr.trim(),
           ar: injuryAr.trim() || injuryEn.trim(),
@@ -150,22 +199,43 @@ export function PTRecordFormDialog({
         status,
         diagnosisDate,
         nextEvaluationDate: nextEvaluationDate || null,
-        clearanceDate: status === "cleared" ? (initialRecord?.clearanceDate || new Date().toISOString().slice(0, 10)) : null,
-        restrictions: restrictions.filter(
-          (r) => r.prohibited.en.trim() || r.prohibited.ar.trim(),
-        ),
-        rehabExercises: rehabExercises.filter(
-          (rx) => rx.name.en.trim() || rx.name.ar.trim(),
-        ),
+        clearanceDate:
+          status === "cleared"
+            ? initialRecord?.clearanceDate ||
+              new Date().toISOString().slice(0, 10)
+            : null,
+        restrictions: cleanRestrictions,
+        rehabExercises: rehabExercises
+          .filter((rx) => rx.name.en.trim() || rx.name.ar.trim())
+          .map((rx) => ({
+            ...rx,
+            name: {
+              en: rx.name.en.trim() || rx.name.ar.trim(),
+              ar: rx.name.ar.trim() || rx.name.en.trim(),
+            },
+            sets: Math.max(1, Number(rx.sets) || 1),
+            reps: rx.reps.trim() || "12-15",
+            frequency: rx.frequency.trim() || "3x / week",
+          })),
         therapistNotes: {
           en: notesEn.trim(),
           ar: notesAr.trim() || notesEn.trim(),
         },
       })
-      appToast.success(isAr ? "تم حفظ ملف العلاج الطبيعي والتأهيل بنجاح" : "Physical therapy record saved successfully")
+      appToast.success(
+        isAr
+          ? "تم حفظ ملف العلاج الطبيعي والتأهيل بنجاح"
+          : "Physical therapy record saved successfully",
+      )
       onClose()
-    } catch {
-      appToast.error(isAr ? "فشل حفظ السجل" : "Failed to save record")
+    } catch (err) {
+      appToast.error(
+        err instanceof Error
+          ? err.message
+          : isAr
+            ? "فشل حفظ السجل"
+            : "Failed to save record",
+      )
     } finally {
       setSaving(false)
     }
@@ -224,11 +294,13 @@ export function PTRecordFormDialog({
                 disabled={Boolean(initialRecord)}
                 className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none focus:border-[var(--gym-ink,#111111)]"
               >
-                {subscribers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.displayName} ({s.email})
-                  </option>
-                ))}
+                {subscribers
+                  .filter((s) => s.status !== "rejected")
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {subscriberDisplayName(s, locale)} ({s.email})
+                    </option>
+                  ))}
               </select>
             </div>
 

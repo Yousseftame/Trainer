@@ -31,9 +31,15 @@ import { ConfirmActionDialog } from "@/components/dashboard/ConfirmActionDialog"
 import { LogMeasurementDialog } from "@/components/dashboard/LogMeasurementDialog"
 import { LogPerformanceDialog } from "@/components/dashboard/LogPerformanceDialog"
 import { PhotoComparisonDialog } from "@/components/dashboard/PhotoComparisonDialog"
+import { ProgressPhotoImage } from "@/components/dashboard/ProgressPhotoImage"
 import { FilterChip, StatCard } from "@/components/dashboard/StatCard"
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
 import { APP_ROUTES } from "@/config/constants"
+import {
+  computeAdherenceWeeks,
+  latestAdherenceWeek,
+  type AdherenceWeek,
+} from "@/features/progress/adherence"
 import {
   useDeleteMeasurementMutation,
   useDeletePerformanceMutation,
@@ -45,27 +51,30 @@ import {
   useSavePerformanceMutation,
   useSavePhotoMutation,
 } from "@/features/progress/hooks"
-import { useSubscribersQuery } from "@/features/subscribers/hooks"
-import { useWorkoutProgramsQuery } from "@/features/workouts/hooks"
-import { useNutritionProgramsQuery } from "@/features/nutrition/hooks"
-import { appToast } from "@/lib/toast"
+import { liftSeries as buildLiftSeries } from "@/features/progress/metrics"
 import {
-  adherenceFor,
-  adherenceScore,
+  buildProgressRoster,
   daysSinceCheckIn,
-  isStale,
-  latestWeek,
-  liftSeries,
-  liftsFor,
-  measurementsFor,
-  photosFor,
-  programsFor,
-  progressRoster,
   progressStats,
   type ProgressFilter,
   type RosterPerson,
-} from "@/features/progress/demo"
-import { getPackageById, currentSubscriptionFor } from "@/features/subscriptions/demo"
+} from "@/features/progress/roster"
+import {
+  useNutritionLogsQuery,
+  useNutritionProgramsQuery,
+} from "@/features/nutrition/hooks"
+import { useSubscribersQuery } from "@/features/subscribers/hooks"
+import {
+  currentSubscriptionFor,
+  getPackageById,
+} from "@/features/subscriptions/cache"
+import { useSubscriptionsQuery } from "@/features/subscriptions/hooks"
+import {
+  useWorkoutLogsQuery,
+  useWorkoutProgramsQuery,
+} from "@/features/workouts/hooks"
+import { appToast } from "@/lib/toast"
+import type { NutritionProgram, WorkoutProgram } from "@/types/program"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatChartDate, formatDate, formatKg, initials } from "@/lib/format"
@@ -115,6 +124,7 @@ export function ProgressPage() {
   const { data: allLifts = [] } = usePerformanceQuery()
   const { data: allWorkouts = [] } = useWorkoutProgramsQuery()
   const { data: allNutrition = [] } = useNutritionProgramsQuery()
+  useSubscriptionsQuery()
 
   const saveMeasurementMutation = useSaveMeasurementMutation()
   const deleteMeasurementMutation = useDeleteMeasurementMutation()
@@ -123,13 +133,11 @@ export function ProgressPage() {
   const savePerformanceMutation = useSavePerformanceMutation()
   const deletePerformanceMutation = useDeletePerformanceMutation()
 
-  // Dialog States
   const [measurementModalOpen, setMeasurementModalOpen] = useState(false)
   const [photoModalOpen, setPhotoModalOpen] = useState(false)
   const [performanceModalOpen, setPerformanceModalOpen] = useState(false)
   const [compareModalOpen, setCompareModalOpen] = useState(false)
 
-  // Confirm Action Dialog State
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean
     title: string
@@ -144,73 +152,21 @@ export function ProgressPage() {
   const [tab, setTab] = useState<ReviewTab>("overview")
   const [params] = useSearchParams()
 
-  // Dynamic Unified Roster combining registered subscribers with demo fallback
-  const roster: RosterPerson[] = useMemo(() => {
-    if (!subscribers.length) return progressRoster()
-
-    return subscribers
-      .filter((s) => s.status !== "rejected")
-      .map((sub) => {
-        const subMeasurements = allMeasurements
-          .filter((m) => m.subscriberId === sub.id)
-          .sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime())
-        const measurements = subMeasurements.length ? subMeasurements : measurementsFor(sub.id)
-        const latest = measurements[measurements.length - 1]
-        const first = measurements[0]
-        const weightKg = latest?.weightKg ?? sub.startingWeightKg
-        const deltaKg =
-          latest?.weightKg != null && sub.startingWeightKg != null
-            ? Math.round((latest.weightKg - sub.startingWeightKg) * 10) / 10
-            : latest?.weightKg != null && first?.weightKg != null
-              ? Math.round((latest.weightKg - first.weightKg) * 10) / 10
-              : null
-
-        const subPhotos = allPhotos.filter((p) => p.subscriberId === sub.id)
-        const photoCount = subPhotos.length || photosFor(sub.id).length
-        const lastCheckInDate = latest?.recordedAt ?? null
-
-        const days = lastCheckInDate
-          ? Math.floor((Date.now() - new Date(lastCheckInDate).getTime()) / (1000 * 60 * 60 * 24))
-          : daysSinceCheckIn(sub.id)
-        const stale = days != null ? days > 14 : isStale(sub.id)
-        const adherence = adherenceScore(sub.id)
-
-        let bucket: ProgressFilter = "ontrack"
-        let tone: "success" | "warning" | "danger" | "muted" = "success"
-
-        if (!lastCheckInDate) {
-          bucket = "quiet"
-          tone = "muted"
-        } else if (stale || (adherence != null && adherence < 70)) {
-          bucket = "attention"
-          tone = stale ? "danger" : "warning"
-        } else if (adherence != null && adherence >= 75) {
-          bucket = "ontrack"
-          tone = "success"
-        } else {
-          bucket = "ontrack"
-          tone = "success"
-        }
-
-        return {
-          subscriber: sub,
-          weightKg,
-          deltaKg,
-          adherence,
-          stale,
-          lastCheckIn: lastCheckInDate,
-          photoCount,
-          bucket,
-          tone,
-        }
-      })
-  }, [subscribers, allMeasurements, allPhotos])
+  const roster: RosterPerson[] = useMemo(
+    () =>
+      buildProgressRoster({
+        subscribers,
+        measurements: allMeasurements,
+        photos: allPhotos,
+      }),
+    [subscribers, allMeasurements, allPhotos],
+  )
 
   const requested = params.get("subscriber")
   const [selectedId, setSelectedId] = useState(
     requested && roster.some((item) => item.subscriber.id === requested)
       ? requested
-      : (roster.find((item) => item.subscriber.id === "sub-alex")?.subscriber.id ?? roster[0]?.subscriber.id ?? ""),
+      : (roster[0]?.subscriber.id ?? ""),
   )
 
   useEffect(() => {
@@ -233,67 +189,77 @@ export function ProgressPage() {
 
   const selected = list.find((item) => item.subscriber.id === selectedId) ?? list[0]
 
-  const stats = useMemo(() => {
-    const weekAgo = new Date()
-    weekAgo.setHours(0, 0, 0, 0)
-    weekAgo.setDate(weekAgo.getDate() - 7)
-    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+  const stats = useMemo(
+    () => progressStats(roster, allMeasurements, allPhotos),
+    [roster, allMeasurements, allPhotos],
+  )
 
-    const checkInsCount = allMeasurements.filter(
-      (m) => new Date(m.recordedAt) >= weekAgo,
-    ).length
-    const photosCount = allPhotos.filter(
-      (p) => new Date(p.takenAt) >= monthStart,
-    ).length
-
-    return {
-      onTrack: roster.filter((item) => item.bucket === "ontrack").length,
-      attention: roster.filter((item) => item.bucket === "attention").length,
-      checkIns: checkInsCount || progressStats(roster).checkIns,
-      photos: photosCount || progressStats(roster).photos,
-    }
-  }, [roster, allMeasurements, allPhotos])
-
-  // Filter live data for the currently selected subscriber
   const selectedMeasurements = useMemo(() => {
     if (!selected) return []
-    const live = allMeasurements
+    return allMeasurements
       .filter((m) => m.subscriberId === selected.subscriber.id)
-      .sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime())
-    return live.length ? live : measurementsFor(selected.subscriber.id)
+      .sort(
+        (a, b) =>
+          new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime(),
+      )
   }, [allMeasurements, selected])
 
   const selectedPhotos = useMemo(() => {
     if (!selected) return []
-    const live = allPhotos
+    return allPhotos
       .filter((p) => p.subscriberId === selected.subscriber.id)
-      .sort((a, b) => new Date(a.takenAt).getTime() - new Date(b.takenAt).getTime())
-    return live.length ? live : photosFor(selected.subscriber.id)
+      .sort(
+        (a, b) => new Date(a.takenAt).getTime() - new Date(b.takenAt).getTime(),
+      )
   }, [allPhotos, selected])
 
   const selectedLifts = useMemo(() => {
     if (!selected) return []
-    const live = allLifts
+    return allLifts
       .filter((l) => l.subscriberId === selected.subscriber.id)
-      .sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime())
-    return live.length ? live : liftsFor(selected.subscriber.id)
+      .sort(
+        (a, b) =>
+          new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime(),
+      )
   }, [allLifts, selected])
 
-  // Historical and active program assignments for selected subscriber
   const subscriberPrograms = useMemo(() => {
-    if (!selected) return { workouts: [], nutrition: [] }
-    const liveWorkouts = allWorkouts.filter(
-      (w) => w.subscriberId === selected.subscriber.id,
-    )
-    const liveNutrition = allNutrition.filter(
-      (n) => n.subscriberId === selected.subscriber.id,
-    )
-    const demo = programsFor(selected.subscriber.id)
+    if (!selected) return { workouts: [] as WorkoutProgram[], nutrition: [] as NutritionProgram[] }
     return {
-      workouts: liveWorkouts.length ? liveWorkouts : demo.workouts,
-      nutrition: liveNutrition.length ? liveNutrition : demo.nutrition,
+      workouts: allWorkouts.filter(
+        (w) => w.subscriberId === selected.subscriber.id,
+      ),
+      nutrition: allNutrition.filter(
+        (n) => n.subscriberId === selected.subscriber.id,
+      ),
     }
   }, [allWorkouts, allNutrition, selected])
+
+  const selectedSubscriberId = selected?.subscriber.id
+  const { data: selectedWorkoutLogs = [] } = useWorkoutLogsQuery({
+    subscriberId: selectedSubscriberId,
+    enabled: Boolean(selectedSubscriberId),
+  })
+  const { data: selectedNutritionLogs = [] } = useNutritionLogsQuery({
+    subscriberId: selectedSubscriberId,
+    enabled: Boolean(selectedSubscriberId),
+  })
+
+  const selectedAdherenceWeeks = useMemo(
+    () =>
+      computeAdherenceWeeks({
+        workoutLogs: selectedWorkoutLogs,
+        nutritionLogs: selectedNutritionLogs,
+        workoutPrograms: subscriberPrograms.workouts,
+        nutritionPrograms: subscriberPrograms.nutrition,
+      }),
+    [
+      selectedWorkoutLogs,
+      selectedNutritionLogs,
+      subscriberPrograms.workouts,
+      subscriberPrograms.nutrition,
+    ],
+  )
 
   // Delete Action Handlers
   function handleDeleteMeasurement(row: BodyMeasurement) {
@@ -467,6 +433,7 @@ export function ProgressPage() {
               liveMeasurements={selectedMeasurements}
               livePhotos={selectedPhotos}
               liveLifts={selectedLifts}
+              adherenceWeeks={selectedAdherenceWeeks}
               programs={subscriberPrograms}
               onOpenMeasurementModal={() => setMeasurementModalOpen(true)}
               onOpenPhotoModal={() => setPhotoModalOpen(true)}
@@ -677,6 +644,7 @@ function ReviewPanel({
   liveMeasurements,
   livePhotos,
   liveLifts,
+  adherenceWeeks = [],
   programs: assignedPrograms,
   onOpenMeasurementModal,
   onOpenPhotoModal,
@@ -693,7 +661,8 @@ function ReviewPanel({
   liveMeasurements?: BodyMeasurement[]
   livePhotos?: ProgressPhoto[]
   liveLifts?: PerformanceRecord[]
-  programs?: ReturnType<typeof programsFor>
+  adherenceWeeks?: AdherenceWeek[]
+  programs?: { workouts: WorkoutProgram[]; nutrition: NutritionProgram[] }
   onOpenMeasurementModal: () => void
   onOpenPhotoModal: () => void
   onOpenPerformanceModal: () => void
@@ -706,38 +675,17 @@ function ReviewPanel({
   const { subscriber } = person
   const subscription = currentSubscriptionFor(subscriber.id)
   const pkg = getPackageById(subscription?.packageId)
-  const days = daysSinceCheckIn(subscriber.id)
+  const days = daysSinceCheckIn(person.lastCheckIn)
 
-  const measurements =
-    liveMeasurements && liveMeasurements.length ? liveMeasurements : measurementsFor(subscriber.id)
-  const photos =
-    livePhotos && livePhotos.length ? livePhotos : photosFor(subscriber.id)
-  const programs = assignedPrograms ?? programsFor(subscriber.id)
-  const week = latestWeek(subscriber.id)
+  const measurements = liveMeasurements ?? []
+  const photos = livePhotos ?? []
+  const programs = assignedPrograms ?? { workouts: [], nutrition: [] }
+  const week = latestAdherenceWeek(adherenceWeeks)
 
-  const lifts = useMemo(() => {
-    if (liveLifts && liveLifts.length) {
-      const grouped = new Map<string, PerformanceRecord[]>()
-      for (const record of liveLifts) {
-        const list = grouped.get(record.name) ?? []
-        list.push(record)
-        grouped.set(record.name, list)
-      }
-      return [...grouped.entries()].map(([name, records]) => {
-        const first = records[0]
-        const latest = records[records.length - 1]
-        return {
-          name,
-          records,
-          first: first.value,
-          latest: latest.value,
-          delta: Math.round((latest.value - first.value) * 10) / 10,
-          unit: latest.unit,
-        }
-      })
-    }
-    return liftSeries(subscriber.id)
-  }, [liveLifts, subscriber.id])
+  const lifts = useMemo(
+    () => buildLiftSeries(liveLifts ?? []),
+    [liveLifts],
+  )
 
   const first = measurements[0]
   const previous = measurements.length >= 2 ? measurements[measurements.length - 2] : undefined
@@ -817,9 +765,9 @@ function ReviewPanel({
         ) : null}
         {tab === "performance" ? (
           <PerformanceTab
-            subscriberId={subscriber.id}
             lifts={lifts}
             liveLifts={liveLifts}
+            adherenceWeeks={adherenceWeeks}
             locale={locale}
             onAddLift={onOpenPerformanceModal}
             onDeleteLift={onDeleteLift}
@@ -854,11 +802,11 @@ function OverviewTab({
 }: {
   measurements: BodyMeasurement[]
   photos: ProgressPhoto[]
-  week: ReturnType<typeof latestWeek>
+  week: AdherenceWeek | undefined
   first?: BodyMeasurement
   previous?: BodyMeasurement
   latest?: BodyMeasurement
-  programs: ReturnType<typeof programsFor>
+  programs: { workouts: WorkoutProgram[]; nutrition: NutritionProgram[] }
   locale: AppLocale
 }) {
   const { t } = useTranslation()
@@ -1208,24 +1156,24 @@ function PhotosTab({
 }
 
 function PerformanceTab({
-  subscriberId,
   lifts,
   liveLifts,
+  adherenceWeeks,
   locale,
   onAddLift,
   onDeleteLift,
 }: {
-  subscriberId: string
-  lifts: ReturnType<typeof liftSeries>
+  lifts: ReturnType<typeof buildLiftSeries>
   liveLifts?: PerformanceRecord[]
+  adherenceWeeks: AdherenceWeek[]
   locale: AppLocale
   onAddLift?: () => void
   onDeleteLift?: (row: PerformanceRecord) => void
 }) {
   const { t } = useTranslation()
   const isAr = locale === "ar"
-  const weeks = adherenceFor(subscriberId)
-  const log = liveLifts && liveLifts.length ? [...liveLifts].reverse() : [...liftsFor(subscriberId)].reverse()
+  const weeks = adherenceWeeks
+  const log = [...(liveLifts ?? [])].reverse()
   const hasWorkout = weeks.some((week) => week.workoutTotal > 0)
   const hasNutrition = weeks.some((week) => week.nutritionTotal > 0)
   const chartData = weeks.map((week) => ({
@@ -1382,7 +1330,7 @@ function HistoryTab({
   programs,
   locale,
 }: {
-  programs: ReturnType<typeof programsFor>
+  programs: { workouts: WorkoutProgram[]; nutrition: NutritionProgram[] }
   locale: AppLocale
 }) {
   const { t } = useTranslation()
@@ -1590,25 +1538,11 @@ function PhotoCard({
   const { t } = useTranslation()
   const { locale } = useLocale()
   const isAr = locale === "ar"
-  const hasImage = photo.storagePath?.startsWith("data:") || photo.storagePath?.startsWith("http")
 
   return (
     <figure className="group relative h-fit overflow-hidden rounded-[16px] bg-[var(--gym-ink,#111111)] text-white shadow-2xs">
       <div className="relative flex aspect-[3/4] items-center justify-center overflow-hidden bg-black/40">
-        {hasImage ? (
-          <img
-            src={photo.storagePath}
-            alt={photo.caption || "Progress photo"}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="relative flex size-full items-center justify-center">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(251,80,1,0.22),transparent_45%)]" />
-            <span className="relative font-heading text-[22px] font-extrabold text-white/80">
-              {photo.pose ? t(`admin.progress.pose.${photo.pose}`) : "•"}
-            </span>
-          </div>
-        )}
+        <ProgressPhotoImage photo={photo} />
         <span className="absolute bottom-2 start-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-bold uppercase">
           {photo.pose ? t(`admin.progress.pose.${photo.pose}`) : "Photo"}
         </span>

@@ -10,24 +10,28 @@ import {
   FileUp,
   FolderTree,
   ShieldCheck,
-  Sparkles,
   X,
 } from "lucide-react"
 import {
   buildCanonicalStoragePath,
+  CONTENT_UPLOAD_LIMITS,
   defaultEntitlementForCategory,
   defaultKindForCategory,
   formatBytesLabel,
-  type DemoContentAsset,
-} from "@/features/content/demo"
+  isHttpUrl,
+} from "@/features/content/paths"
 import type { SaveContentAssetInput } from "@/features/content/service"
 import { useNutritionProgramsQuery } from "@/features/nutrition/hooks"
-import { subscriberDisplayName, type DemoSubscriber } from "@/features/subscribers/demo"
+import {
+  subscriberDisplayName,
+  type Subscriber,
+} from "@/features/subscribers/types"
 import type { CatalogPackage } from "@/features/subscriptions/types"
 import { useWorkoutProgramsQuery } from "@/features/workouts/hooks"
 import { useLocale } from "@/hooks/useLocale"
 import { cn } from "@/lib/utils"
 import type {
+  ContentAsset,
   ContentCategory,
   ContentVisibility,
   VideoProviderId,
@@ -36,10 +40,10 @@ import type { PackageEntitlementKey } from "@/types/subscription"
 
 type ContentAssetFormDialogProps = {
   open: boolean
-  initialAsset?: DemoContentAsset | null
+  initialAsset?: ContentAsset | null
   defaultCategory?: ContentCategory
   packages: CatalogPackage[]
-  subscribers: DemoSubscriber[]
+  subscribers: Subscriber[]
   busy?: boolean
   adminName?: string
   onClose: () => void
@@ -78,20 +82,19 @@ const CATEGORIES: Array<{
   },
   {
     id: "reference",
-    ar: "مرجع وموارد تدريبية",
-    en: "Reference material",
+    ar: "مرجع داخلي للفريق",
+    en: "Staff reference",
     icon: Bookmark,
   },
 ]
 
 const VIDEO_PROVIDERS: Array<{ id: VideoProviderId; label: string }> = [
-  { id: "bunny", label: "Bunny Stream CDN" },
+  { id: "bunny", label: "Bunny Stream (recommended)" },
   { id: "cloudflare", label: "Cloudflare Stream" },
   { id: "mux", label: "Mux Video" },
-  { id: "youtube", label: "YouTube (Unlisted / Embed)" },
-  { id: "vimeo", label: "Vimeo Pro" },
-  { id: "direct", label: "Direct MP4 / HLS URL" },
-  { id: "stub", label: "Internal / Local Preview" },
+  { id: "youtube", label: "YouTube (unlisted)" },
+  { id: "vimeo", label: "Vimeo" },
+  { id: "direct", label: "Direct HTTPS / HLS URL" },
 ]
 
 const ENTITLEMENT_OPTIONS: Array<{
@@ -99,11 +102,18 @@ const ENTITLEMENT_OPTIONS: Array<{
   ar: string
   en: string
 }> = [
-  { id: "exerciseVideos", ar: "مكتبة الفيديوهات التعليمية", en: "Exercise video library" },
+  {
+    id: "exerciseVideos",
+    ar: "مكتبة الفيديوهات التعليمية",
+    en: "Exercise video library",
+  },
   { id: "workoutProgram", ar: "برامج التمارين", en: "Workout programs" },
   { id: "nutritionProgram", ar: "برامج التغذية", en: "Nutrition programs" },
-  { id: "pdfDocuments", ar: "ملفات PDF والمستندات", en: "PDFs & educational docs" },
-  { id: "progressTracking", ar: "تتبع التقدم", en: "Progress tracking" },
+  {
+    id: "pdfDocuments",
+    ar: "ملفات PDF والمستندات",
+    en: "PDFs & educational docs",
+  },
 ]
 
 export function ContentAssetFormDialog({
@@ -135,13 +145,12 @@ export function ContentAssetFormDialog({
   const [descEn, setDescEn] = useState("")
   const [file, setFile] = useState<File | null>(null)
   const [fileName, setFileName] = useState("")
-  const [sizeLabel, setSizeLabel] = useState("")
   const [pageCount, setPageCount] = useState("")
   const [durationSeconds, setDurationSeconds] = useState("")
   const [videoProvider, setVideoProvider] = useState<VideoProviderId>("bunny")
   const [videoAssetId, setVideoAssetId] = useState("")
   const [streamOrFileUrl, setStreamOrFileUrl] = useState("")
-  const [customPath, setCustomPath] = useState("")
+  const [thumbnailUrl, setThumbnailUrl] = useState("")
   const [tagsText, setTagsText] = useState("")
   const [exerciseNamesText, setExerciseNamesText] = useState("")
   const [visibility, setVisibility] = useState<ContentVisibility>("package")
@@ -150,6 +159,7 @@ export function ContentAssetFormDialog({
   const [packageIds, setPackageIds] = useState<string[]>([])
   const [subscriberIds, setSubscriberIds] = useState<string[]>([])
   const [programIds, setProgramIds] = useState<string[]>([])
+  const [uploadPercent, setUploadPercent] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const allPrograms = useMemo(
@@ -158,13 +168,11 @@ export function ContentAssetFormDialog({
         id: p.id,
         title: p.title,
         domain: "workout" as const,
-        status: p.status,
       })),
       ...nutritionPrograms.map((p) => ({
         id: p.id,
         title: p.title,
         domain: "nutrition" as const,
-        status: p.status,
       })),
     ],
     [workoutPrograms, nutritionPrograms],
@@ -174,6 +182,7 @@ export function ContentAssetFormDialog({
     if (!open) return
     setError(null)
     setFile(null)
+    setUploadPercent(null)
 
     if (initialAsset) {
       setCategory(initialAsset.category)
@@ -182,7 +191,6 @@ export function ContentAssetFormDialog({
       setDescAr(initialAsset.description.ar)
       setDescEn(initialAsset.description.en)
       setFileName(initialAsset.fileName ?? "")
-      setSizeLabel(initialAsset.sizeLabel ?? "")
       setPageCount(
         initialAsset.pageCount != null ? String(initialAsset.pageCount) : "",
       )
@@ -200,7 +208,7 @@ export function ContentAssetFormDialog({
             : "") ??
           "",
       )
-      setCustomPath(initialAsset.storagePath ?? "")
+      setThumbnailUrl(initialAsset.thumbnailUrl ?? "")
       setTagsText(initialAsset.tags.join(", "))
       setExerciseNamesText((initialAsset.exerciseNames ?? []).join(", "))
       setVisibility(initialAsset.visibility)
@@ -219,13 +227,12 @@ export function ContentAssetFormDialog({
       setDescAr("")
       setDescEn("")
       setFileName("")
-      setSizeLabel(cat === "exerciseVideo" ? "140 MB" : "1.5 MB")
-      setPageCount(cat === "exerciseVideo" ? "" : "8")
-      setDurationSeconds(cat === "exerciseVideo" ? "45" : "")
+      setPageCount("")
+      setDurationSeconds("")
       setVideoProvider("bunny")
       setVideoAssetId("")
       setStreamOrFileUrl("")
-      setCustomPath("")
+      setThumbnailUrl("")
       setTagsText("")
       setExerciseNamesText("")
       setVisibility(cat === "reference" ? "library" : "package")
@@ -243,15 +250,7 @@ export function ContentAssetFormDialog({
   const kind = defaultKindForCategory(category)
 
   const previewStoragePath = useMemo(() => {
-    if (customPath.trim()) return customPath.trim()
-    const draftId =
-      initialAsset?.id ||
-      (titleEn.trim() || titleAr.trim() || fileName.trim() || "new-asset")
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "")
-        .slice(0, 24) ||
-      "asset"
+    const draftId = initialAsset?.id || "new"
     return buildCanonicalStoragePath({
       id: draftId,
       category,
@@ -259,14 +258,13 @@ export function ContentAssetFormDialog({
         file?.name ||
         fileName.trim() ||
         (kind === "video" ? `${draftId}.mp4` : `${draftId}.pdf`),
-      videoProvider,
+      videoProvider: kind === "video" ? videoProvider : undefined,
       videoAssetId: videoAssetId.trim() || undefined,
+      createdAt: initialAsset?.createdAt,
     })
   }, [
-    customPath,
     initialAsset?.id,
-    titleEn,
-    titleAr,
+    initialAsset?.createdAt,
     fileName,
     file,
     category,
@@ -281,24 +279,44 @@ export function ContentAssetFormDialog({
     setCategory(nextCat)
     if (!initialAsset) {
       setRequiredEntitlement(defaultEntitlementForCategory(nextCat))
-      setCustomPath("")
-      if (nextCat === "exerciseVideo") {
-        setSizeLabel("140 MB")
-        setDurationSeconds("45")
-      } else {
-        setSizeLabel("1.5 MB")
-        setPageCount("8")
-      }
+      setVisibility(nextCat === "reference" ? "library" : "package")
+      setFile(null)
+      setFileName("")
+      setStreamOrFileUrl("")
+      setPageCount("")
+      setDurationSeconds("")
     }
   }
 
   function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = e.target.files?.[0]
     if (!picked) return
+
+    const limit =
+      kind === "video"
+        ? CONTENT_UPLOAD_LIMITS.videoBytes
+        : CONTENT_UPLOAD_LIMITS.pdfBytes
+    if (picked.size > limit) {
+      setError(
+        isAr
+          ? `حجم الملف يتجاوز الحد (${formatBytesLabel(limit)}). ${
+              kind === "video"
+                ? "ارفع الفيديو إلى CDN والصق رابط البث."
+                : "استخدم ملفاً أصغر أو رابطاً خارجياً."
+            }`
+          : `File exceeds ${formatBytesLabel(limit)}. ${
+              kind === "video"
+                ? "Upload to a streaming CDN and paste the stream URL."
+                : "Use a smaller file or an external HTTPS URL."
+            }`,
+      )
+      e.target.value = ""
+      return
+    }
+
+    setError(null)
     setFile(picked)
     setFileName(picked.name)
-    setSizeLabel(formatBytesLabel(picked.size))
-    setCustomPath("")
 
     if (!titleEn.trim() && !titleAr.trim()) {
       const baseName = picked.name
@@ -308,7 +326,6 @@ export function ContentAssetFormDialog({
       setTitleAr(baseName)
     }
 
-    // Auto-detect video duration if a local video file is picked
     if (picked.type.startsWith("video/")) {
       const tempUrl = URL.createObjectURL(picked)
       const videoEl = document.createElement("video")
@@ -324,7 +341,11 @@ export function ContentAssetFormDialog({
     }
   }
 
-  function toggleItem(list: string[], id: string, setter: (v: string[]) => void) {
+  function toggleItem(
+    list: string[],
+    id: string,
+    setter: (v: string[]) => void,
+  ) {
     setter(list.includes(id) ? list.filter((x) => x !== id) : [...list, id])
   }
 
@@ -341,6 +362,57 @@ export function ContentAssetFormDialog({
       return
     }
 
+    const url = streamOrFileUrl.trim()
+    if (url && !isHttpUrl(url)) {
+      setError(
+        isAr
+          ? "رابط الملف/البث يجب أن يبدأ بـ https://"
+          : "File / stream URL must be a valid http(s) URL.",
+      )
+      return
+    }
+
+    if (!isEdit) {
+      if (kind === "video" && !file && !url) {
+        setError(
+          isAr
+            ? "أضف رابط بث من CDN (موصى به) أو ارفع فيديو ضمن الحد المسموح."
+            : "Add a CDN stream URL (recommended) or upload a video under the size limit.",
+        )
+        return
+      }
+      if (kind !== "video" && !file && !url) {
+        setError(
+          isAr
+            ? "ارفع ملف PDF أو أدخل رابط https صالح."
+            : "Upload a PDF/document or provide a valid https URL.",
+        )
+        return
+      }
+    }
+
+    if (visibility === "package" && packageIds.length === 0) {
+      setError(
+        isAr
+          ? "حدّد باقة واحدةً على الأقل للمحتوى المرتبط بالباقات."
+          : "Select at least one package for package-gated content.",
+      )
+      return
+    }
+
+    if (
+      visibility === "assigned" &&
+      subscriberIds.length === 0 &&
+      programIds.length === 0
+    ) {
+      setError(
+        isAr
+          ? "المحتوى المخصص يحتاج مشتركاً أو برنامجاً مرتبطاً."
+          : "Assigned content needs at least one subscriber or program link.",
+      )
+      return
+    }
+
     const parsedPages = Number(pageCount)
     const parsedDuration = Number(durationSeconds)
     const tags = tagsText
@@ -352,47 +424,59 @@ export function ContentAssetFormDialog({
       .map((s) => s.trim())
       .filter(Boolean)
 
-    await onSave({
-      id: initialAsset?.id,
-      category,
-      title: {
-        ar: cleanAr,
-        en: cleanEn,
-      },
-      description: {
-        ar: descAr.trim() || descEn.trim(),
-        en: descEn.trim() || descAr.trim(),
-      },
-      file,
-      fileName:
-        file?.name ||
-        fileName.trim() ||
-        (kind === "video" ? "Instructional_Video.mp4" : "Document.pdf"),
-      sizeBytes: file?.size ?? initialAsset?.sizeBytes,
-      sizeLabel: sizeLabel.trim() || (kind === "video" ? "140 MB" : "1.5 MB"),
-      pageCount:
-        kind !== "video" && Number.isFinite(parsedPages) && parsedPages > 0
-          ? parsedPages
-          : null,
-      durationSeconds:
-        kind === "video" && Number.isFinite(parsedDuration) && parsedDuration > 0
-          ? parsedDuration
-          : null,
-      storagePath: previewStoragePath,
-      fileUrl: kind !== "video" ? streamOrFileUrl.trim() || undefined : undefined,
-      streamUrl: kind === "video" ? streamOrFileUrl.trim() || undefined : undefined,
-      videoProvider: kind === "video" ? videoProvider : undefined,
-      videoAssetId:
-        kind === "video" ? videoAssetId.trim() || undefined : undefined,
-      tags,
-      exerciseNames: kind === "video" ? exercises : [],
-      visibility,
-      requiredEntitlement,
-      packageIds,
-      subscriberIds,
-      programIds,
-      uploadedBy: adminName,
-    })
+    try {
+      setUploadPercent(file ? 0 : null)
+      await onSave({
+        id: initialAsset?.id,
+        category,
+        title: { ar: cleanAr, en: cleanEn },
+        description: {
+          ar: descAr.trim() || descEn.trim(),
+          en: descEn.trim() || descAr.trim(),
+        },
+        file,
+        fileName:
+          file?.name ||
+          fileName.trim() ||
+          (kind === "video" ? undefined : undefined),
+        sizeBytes: file?.size ?? initialAsset?.sizeBytes,
+        pageCount:
+          kind !== "video" && Number.isFinite(parsedPages) && parsedPages > 0
+            ? parsedPages
+            : null,
+        durationSeconds:
+          kind === "video" &&
+          Number.isFinite(parsedDuration) &&
+          parsedDuration > 0
+            ? parsedDuration
+            : null,
+        fileUrl: kind !== "video" ? url || undefined : undefined,
+        streamUrl: kind === "video" ? url || undefined : undefined,
+        thumbnailUrl: thumbnailUrl.trim() || undefined,
+        videoProvider: kind === "video" ? videoProvider : undefined,
+        videoAssetId:
+          kind === "video" ? videoAssetId.trim() || undefined : undefined,
+        tags,
+        exerciseNames: kind === "video" ? exercises : [],
+        visibility,
+        requiredEntitlement,
+        packageIds,
+        subscriberIds,
+        programIds,
+        uploadedBy: adminName,
+        onUploadProgress: (percent) => setUploadPercent(percent),
+      })
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : isAr
+            ? "تعذر حفظ المحتوى."
+            : "Failed to save content.",
+      )
+    } finally {
+      setUploadPercent(null)
+    }
   }
 
   return createPortal(
@@ -418,16 +502,20 @@ export function ContentAssetFormDialog({
               <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#111111)]">
                 {isEdit
                   ? isAr
-                    ? "تحديث بيانات وملف المحتوى"
-                    : "Update content asset"
+                    ? "تحديث المحتوى"
+                    : "Update content"
                   : isAr
-                    ? "رفع وإضافة محتوى رقمي جديد"
-                    : "Upload & register digital content"}
+                    ? "إضافة محتوى جديد"
+                    : "Add content"}
               </h2>
               <p className="text-[12px] font-medium text-[#8c8c8c]">
-                {isAr
-                  ? "يدعم العربية والإنجليزية، المسارات الذكية، وربط الباقات والبرامج والمشتركين"
-                  : "Bilingual AR/EN metadata, canonical storage path, and entitlement rules"}
+                {kind === "video"
+                  ? isAr
+                    ? "الفيديو عبر CDN (موصى به) · PDF عبر Firebase Storage"
+                    : "Videos via CDN (recommended) · PDFs via Firebase Storage"
+                  : isAr
+                    ? "PDF/مستندات عبر Firebase Storage مع مسار منظم"
+                    : "PDFs/docs via Firebase Storage with canonical paths"}
               </p>
             </div>
           </div>
@@ -451,10 +539,9 @@ export function ContentAssetFormDialog({
             </div>
           ) : null}
 
-          {/* Content Category Selector */}
           <div>
             <p className="mb-2 text-[12px] font-bold text-[#6B7280]">
-              {isAr ? "تصنيف المحتوى الرقمي *" : "Content category *"}
+              {isAr ? "تصنيف المحتوى *" : "Content category *"}
             </p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
               {CATEGORIES.map((cat) => {
@@ -464,12 +551,14 @@ export function ContentAssetFormDialog({
                   <button
                     key={cat.id}
                     type="button"
+                    disabled={isEdit}
                     onClick={() => handleCategorySwitch(cat.id)}
                     className={cn(
                       "flex flex-col items-start gap-1.5 rounded-2xl border p-3 text-start transition",
                       active
                         ? "border-[var(--gym-ink,#111111)] bg-[var(--gym-ink,#111111)] text-white"
                         : "border-black/8 bg-[#F4F4F4] text-[var(--gym-ink,#111111)] hover:bg-black/5",
+                      isEdit && !active && "opacity-50",
                     )}
                   >
                     <Icon
@@ -490,88 +579,74 @@ export function ContentAssetFormDialog({
             </div>
           </div>
 
-          {/* Bilingual Titles */}
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="flex flex-col gap-1.5">
               <span className="text-[12px] font-bold text-[#6B7280]">
-                {isAr ? "عنوان المحتوى (عربي) *" : "Title (Arabic) *"}
+                {isAr ? "العنوان (عربي) *" : "Title (Arabic) *"}
               </span>
               <input
                 dir="rtl"
                 value={titleAr}
                 onChange={(e) => setTitleAr(e.target.value)}
-                placeholder="مثال: ضغط بنش بالبار / دليل تغذية رمضان"
+                placeholder="مثال: ضغط بنش بالبار"
                 className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none [font-family:var(--font-arabic)]"
               />
             </label>
             <label className="flex flex-col gap-1.5">
               <span className="text-[12px] font-bold text-[#6B7280]">
-                {isAr ? "عنوان المحتوى (إنجليزي) *" : "Title (English) *"}
+                {isAr ? "العنوان (إنجليزي) *" : "Title (English) *"}
               </span>
               <input
                 dir="ltr"
                 value={titleEn}
                 onChange={(e) => setTitleEn(e.target.value)}
-                placeholder="e.g. Barbell bench press / Ramadan nutrition guide"
+                placeholder="e.g. Barbell bench press"
                 className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none"
               />
             </label>
           </div>
 
-          {/* Bilingual Descriptions */}
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="flex flex-col gap-1.5">
               <span className="text-[12px] font-bold text-[#6B7280]">
-                {isAr ? "الوصف والتعليمات (عربي)" : "Description (Arabic)"}
+                {isAr ? "الوصف (عربي)" : "Description (Arabic)"}
               </span>
               <textarea
                 rows={2}
                 dir="rtl"
                 value={descAr}
                 onChange={(e) => setDescAr(e.target.value)}
-                placeholder="شرح مختصر للمحتوى وطريقة الاستفادة منه..."
                 className="rounded-2xl bg-[#F4F4F4] p-3 text-[13px] font-medium text-[var(--gym-ink,#111111)] outline-none [font-family:var(--font-arabic)]"
               />
             </label>
             <label className="flex flex-col gap-1.5">
               <span className="text-[12px] font-bold text-[#6B7280]">
-                {isAr ? "الوصف والتعليمات (إنجليزي)" : "Description (English)"}
+                {isAr ? "الوصف (إنجليزي)" : "Description (English)"}
               </span>
               <textarea
                 rows={2}
                 dir="ltr"
                 value={descEn}
                 onChange={(e) => setDescEn(e.target.value)}
-                placeholder="Concise coaching notes or instructions for this resource..."
                 className="rounded-2xl bg-[#F4F4F4] p-3 text-[13px] font-medium text-[var(--gym-ink,#111111)] outline-none"
               />
             </label>
           </div>
 
-          {/* File Upload & Canonical Storage Architecture Box */}
           <div className="rounded-2xl border border-black/8 bg-[#FAFAFA] p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <FolderTree className="size-4 text-[var(--gym-lime,#fb5001)]" />
-                <span className="text-[12px] font-extrabold uppercase tracking-[0.06em] text-[var(--gym-ink,#111111)]">
-                  {kind === "video"
-                    ? isAr
-                      ? "بنية بث الفيديو والمسار الذكي"
-                      : "Video streaming & smart storage path"
-                    : isAr
-                      ? "رفع ملف PDF / المستند والمسار الذكي"
-                      : "PDF / Document upload & smart storage path"}
-                </span>
-              </div>
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
-                <Sparkles className="size-3" />
-                {isAr
-                  ? "متوافق مع الخطة المجانية (Spark) وStorage"
-                  : "Spark Free-Plan & Cloud Storage Ready"}
+            <div className="flex items-center gap-2">
+              <FolderTree className="size-4 text-[var(--gym-lime,#fb5001)]" />
+              <span className="text-[12px] font-extrabold uppercase tracking-[0.06em] text-[var(--gym-ink,#111111)]">
+                {kind === "video"
+                  ? isAr
+                    ? "مصدر الفيديو (CDN أولاً)"
+                    : "Video source (CDN first)"
+                  : isAr
+                    ? "رفع المستند"
+                    : "Document upload"}
               </span>
             </div>
 
-            {/* File Dropzone / Picker */}
             <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
               <input
                 ref={fileInputRef}
@@ -579,7 +654,7 @@ export function ContentAssetFormDialog({
                 accept={
                   kind === "video"
                     ? "video/mp4,video/webm,video/quicktime"
-                    : ".pdf,.doc,.docx,application/pdf"
+                    : ".pdf,application/pdf"
                 }
                 onChange={handleFileSelected}
                 className="hidden"
@@ -592,36 +667,59 @@ export function ContentAssetFormDialog({
                 <FileUp className="size-3.5" />
                 {file
                   ? isAr
-                    ? "تغيير الملف المختار"
-                    : "Change selected file"
+                    ? "تغيير الملف"
+                    : "Change file"
                   : isAr
                     ? kind === "video"
-                      ? "اختيار ملف فيديو من الجهاز"
-                      : "اختيار ملف PDF / مستند من الجهاز"
+                      ? `رفع محلي (حد ${formatBytesLabel(CONTENT_UPLOAD_LIMITS.videoBytes)})`
+                      : `رفع PDF (حد ${formatBytesLabel(CONTENT_UPLOAD_LIMITS.pdfBytes)})`
                     : kind === "video"
-                      ? "Choose local video file"
-                      : "Choose local PDF / doc"}
+                      ? `Local upload (max ${formatBytesLabel(CONTENT_UPLOAD_LIMITS.videoBytes)})`
+                      : `Upload PDF (max ${formatBytesLabel(CONTENT_UPLOAD_LIMITS.pdfBytes)})`}
               </button>
               <div className="min-w-0 flex-1 text-[12px] font-medium text-[#6B7280]">
                 {file ? (
                   <span className="font-bold text-[var(--gym-ink,#111111)]">
                     {file.name} ({formatBytesLabel(file.size)})
                   </span>
+                ) : initialAsset?.fileName ? (
+                  <span>
+                    {isAr ? "الملف الحالي:" : "Current:"} {initialAsset.fileName}
+                    {initialAsset.sizeLabel ? ` · ${initialAsset.sizeLabel}` : ""}
+                  </span>
                 ) : (
                   <span>
-                    {isAr
-                      ? "أو أدخل اسم الملف / رابط البث المباشر أو CDN بالأسفل"
-                      : "Or enter file name / external CDN or stream URL below"}
+                    {kind === "video"
+                      ? isAr
+                        ? "الأفضل: ارفع إلى Bunny/Cloudflare ثم الصق رابط البث"
+                        : "Best: upload to Bunny/Cloudflare, then paste the stream URL"
+                      : isAr
+                        ? "أو الصق رابط https للملف"
+                        : "Or paste an https file URL"}
                   </span>
                 )}
               </div>
             </div>
 
+            {uploadPercent != null ? (
+              <div className="mt-3">
+                <div className="h-2 overflow-hidden rounded-full bg-black/10">
+                  <div
+                    className="h-full rounded-full bg-[var(--gym-lime,#fb5001)] transition-all"
+                    style={{ width: `${uploadPercent}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-[11px] font-bold text-[#6B7280]">
+                  {isAr ? `جاري الرفع ${uploadPercent}%` : `Uploading ${uploadPercent}%`}
+                </p>
+              </div>
+            ) : null}
+
             {kind === "video" ? (
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
                 <label className="flex flex-col gap-1">
                   <span className="text-[11px] font-bold text-[#6B7280]">
-                    {isAr ? "مزود البث (Streaming Provider)" : "Streaming provider"}
+                    {isAr ? "مزود البث *" : "Streaming provider *"}
                   </span>
                   <select
                     value={videoProvider}
@@ -639,32 +737,31 @@ export function ContentAssetFormDialog({
                 </label>
                 <label className="flex flex-col gap-1">
                   <span className="text-[11px] font-bold text-[#6B7280]">
-                    {isAr ? "معرّف الفيديو (Asset ID)" : "Provider Asset ID"}
+                    {isAr ? "معرّف الأصل (اختياري)" : "Provider asset ID"}
                   </span>
                   <input
                     dir="ltr"
                     value={videoAssetId}
                     onChange={(e) => setVideoAssetId(e.target.value)}
-                    placeholder="e.g. bnny_squat_01"
+                    placeholder="bunny-guid / mux playback id"
                     className="h-10 rounded-xl bg-white px-3 text-[12px] font-medium text-[var(--gym-ink,#111111)] outline-none ring-1 ring-black/8"
                   />
                 </label>
                 <label className="flex flex-col gap-1">
                   <span className="text-[11px] font-bold text-[#6B7280]">
-                    {isAr ? "المدة (بالثواني)" : "Duration (seconds)"}
+                    {isAr ? "المدة (ثواني)" : "Duration (sec)"}
                   </span>
                   <input
                     type="number"
                     min={1}
                     value={durationSeconds}
                     onChange={(e) => setDurationSeconds(e.target.value)}
-                    placeholder="45"
                     className="h-10 rounded-xl bg-white px-3 text-[12px] font-medium text-[var(--gym-ink,#111111)] outline-none ring-1 ring-black/8"
                   />
                 </label>
               </div>
             ) : (
-              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <label className="flex flex-col gap-1">
                   <span className="text-[11px] font-bold text-[#6B7280]">
                     {isAr ? "اسم الملف" : "File name"}
@@ -679,126 +776,104 @@ export function ContentAssetFormDialog({
                 </label>
                 <label className="flex flex-col gap-1">
                   <span className="text-[11px] font-bold text-[#6B7280]">
-                    {isAr ? "حجم الملف" : "File size label"}
-                  </span>
-                  <input
-                    dir="ltr"
-                    value={sizeLabel}
-                    onChange={(e) => setSizeLabel(e.target.value)}
-                    placeholder="2.4 MB"
-                    className="h-10 rounded-xl bg-white px-3 text-[12px] font-medium text-[var(--gym-ink,#111111)] outline-none ring-1 ring-black/8"
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-[11px] font-bold text-[#6B7280]">
-                    {isAr ? "عدد الصفحات" : "Page count"}
+                    {isAr ? "عدد الصفحات (اختياري)" : "Page count (optional)"}
                   </span>
                   <input
                     type="number"
                     min={1}
                     value={pageCount}
                     onChange={(e) => setPageCount(e.target.value)}
-                    placeholder="12"
                     className="h-10 rounded-xl bg-white px-3 text-[12px] font-medium text-[var(--gym-ink,#111111)] outline-none ring-1 ring-black/8"
                   />
                 </label>
               </div>
             )}
 
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <label className="flex flex-col gap-1">
+            <label className="mt-3 flex flex-col gap-1">
+              <span className="text-[11px] font-bold text-[#6B7280]">
+                {kind === "video"
+                  ? isAr
+                    ? "رابط البث / Embed / HLS *"
+                    : "Stream / embed / HLS URL *"
+                  : isAr
+                    ? "رابط المستند (إن لم ترفع ملفاً)"
+                    : "Document URL (if not uploading)"}
+              </span>
+              <input
+                dir="ltr"
+                value={streamOrFileUrl}
+                onChange={(e) => setStreamOrFileUrl(e.target.value)}
+                placeholder={
+                  kind === "video"
+                    ? "https://iframe.mediadelivery.net/embed/..."
+                    : "https://.../document.pdf"
+                }
+                className="h-10 rounded-xl bg-white px-3 text-[12px] font-medium text-[var(--gym-ink,#111111)] outline-none ring-1 ring-black/8"
+              />
+            </label>
+
+            {kind === "video" ? (
+              <label className="mt-3 flex flex-col gap-1">
                 <span className="text-[11px] font-bold text-[#6B7280]">
-                  {kind === "video"
-                    ? isAr
-                      ? "رابط البث المباشر / YouTube / Vimeo / MP4 (اختياري)"
-                      : "Stream / Embed / MP4 URL (optional)"
-                    : isAr
-                      ? "رابط الملف الخارجي / Google Drive / CDN (اختياري)"
-                      : "Direct PDF / Drive / CDN URL (optional)"}
+                  {isAr ? "رابط الصورة المصغرة (اختياري)" : "Thumbnail URL (optional)"}
                 </span>
                 <input
                   dir="ltr"
-                  value={streamOrFileUrl}
-                  onChange={(e) => setStreamOrFileUrl(e.target.value)}
-                  placeholder={
-                    kind === "video"
-                      ? "https://iframe.mediadelivery.net/... or https://youtu.be/..."
-                      : "https://.../document.pdf"
-                  }
+                  value={thumbnailUrl}
+                  onChange={(e) => setThumbnailUrl(e.target.value)}
+                  placeholder="https://..."
                   className="h-10 rounded-xl bg-white px-3 text-[12px] font-medium text-[var(--gym-ink,#111111)] outline-none ring-1 ring-black/8"
                 />
               </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-bold text-[#6B7280]">
-                  {isAr
-                    ? "المسار المنظم في التخزين (Storage Path)"
-                    : "Structured Storage Path"}
-                </span>
-                <input
-                  dir="ltr"
-                  value={customPath}
-                  onChange={(e) => setCustomPath(e.target.value)}
-                  placeholder={previewStoragePath}
-                  className="h-10 rounded-xl bg-white px-3 font-mono text-[11px] font-medium text-[var(--gym-ink,#111111)] outline-none ring-1 ring-black/8"
-                />
-              </label>
-            </div>
+            ) : null}
+
             <p className="mt-2 font-mono text-[11px] text-[#6B7280]" dir="ltr">
-              Path: <strong className="text-[var(--gym-ink,#111111)]">{previewStoragePath}</strong>
+              Storage path:{" "}
+              <strong className="text-[var(--gym-ink,#111111)]">
+                {previewStoragePath}
+              </strong>
             </p>
           </div>
 
-          {/* Tags & Exercise Names */}
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="flex flex-col gap-1.5">
               <span className="text-[12px] font-bold text-[#6B7280]">
-                {isAr
-                  ? "الوسوم والكلمات المفتاحية للبحث (مفصولة بفاصلة)"
-                  : "Search tags (comma-separated, AR or EN)"}
+                {isAr ? "وسوم البحث" : "Search tags"}
               </span>
               <input
                 value={tagsText}
                 onChange={(e) => setTagsText(e.target.value)}
-                placeholder={
-                  isAr
-                    ? "مثال: chest, barbell, صدر, تضخم"
-                    : "e.g. chest, barbell, push, صدر"
-                }
+                placeholder={isAr ? "صدر, barbell, تضخم" : "chest, barbell, push"}
                 className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[13px] font-medium text-[var(--gym-ink,#111111)] outline-none"
               />
             </label>
             {kind === "video" ? (
               <label className="flex flex-col gap-1.5">
                 <span className="text-[12px] font-bold text-[#6B7280]">
-                  {isAr
-                    ? "أسماء التمارين المرتبطة بهذا الفيديو"
-                    : "Linked exercise names"}
+                  {isAr ? "أسماء التمارين المرتبطة" : "Linked exercise names"}
                 </span>
                 <input
                   value={exerciseNamesText}
                   onChange={(e) => setExerciseNamesText(e.target.value)}
-                  placeholder="e.g. Barbell bench press"
+                  placeholder="Barbell bench press"
                   className="h-11 rounded-2xl bg-[#F4F4F4] px-4 text-[13px] font-medium text-[var(--gym-ink,#111111)] outline-none"
                 />
               </label>
             ) : null}
           </div>
 
-          {/* Access Control & Entitlements */}
           <div className="rounded-2xl border border-black/8 bg-[#FAFAFA] p-4">
             <div className="flex items-center gap-2">
               <ShieldCheck className="size-4 text-[var(--gym-ink,#111111)]" />
               <span className="text-[12px] font-extrabold uppercase tracking-[0.06em] text-[var(--gym-ink,#111111)]">
-                {isAr
-                  ? "صلاحيات الوصول وربط الباقات والبرامج والمشتركين"
-                  : "Access control, entitlements & associations"}
+                {isAr ? "الوصول والربط" : "Access & associations"}
               </span>
             </div>
 
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <label className="flex flex-col gap-1">
                 <span className="text-[11px] font-bold text-[#6B7280]">
-                  {isAr ? "مستوى الظهور والوصول" : "Content visibility"}
+                  {isAr ? "مستوى الظهور" : "Visibility"}
                 </span>
                 <select
                   value={visibility}
@@ -808,28 +883,20 @@ export function ContentAssetFormDialog({
                   className="h-10 rounded-xl bg-white px-3 text-[12px] font-bold text-[var(--gym-ink,#111111)] outline-none ring-1 ring-black/8"
                 >
                   <option value="package">
-                    {isAr
-                      ? "مرتبط بالباقات المحددة (Package-gated)"
-                      : "Package-gated (Unlocked by package)"}
+                    {isAr ? "مرتبط بالباقات" : "Package-gated"}
                   </option>
                   <option value="assigned">
-                    {isAr
-                      ? "مخصص لمشتركين / برامج محددة (Assigned)"
-                      : "Assigned (Specific subscribers / programs)"}
+                    {isAr ? "مخصص لمشتركين/برامج" : "Assigned only"}
                   </option>
                   <option value="library">
-                    {isAr
-                      ? "عام في المكتبة (يتطلب صلاحية الباقة)"
-                      : "Library resource (Requires entitlement)"}
+                    {isAr ? "مكتبة عامة (بصلاحية الباقة)" : "Library (needs entitlement)"}
                   </option>
                 </select>
               </label>
 
               <label className="flex flex-col gap-1">
                 <span className="text-[11px] font-bold text-[#6B7280]">
-                  {isAr
-                    ? "صلاحية الباقة المطلوبة (Required Entitlement)"
-                    : "Required package entitlement"}
+                  {isAr ? "صلاحية الباقة المطلوبة" : "Required entitlement"}
                 </span>
                 <select
                   value={requiredEntitlement}
@@ -849,12 +916,9 @@ export function ContentAssetFormDialog({
               </label>
             </div>
 
-            {/* Packages association */}
             <div className="mt-4">
               <p className="text-[11px] font-bold text-[#6B7280]">
-                {isAr
-                  ? "الباقات المرتبطة بهذا المحتوى:"
-                  : "Associated subscription packages:"}
+                {isAr ? "الباقات المرتبطة" : "Linked packages"}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {packages.map((pkg) => {
@@ -873,7 +937,9 @@ export function ContentAssetFormDialog({
                           : "border-black/10 bg-white text-[#6B7280] hover:bg-black/5",
                       )}
                     >
-                      {checked ? <Check className="size-3" strokeWidth={3} /> : null}
+                      {checked ? (
+                        <Check className="size-3" strokeWidth={3} />
+                      ) : null}
                       {pkg.name[locale]}
                     </button>
                   )
@@ -881,44 +947,48 @@ export function ContentAssetFormDialog({
               </div>
             </div>
 
-            {/* Programs association */}
             <div className="mt-4">
               <p className="text-[11px] font-bold text-[#6B7280]">
-                {isAr
-                  ? "برامج التمارين والتغذية المرتبطة:"
-                  : "Associated workout & nutrition programs:"}
+                {isAr ? "برامج التمارين والتغذية" : "Workout & nutrition programs"}
               </p>
               <div className="mt-2 flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
-                {allPrograms.map((prog) => {
-                  const checked = programIds.includes(prog.id)
-                  return (
-                    <button
-                      key={prog.id}
-                      type="button"
-                      onClick={() =>
-                        toggleItem(programIds, prog.id, setProgramIds)
-                      }
-                      className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
-                        checked
-                          ? "border-[var(--gym-lime,#fb5001)] bg-[var(--gym-lime,#fb5001)] text-white"
-                          : "border-black/10 bg-white text-[#6B7280] hover:bg-black/5",
-                      )}
-                    >
-                      {checked ? <Check className="size-2.5" strokeWidth={3} /> : null}
-                      {prog.title[locale]}
-                    </button>
-                  )
-                })}
+                {allPrograms.length === 0 ? (
+                  <p className="text-[11px] text-[#8c8c8c]">
+                    {isAr ? "لا توجد برامج بعد" : "No programs yet"}
+                  </p>
+                ) : (
+                  allPrograms.map((prog) => {
+                    const checked = programIds.includes(prog.id)
+                    return (
+                      <button
+                        key={prog.id}
+                        type="button"
+                        onClick={() =>
+                          toggleItem(programIds, prog.id, setProgramIds)
+                        }
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
+                          checked
+                            ? "border-[var(--gym-lime,#fb5001)] bg-[var(--gym-lime,#fb5001)] text-white"
+                            : "border-black/10 bg-white text-[#6B7280] hover:bg-black/5",
+                        )}
+                      >
+                        {checked ? (
+                          <Check className="size-2.5" strokeWidth={3} />
+                        ) : null}
+                        {prog.title[locale]}
+                      </button>
+                    )
+                  })
+                )}
               </div>
             </div>
 
-            {/* Direct Subscribers association */}
             <div className="mt-4">
               <p className="text-[11px] font-bold text-[#6B7280]">
                 {isAr
-                  ? "تخصيص مباشر لمشتركين محددين (اختياري):"
-                  : "Direct subscriber assignment (optional):"}
+                  ? "تخصيص مباشر لمشتركين (اختياري)"
+                  : "Direct subscriber assignment (optional)"}
               </p>
               <div className="mt-2 flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
                 {subscribers.map((sub) => {
@@ -937,7 +1007,9 @@ export function ContentAssetFormDialog({
                           : "border-black/10 bg-white text-[#6B7280] hover:bg-black/5",
                       )}
                     >
-                      {checked ? <Check className="size-2.5" strokeWidth={3} /> : null}
+                      {checked ? (
+                        <Check className="size-2.5" strokeWidth={3} />
+                      ) : null}
                       {subscriberDisplayName(sub, locale)}
                     </button>
                   )
@@ -969,8 +1041,8 @@ export function ContentAssetFormDialog({
                     ? "حفظ التحديثات"
                     : "Save changes"
                   : isAr
-                    ? "رفع وحفظ المحتوى"
-                    : "Save content asset"}
+                    ? "حفظ المحتوى"
+                    : "Save content"}
             </button>
           </div>
         </form>
@@ -979,4 +1051,3 @@ export function ContentAssetFormDialog({
     document.body,
   )
 }
-

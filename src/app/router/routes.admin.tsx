@@ -3,8 +3,10 @@ import type { RouteObject } from "react-router-dom"
 import { AdminLayout } from "@/layouts/AdminLayout"
 import { RequireAuth, RequirePermission, RequireRole } from "@/app/router/guards"
 
-const OverviewPage = lazy(() =>
-  import("@/pages/admin/OverviewPage").then((m) => ({ default: m.OverviewPage })),
+const AdminEntryPage = lazy(() =>
+  import("@/pages/admin/AdminEntryPage").then((m) => ({
+    default: m.AdminEntryPage,
+  })),
 )
 const SubscribersPage = lazy(() =>
   import("@/pages/admin/SubscribersPage").then((m) => ({ default: m.SubscribersPage })),
@@ -58,10 +60,7 @@ export const adminRoutes: RouteObject[] = [
           {
             element: <AdminLayout />,
             children: [
-              {
-                element: <RequirePermission permission="reports:read" />,
-                children: [{ index: true, element: <OverviewPage /> }],
-              },
+              { index: true, element: <AdminEntryPage /> },
               {
                 element: <RequirePermission permission="subscribers:read" />,
                 children: [

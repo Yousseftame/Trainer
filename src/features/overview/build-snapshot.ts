@@ -1,9 +1,28 @@
 import { APP_ROUTES } from "@/config/constants"
+import {
+  adherenceScoreFromWeeks,
+  computeAdherenceWeeks,
+} from "@/features/progress/adherence"
+import { daysSince } from "@/features/progress/metrics"
+import { buildProgressRoster } from "@/features/progress/roster"
+import type {
+  PriorityItem,
+  PriorityKind,
+} from "@/features/overview/types"
 import type { RegistrationRequest, Subscriber } from "@/features/subscribers/types"
 import type { CatalogPackage } from "@/features/subscriptions/types"
-import type { NutritionProgram, WorkoutProgram } from "@/types/program"
+import type {
+  BodyMeasurement,
+  ProgressPhoto,
+} from "@/types/progress"
+import type {
+  NutritionAdherenceLog,
+  NutritionProgram,
+  WorkoutProgram,
+  WorkoutSessionLog,
+} from "@/types/program"
 import type { SubscriberSubscription } from "@/types/subscription"
-import type { PriorityItem, PriorityKind } from "@/features/overview/demo"
+import { EXPIRING_DAYS } from "@/features/reports/types"
 
 export type OverviewLiveInput = {
   subscribers: Subscriber[]
@@ -12,11 +31,29 @@ export type OverviewLiveInput = {
   registrationRequests: RegistrationRequest[]
   workoutPrograms?: WorkoutProgram[]
   nutritionPrograms?: NutritionProgram[]
+  measurements?: BodyMeasurement[]
+  photos?: ProgressPhoto[]
+  workoutLogs?: WorkoutSessionLog[]
+  nutritionLogs?: NutritionAdherenceLog[]
+  now?: Date
 }
 
-function daysFromToday(value: string | null | undefined) {
+function rate(done: number, total: number) {
+  if (!total) return null
+  return Math.round((done / total) * 100)
+}
+
+function overall(workout: number | null, nutrition: number | null) {
+  const parts = [workout, nutrition].filter(
+    (item): item is number => item != null,
+  )
+  if (!parts.length) return null
+  return Math.round(parts.reduce((sum, item) => sum + item, 0) / parts.length)
+}
+
+function daysFromToday(value: string | null | undefined, now: Date) {
   if (!value) return null
-  return Math.ceil((new Date(value).getTime() - Date.now()) / 86_400_000)
+  return Math.ceil((new Date(value).getTime() - now.getTime()) / 86_400_000)
 }
 
 function packageById(packages: CatalogPackage[], id: string | null | undefined) {
@@ -64,8 +101,8 @@ function packageRows(
     subscriptions
       .filter((item) => {
         if (item.status !== "active") return false
-        const days = daysFromToday(item.endsAt)
-        return days != null && days >= 0 && days <= 14
+        const days = daysFromToday(item.endsAt, new Date())
+        return days != null && days >= 0 && days <= EXPIRING_DAYS
       })
       .map((item) => item.id),
   )
@@ -85,12 +122,113 @@ function packageRows(
     .sort((a, b) => b.active - a.active)
 }
 
+function startOfUtcWeek(iso: string): string {
+  const date = new Date(iso)
+  const day = date.getUTCDay() || 7
+  const monday = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  )
+  monday.setUTCDate(monday.getUTCDate() - (day - 1))
+  return monday.toISOString()
+}
+
+function studioAdherenceTrend(input: {
+  workoutLogs: WorkoutSessionLog[]
+  nutritionLogs: NutritionAdherenceLog[]
+  workoutPrograms: WorkoutProgram[]
+  nutritionPrograms: NutritionProgram[]
+}) {
+  // Aggregate across all subscribers by summing per-subscriber week buckets.
+  const bySubscriber = new Map<string, { w: WorkoutSessionLog[]; n: NutritionAdherenceLog[]; wp: WorkoutProgram[]; np: NutritionProgram[] }>()
+
+  const ensure = (id: string) => {
+    let row = bySubscriber.get(id)
+    if (!row) {
+      row = { w: [], n: [], wp: [], np: [] }
+      bySubscriber.set(id, row)
+    }
+    return row
+  }
+
+  for (const log of input.workoutLogs) ensure(log.subscriberId).w.push(log)
+  for (const log of input.nutritionLogs) ensure(log.subscriberId).n.push(log)
+  for (const program of input.workoutPrograms) {
+    if (program.subscriberId) ensure(program.subscriberId).wp.push(program)
+  }
+  for (const program of input.nutritionPrograms) {
+    if (program.subscriberId) ensure(program.subscriberId).np.push(program)
+  }
+
+  const weekMap = new Map<
+    string,
+    { workoutDone: number; workoutTotal: number; nutritionDone: number; nutritionTotal: number }
+  >()
+
+  for (const row of bySubscriber.values()) {
+    const weeks = computeAdherenceWeeks({
+      workoutLogs: row.w,
+      nutritionLogs: row.n,
+      workoutPrograms: row.wp,
+      nutritionPrograms: row.np,
+      weeks: 8,
+    })
+    for (const week of weeks) {
+      const current = weekMap.get(week.weekStart) ?? {
+        workoutDone: 0,
+        workoutTotal: 0,
+        nutritionDone: 0,
+        nutritionTotal: 0,
+      }
+      current.workoutDone += week.workoutDone
+      current.workoutTotal += week.workoutTotal
+      current.nutritionDone += week.nutritionDone
+      current.nutritionTotal += week.nutritionTotal
+      weekMap.set(week.weekStart, current)
+    }
+  }
+
+  return [...weekMap.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-8)
+    .map(([week, value]) => ({
+      week,
+      workout: rate(value.workoutDone, value.workoutTotal),
+      nutrition: rate(value.nutritionDone, value.nutritionTotal),
+      overall: rate(
+        value.workoutDone + value.nutritionDone,
+        value.workoutTotal + value.nutritionTotal,
+      ),
+    }))
+}
+
+function checkInTrend(measurements: BodyMeasurement[], now: Date) {
+  const buckets = new Map<string, number>()
+  for (let i = 7; i >= 0; i -= 1) {
+    const start = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    )
+    const day = start.getUTCDay() || 7
+    start.setUTCDate(start.getUTCDate() - (day - 1) - i * 7)
+    buckets.set(start.toISOString(), 0)
+  }
+
+  for (const row of measurements) {
+    const key = startOfUtcWeek(row.recordedAt)
+    if (!buckets.has(key)) continue
+    buckets.set(key, (buckets.get(key) ?? 0) + 1)
+  }
+
+  return [...buckets.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([week, count]) => ({ week, count }))
+}
+
 /**
- * Live admin overview snapshot — subscribers / packages / subscriptions /
- * registration / workout programs come from Firestore (fetch-on-need).
- * Nutrition adherence stays neutral until that module is fully live.
+ * Live admin overview snapshot from Firestore module data.
+ * Summaries only — no demo fallbacks.
  */
 export function buildOverviewSnapshot(input: OverviewLiveInput) {
+  const now = input.now ?? new Date()
   const {
     subscribers,
     subscriptions,
@@ -98,8 +236,51 @@ export function buildOverviewSnapshot(input: OverviewLiveInput) {
     registrationRequests,
     workoutPrograms = [],
     nutritionPrograms = [],
+    measurements = [],
+    photos = [],
+    workoutLogs = [],
+    nutritionLogs = [],
   } = input
+
   const mix = seatMix(subscribers, subscriptions)
+  const trend = studioAdherenceTrend({
+    workoutLogs,
+    nutritionLogs,
+    workoutPrograms,
+    nutritionPrograms,
+  })
+  const nowWeek = trend[trend.length - 1]
+  const prevWeek = trend[trend.length - 2]
+
+  const checkIns = checkInTrend(measurements, now)
+  const checkInsNow = checkIns[checkIns.length - 1]?.count ?? 0
+  const checkInsPrev = checkIns[checkIns.length - 2]?.count ?? 0
+
+  const adherenceBySubscriber: Record<string, number | null> = {}
+  for (const person of subscribers) {
+    if (person.status === "rejected") continue
+    const weeks = computeAdherenceWeeks({
+      workoutLogs: workoutLogs.filter((item) => item.subscriberId === person.id),
+      nutritionLogs: nutritionLogs.filter(
+        (item) => item.subscriberId === person.id,
+      ),
+      workoutPrograms: workoutPrograms.filter(
+        (item) => item.subscriberId === person.id,
+      ),
+      nutritionPrograms: nutritionPrograms.filter(
+        (item) => item.subscriberId === person.id,
+      ),
+      weeks: 4,
+    })
+    adherenceBySubscriber[person.id] = adherenceScoreFromWeeks(weeks)
+  }
+
+  const roster = buildProgressRoster({
+    subscribers,
+    measurements,
+    photos,
+    adherenceBySubscriber,
+  })
 
   const pendingRequests = registrationRequests
     .filter((item) => item.status === "pending")
@@ -119,8 +300,8 @@ export function buildOverviewSnapshot(input: OverviewLiveInput) {
   const expiring = subscriptions
     .filter((item) => {
       if (item.status !== "active") return false
-      const days = daysFromToday(item.endsAt)
-      return days != null && days >= 0 && days <= 14
+      const days = daysFromToday(item.endsAt, now)
+      return days != null && days >= 0 && days <= EXPIRING_DAYS
     })
     .sort(
       (a, b) =>
@@ -134,7 +315,7 @@ export function buildOverviewSnapshot(input: OverviewLiveInput) {
         name: person?.displayName ?? item.subscriberId,
         packageName: packageById(packages, item.packageId)?.name,
         endsAt: item.endsAt,
-        daysLeft: daysFromToday(item.endsAt) ?? 0,
+        daysLeft: daysFromToday(item.endsAt, now) ?? 0,
       }
     })
 
@@ -150,8 +331,15 @@ export function buildOverviewSnapshot(input: OverviewLiveInput) {
       subscriberId: item.person.id,
       name: item.person.displayName,
       packageName: packageById(packages, item.seat!.packageId)?.name,
-      days: Math.abs(daysFromToday(item.seat!.endsAt) ?? 0),
+      days: Math.abs(daysFromToday(item.seat!.endsAt, now) ?? 0),
     }))
+
+  const stale = roster.filter((item) => {
+    if (!item.stale) return false
+    if (item.subscriber.status !== "active") return false
+    const seat = latestSubscriptionFor(subscriptions, item.subscriber.id)
+    return seat?.status === "active"
+  })
 
   const priority: PriorityItem[] = [
     ...requests.map((item) => ({
@@ -178,10 +366,19 @@ export function buildOverviewSnapshot(input: OverviewLiveInput) {
       packageName: item.packageName,
       days: item.days,
     })),
-  ].slice(0, 6)
+    ...stale.map((item) => ({
+      id: `stale-${item.subscriber.id}`,
+      kind: "stale" as PriorityKind,
+      name: item.subscriber.displayName,
+      href: `${APP_ROUTES.admin.progress}?subscriber=${item.subscriber.id}`,
+      days: daysSince(item.lastCheckIn) ?? 0,
+    })),
+  ].slice(0, 8)
+
+  const liveRoster = roster.filter((item) => item.subscriber.status !== "rejected")
 
   return {
-    today: new Date().toISOString(),
+    today: now.toISOString(),
     subscribers: {
       total: subscribers.filter((item) => item.status !== "rejected").length,
       active: subscribers.filter((item) => item.status === "active").length,
@@ -191,23 +388,24 @@ export function buildOverviewSnapshot(input: OverviewLiveInput) {
       expiring: expiring.length,
     },
     adherence: {
-      workout: null as number | null,
-      nutrition: null as number | null,
-      overall: null as number | null,
-      previous: null as number | null,
-      trend: [] as Array<{
-        week: string
-        workout: number | null
-        nutrition: number | null
-        overall: number | null
-      }>,
+      workout: nowWeek?.workout ?? null,
+      nutrition: nowWeek?.nutrition ?? null,
+      overall:
+        nowWeek?.overall ??
+        overall(nowWeek?.workout ?? null, nowWeek?.nutrition ?? null),
+      previous: prevWeek?.overall ?? null,
+      trend,
     },
     checkIns: {
-      now: 0,
-      previous: 0,
-      trend: [] as Array<{ week: string; count: number }>,
+      now: checkInsNow,
+      previous: checkInsPrev,
+      trend: checkIns,
     },
-    progress: { onTrack: 0, attention: 0, quiet: 0 },
+    progress: {
+      onTrack: liveRoster.filter((item) => item.bucket === "ontrack").length,
+      attention: liveRoster.filter((item) => item.bucket === "attention").length,
+      quiet: liveRoster.filter((item) => item.bucket === "quiet").length,
+    },
     packages: packageRows(packages, subscriptions),
     programs: {
       workouts: workoutPrograms.filter((item) => item.status === "active").length,

@@ -20,6 +20,7 @@ type DashboardSidebarProps = {
   onMobileClose: () => void
   onToggle: () => void
   onSignOut: () => void
+  badgeByTo?: Record<string, number>
 }
 
 function childIsActive(pathname: string, item: NavItem, homeTo: string) {
@@ -41,6 +42,7 @@ export function DashboardSidebar({
   onMobileClose,
   onToggle,
   onSignOut,
+  badgeByTo,
 }: DashboardSidebarProps) {
   const { t } = useTranslation()
   const { locale } = useLocale()
@@ -165,6 +167,7 @@ export function DashboardSidebar({
                 onToggle={() => toggleGroup(item.to)}
                 onNavigate={onMobileClose}
                 onExpandSidebar={collapsed ? onToggle : undefined}
+                badgeByTo={badgeByTo}
               />
             ) : (
               <SidebarNavLink
@@ -174,6 +177,7 @@ export function DashboardSidebar({
                 collapsed={collapsed}
                 active={isNavActive(location.pathname, item.to, homeTo)}
                 onClick={onMobileClose}
+                badge={badgeByTo?.[item.to]}
               />
             ),
           )}
@@ -243,6 +247,7 @@ function SidebarNavGroup({
   onToggle,
   onNavigate,
   onExpandSidebar,
+  badgeByTo,
 }: {
   item: NavItem
   homeTo: string
@@ -251,12 +256,17 @@ function SidebarNavGroup({
   onToggle: () => void
   onNavigate: () => void
   onExpandSidebar?: () => void
+  badgeByTo?: Record<string, number>
 }) {
   const { t } = useTranslation()
   const location = useLocation()
   const Icon = item.icon
   const active = groupIsActive(location.pathname, item, homeTo)
   const children = item.children ?? []
+  const groupBadge = children.reduce(
+    (sum, child) => sum + (badgeByTo?.[child.to] ?? 0),
+    badgeByTo?.[item.to] ?? 0,
+  )
 
   function handleParentClick() {
     if (collapsed && onExpandSidebar) {
@@ -278,6 +288,7 @@ function SidebarNavGroup({
       >
         <span className="relative inline-flex size-[18px] shrink-0 items-center justify-center">
           <Icon className="size-[18px]" strokeWidth={1.8} />
+          <NavBadge count={groupBadge} collapsedDot={collapsed} />
         </span>
         <SidebarLabel collapsed={collapsed}>{t(item.labelKey)}</SidebarLabel>
         <ChevronDown
@@ -311,6 +322,7 @@ function SidebarNavGroup({
                   active={childIsActive(location.pathname, child, homeTo)}
                   onClick={onNavigate}
                   nested
+                  badge={badgeByTo?.[child.to]}
                 />
               ))}
             </div>
@@ -328,6 +340,7 @@ function SidebarNavLink({
   active,
   onClick,
   nested = false,
+  badge,
 }: {
   item: NavItem
   label: string
@@ -335,6 +348,7 @@ function SidebarNavLink({
   active: boolean
   onClick: () => void
   nested?: boolean
+  badge?: number
 }) {
   const Icon = item.icon
 
@@ -351,9 +365,32 @@ function SidebarNavLink({
     >
       <span className="relative inline-flex size-[18px] shrink-0 items-center justify-center">
         <Icon className="size-[18px]" strokeWidth={1.8} />
+        <NavBadge count={badge} collapsedDot={collapsed} />
       </span>
       <SidebarLabel collapsed={collapsed}>{label}</SidebarLabel>
+      {!collapsed && badge && badge > 0 ? (
+        <span className="ms-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[var(--gym-lime,#fb5001)] px-1.5 text-[10px] font-extrabold text-[var(--gym-ink,#111111)]">
+          {badge > 99 ? "99+" : badge}
+        </span>
+      ) : null}
     </Link>
+  )
+}
+
+function NavBadge({
+  count,
+  collapsedDot,
+}: {
+  count?: number
+  collapsedDot?: boolean
+}) {
+  if (!count || count <= 0) return null
+  if (!collapsedDot) return null
+  return (
+    <span
+      className="absolute -end-1 -top-1 size-2 rounded-full bg-[var(--gym-lime,#fb5001)] ring-2 ring-[#F4F4F4]"
+      aria-hidden
+    />
   )
 }
 

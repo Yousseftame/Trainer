@@ -10,6 +10,7 @@ import {
   setSubscriberClaims,
 } from "../../shared/subscribers.js";
 import {createInitialSubscription} from "../../shared/subscriptions.js";
+import {enqueueNotice} from "../../shared/notices.js";
 
 export const approveRegistrationRequest = onCall(async (request) => {
   const caller = assertStaffCaller(request.auth, "subscribers:approve");
@@ -150,6 +151,25 @@ export const approveRegistrationRequest = onCall(async (request) => {
         "Assigned upon registration request approval",
     });
   }
+
+  await enqueueNotice({
+    kind: "approval",
+    toEmail: email,
+    toName: displayName,
+    subscriberId: uid,
+    requestId,
+    packageId: selectedPkgId ?? undefined,
+    dedupeKey: `approval:${requestId}`,
+    subject: {
+      en: `${displayName}'s account is ready`,
+      ar: `حساب ${displayName} جاهز`,
+    },
+    detail: {
+      en: "Your registration was approved. Sign in to the subscriber panel to continue.",
+      ar: "تمت الموافقة على طلبك. سجّل الدخول إلى لوحة المشترك للمتابعة.",
+    },
+    alarmStaff: true,
+  });
 
   return {request: updatedReq, subscriber, approvedBy: caller.uid};
 });

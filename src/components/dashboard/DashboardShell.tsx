@@ -19,6 +19,8 @@ type DashboardShellProps = {
   area: "admin" | "subscriber"
   items: NavItem[]
   homeTo: string
+  /** Live counters keyed by nav `to` path (e.g. reports inbox badge). */
+  badgeByTo?: Record<string, number>
 }
 
 function resolveTitle(pathname: string, items: NavItem[], fallback: string) {
@@ -36,7 +38,12 @@ function readCollapsed(): boolean {
   }
 }
 
-export function DashboardShell({ area, items, homeTo }: DashboardShellProps) {
+export function DashboardShell({
+  area,
+  items,
+  homeTo,
+  badgeByTo,
+}: DashboardShellProps) {
   const { t } = useTranslation()
   const location = useLocation()
   const navigate = useNavigate()
@@ -125,6 +132,7 @@ export function DashboardShell({ area, items, homeTo }: DashboardShellProps) {
         onMobileClose={() => setMobileOpen(false)}
         onToggle={toggleCollapsed}
         onSignOut={requestSignOut}
+        badgeByTo={badgeByTo}
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">

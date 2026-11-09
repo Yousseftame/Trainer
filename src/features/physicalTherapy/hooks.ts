@@ -1,64 +1,77 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_STALE_TIMES } from "@/config/constants"
 import {
-  deletePTRecord,
-  fetchPTRecords,
+  deletePhysicalTherapyRecord,
   fetchSubscriberPTRecord,
-  fetchSubscriberPTRecords,
-  savePTRecord,
+  listPhysicalTherapyRecords,
+  savePhysicalTherapyRecord,
+  type SavePTRecordInput,
 } from "@/features/physicalTherapy/service"
-import type { PhysicalTherapyRecord } from "@/types/physicalTherapy"
 
-export const PT_QUERY_KEY = ["physical_therapy"]
-
-export function usePTRecordsQuery() {
-  return useQuery({
-    queryKey: PT_QUERY_KEY,
-    queryFn: fetchPTRecords,
-    staleTime: 30_000,
-  })
+export const PT_QUERY_KEYS = {
+  all: ["physical_therapy"] as const,
+  list: (subscriberId?: string) =>
+    subscriberId
+      ? (["physical_therapy", "list", subscriberId] as const)
+      : (["physical_therapy", "list"] as const),
+  primary: (subscriberId: string) =>
+    ["physical_therapy", "primary", subscriberId] as const,
 }
 
-export function useSubscriberPTQuery(subscriberId?: string) {
+/** @deprecated Prefer PT_QUERY_KEYS.all */
+export const PT_QUERY_KEY = PT_QUERY_KEYS.all
+
+export function usePTRecordsQuery(options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: [...PT_QUERY_KEY, "subscriber", subscriberId],
-    queryFn: () => (subscriberId ? fetchSubscriberPTRecord(subscriberId) : null),
-    enabled: Boolean(subscriberId),
-    staleTime: 30_000,
+    queryKey: PT_QUERY_KEYS.list(),
+    queryFn: () => listPhysicalTherapyRecords(),
+    enabled: options?.enabled ?? true,
+    staleTime: QUERY_STALE_TIMES.adminList,
   })
 }
 
 export function useSubscriberPTRecordsQuery(subscriberId?: string) {
   return useQuery({
-    queryKey: [...PT_QUERY_KEY, "subscriber_records", subscriberId],
-    queryFn: () => (subscriberId ? fetchSubscriberPTRecords(subscriberId) : []),
+    queryKey: PT_QUERY_KEYS.list(subscriberId),
+    queryFn: () =>
+      subscriberId ? listPhysicalTherapyRecords(subscriberId) : [],
     enabled: Boolean(subscriberId),
-    staleTime: 30_000,
+    staleTime: QUERY_STALE_TIMES.subscriberDashboard,
+  })
+}
+
+export function useSubscriberPTQuery(subscriberId?: string) {
+  return useQuery({
+    queryKey: PT_QUERY_KEYS.primary(subscriberId ?? ""),
+    queryFn: () =>
+      subscriberId ? fetchSubscriberPTRecord(subscriberId) : null,
+    enabled: Boolean(subscriberId),
+    staleTime: QUERY_STALE_TIMES.subscriberDashboard,
   })
 }
 
 export function useSavePTRecordMutation() {
-  const qc = useQueryClient()
+  const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (
-      record: Partial<PhysicalTherapyRecord> & {
-        subscriberId: string
-        injuryTitle: PhysicalTherapyRecord["injuryTitle"]
-        affectedArea: PhysicalTherapyRecord["affectedArea"]
-      },
-    ) => savePTRecord(record),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: PT_QUERY_KEY })
+    mutationFn: (input: SavePTRecordInput) => savePhysicalTherapyRecord(input),
+    onSuccess: (saved) => {
+      void queryClient.invalidateQueries({ queryKey: PT_QUERY_KEYS.all })
+      void queryClient.invalidateQueries({
+        queryKey: PT_QUERY_KEYS.list(saved.subscriberId),
+      })
+      void queryClient.invalidateQueries({
+        queryKey: PT_QUERY_KEYS.primary(saved.subscriberId),
+      })
     },
   })
 }
 
 export function useDeletePTRecordMutation() {
-  const qc = useQueryClient()
+  const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => deletePTRecord(id),
+    mutationFn: (id: string) => deletePhysicalTherapyRecord(id),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: PT_QUERY_KEY })
+      void queryClient.invalidateQueries({ queryKey: PT_QUERY_KEYS.all })
     },
   })
 }
-

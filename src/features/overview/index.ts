@@ -1,7 +1,11 @@
-export { overviewSnapshot } from "@/features/overview/demo"
+export type { PriorityItem, PriorityKind } from "@/features/overview/types"
 export {
   buildOverviewSnapshot,
-  type OverviewLiveInput,
   type LiveOverviewSnapshot,
+  type OverviewLiveInput,
 } from "@/features/overview/build-snapshot"
-export type { OverviewSnapshot, PriorityItem, PriorityKind } from "@/features/overview/demo"
+export { fetchOverviewDesk } from "@/features/overview/service"
+export {
+  OVERVIEW_QUERY_KEY,
+  useOverviewDeskQuery,
+} from "@/features/overview/hooks"

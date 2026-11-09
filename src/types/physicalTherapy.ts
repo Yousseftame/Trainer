@@ -17,10 +17,14 @@ export type PTStatus = "active" | "recovering" | "cleared"
 
 export type PTMovementRestriction = {
   id: string
-  prohibited: BilingualText // Exercise or movement to avoid (e.g. "Overhead Barbell Press")
-  safeAlternative: BilingualText // Safe replacement (e.g. "Landmine Press or Neutral Grip DB Press")
-  reason?: BilingualText // Medical/biomechanical reason
+  /** Exercise or movement to avoid (e.g. "Overhead Barbell Press") */
+  prohibited: BilingualText
+  /** Safe replacement (e.g. "Landmine Press") */
+  safeAlternative: BilingualText
+  reason?: BilingualText
   equipment?: string
+  /** Lowercase tokens used by workout contraindication matching */
+  matchTokens?: string[]
 }
 
 export type PTRehabExercise = {
@@ -28,14 +32,19 @@ export type PTRehabExercise = {
   name: BilingualText
   sets: number
   reps: string
-  frequency: string // e.g., "Daily", "3x / week", "Pre-workout warmup"
+  /** e.g. "Daily", "3x / week", "Pre-workout warmup" */
+  frequency: string
   notes?: BilingualText
+  /** Prefer Content Library id when available */
+  videoContentId?: string
+  /** External / legacy stream URL */
   videoUrl?: string
 }
 
 export type PhysicalTherapyRecord = {
   id: string
   subscriberId: string
+  /** @deprecated Prefer resolving display name from subscribers query */
   subscriberName?: string
   injuryTitle: BilingualText
   affectedArea: PTAffectedArea
@@ -43,11 +52,12 @@ export type PhysicalTherapyRecord = {
   status: PTStatus
   diagnosisDate: string
   clearanceDate?: string | null
+  nextEvaluationDate?: string | null
   restrictions: PTMovementRestriction[]
   rehabExercises: PTRehabExercise[]
   therapistNotes?: BilingualText
-  nextEvaluationDate?: string | null
   createdAt: string
   updatedAt: string
+  createdBy?: string
+  updatedBy?: string
 }
-

@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_STALE_TIMES } from "@/config/constants"
-import { getContentSnapshot } from "@/features/content/demo"
 import {
   deleteContentAsset,
   fetchContentAssets,
+  fetchSubscriberContentLibrary,
   saveContentAsset,
   updateContentAssociations,
   type SaveContentAssetInput,
@@ -12,19 +12,29 @@ import {
 
 export const CONTENT_QUERY_KEYS = {
   all: ["content_assets"] as const,
+  subscriberLibrary: ["content_assets", "subscriber_library"] as const,
 }
 
 export const contentKeys = CONTENT_QUERY_KEYS
 
 type ContentQueryOptions = {
   enabled?: boolean
+  /** Staff SDK list (default) vs entitlement-gated subscriber callable */
+  audience?: "staff" | "subscriber"
 }
 
 /** Fetch only when a page that needs the library is mounted. */
 export function useContentAssetsQuery(options?: ContentQueryOptions) {
+  const audience = options?.audience ?? "staff"
   return useQuery({
-    queryKey: CONTENT_QUERY_KEYS.all,
-    queryFn: fetchContentAssets,
+    queryKey:
+      audience === "subscriber"
+        ? CONTENT_QUERY_KEYS.subscriberLibrary
+        : CONTENT_QUERY_KEYS.all,
+    queryFn:
+      audience === "subscriber"
+        ? fetchSubscriberContentLibrary
+        : fetchContentAssets,
     staleTime: QUERY_STALE_TIMES.catalog,
     enabled: options?.enabled ?? true,
   })
@@ -34,10 +44,8 @@ export function useSaveContentAssetMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: SaveContentAssetInput) => saveContentAsset(input),
-    onSuccess: (saved) => {
-      queryClient.setQueryData(CONTENT_QUERY_KEYS.all, getContentSnapshot())
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: CONTENT_QUERY_KEYS.all })
-      return saved
     },
   })
 }
@@ -47,10 +55,8 @@ export function useUpdateContentAssociationsMutation() {
   return useMutation({
     mutationFn: (input: UpdateContentAssociationsInput) =>
       updateContentAssociations(input),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(CONTENT_QUERY_KEYS.all, getContentSnapshot())
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: CONTENT_QUERY_KEYS.all })
-      return updated
     },
   })
 }
@@ -60,9 +66,7 @@ export function useDeleteContentAssetMutation() {
   return useMutation({
     mutationFn: (assetId: string) => deleteContentAsset(assetId),
     onSuccess: () => {
-      queryClient.setQueryData(CONTENT_QUERY_KEYS.all, getContentSnapshot())
       void queryClient.invalidateQueries({ queryKey: CONTENT_QUERY_KEYS.all })
     },
   })
 }
-

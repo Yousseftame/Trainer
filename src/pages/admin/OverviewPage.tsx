@@ -28,17 +28,11 @@ import {
 import adminBanner from "@/assets/admin.webp"
 import { APP_ROUTES } from "@/config/constants"
 import { useAuth } from "@/features/auth/auth-context"
-import { buildOverviewSnapshot, type PriorityKind } from "@/features/overview"
 import {
-  useRegistrationRequestsQuery,
-  useSubscribersQuery,
-} from "@/features/subscribers/hooks"
-import {
-  usePackagesQuery,
-  useSubscriptionsQuery,
-} from "@/features/subscriptions/hooks"
-import { useNutritionProgramsQuery } from "@/features/nutrition/hooks"
-import { useWorkoutProgramsQuery } from "@/features/workouts/hooks"
+  useOverviewDeskQuery,
+  type LiveOverviewSnapshot,
+  type PriorityKind,
+} from "@/features/overview"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatChartDate, formatDate, initials } from "@/lib/format"
@@ -86,48 +80,40 @@ function signed(value: number) {
   return "0"
 }
 
+const EMPTY_OVERVIEW: LiveOverviewSnapshot = {
+  today: new Date().toISOString(),
+  subscribers: { total: 0, active: 0 },
+  subscriptions: {
+    active: 0,
+    expired: 0,
+    pending: 0,
+    suspended: 0,
+    expiring: 0,
+  },
+  adherence: {
+    workout: null,
+    nutrition: null,
+    overall: null,
+    previous: null,
+    trend: [],
+  },
+  checkIns: { now: 0, previous: 0, trend: [] },
+  progress: { onTrack: 0, attention: 0, quiet: 0 },
+  packages: [],
+  programs: { workouts: 0, nutrition: 0 },
+  queue: 0,
+  requests: 0,
+  priority: [],
+}
+
 export function OverviewPage() {
   const { t } = useTranslation()
   const { locale } = useLocale()
   const { user, hasPermission } = useAuth()
   useDocumentTitle(t("nav.overview"))
 
-  const { data: packages = [] } = usePackagesQuery()
-  const { data: subscriptions = [] } = useSubscriptionsQuery()
-  const { data: subscribers = [] } = useSubscribersQuery()
-  const { data: registrationRequests = [] } = useRegistrationRequestsQuery()
-  const { data: workoutPrograms = [] } = useWorkoutProgramsQuery({
-    enabled:
-      hasPermission("workouts:manage") ||
-      hasPermission("subscribers:read") ||
-      hasPermission("reports:read"),
-  })
-  const { data: nutritionPrograms = [] } = useNutritionProgramsQuery({
-    enabled:
-      hasPermission("nutrition:manage") ||
-      hasPermission("subscribers:read") ||
-      hasPermission("reports:read"),
-  })
-
-  const data = useMemo(
-    () =>
-      buildOverviewSnapshot({
-        packages,
-        subscriptions,
-        subscribers,
-        registrationRequests,
-        workoutPrograms,
-        nutritionPrograms,
-      }),
-    [
-      packages,
-      subscriptions,
-      subscribers,
-      registrationRequests,
-      workoutPrograms,
-      nutritionPrograms,
-    ],
-  )
+  const { data, isLoading, isError, refetch } = useOverviewDeskQuery()
+  const snapshot = data ?? EMPTY_OVERVIEW
   const rtl = locale === "ar"
   const Chevron = rtl ? ChevronLeft : ChevronRight
   const name = user?.displayName ?? ""
@@ -137,29 +123,32 @@ export function OverviewPage() {
       (["active", "expired", "pending", "suspended"] as const)
         .map((key) => ({
           key,
-          value: data.subscriptions[key],
+          value: snapshot.subscriptions[key],
           label: t(`admin.overview.mix.${key}`),
         }))
         .filter((item) => item.value > 0),
-    [data.subscriptions, t],
+    [snapshot.subscriptions, t],
   )
 
   const trend = useMemo(
     () =>
-      data.adherence.trend.map((item) => ({
+      snapshot.adherence.trend.map((item) => ({
         date: formatChartDate(item.week, locale),
         workout: item.workout,
         nutrition: item.nutrition,
       })),
-    [data.adherence.trend, locale],
+    [snapshot.adherence.trend, locale],
   )
 
-  const progressTotal = data.progress.onTrack + data.progress.attention + data.progress.quiet || 1
+  const progressTotal =
+    snapshot.progress.onTrack +
+      snapshot.progress.attention +
+      snapshot.progress.quiet || 1
   const adherenceDelta =
-    data.adherence.overall != null && data.adherence.previous != null
-      ? data.adherence.overall - data.adherence.previous
+    snapshot.adherence.overall != null && snapshot.adherence.previous != null
+      ? snapshot.adherence.overall - snapshot.adherence.previous
       : null
-  const checkInDelta = data.checkIns.now - data.checkIns.previous
+  const checkInDelta = snapshot.checkIns.now - snapshot.checkIns.previous
 
   const actions = (
     [
@@ -168,7 +157,9 @@ export function OverviewPage() {
         permission: "subscribers:approve" as Permission,
         icon: <Inbox className="size-4" strokeWidth={1.8} />,
         title: t("admin.overview.actions.requests"),
-        hint: t("admin.overview.actions.requestsHint", { count: data.requests }),
+        hint: t("admin.overview.actions.requestsHint", {
+          count: snapshot.requests,
+        }),
       },
       {
         to: APP_ROUTES.admin.progress,
@@ -193,6 +184,23 @@ export function OverviewPage() {
       },
     ] as const
   ).filter((item) => hasPermission(item.permission))
+
+  if (isError) {
+    return (
+      <div className="rounded-[24px] bg-white p-8 text-center">
+        <p className="text-[14px] font-medium text-[#C44536]">
+          {t("admin.overview.empty.loadError")}
+        </p>
+        <button
+          type="button"
+          onClick={() => void refetch()}
+          className="mt-4 inline-flex h-10 items-center rounded-full bg-[var(--gym-ink,#111111)] px-4 text-[13px] font-bold text-white"
+        >
+          {t("admin.common.retry")}
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
@@ -230,7 +238,7 @@ export function OverviewPage() {
         <div className="relative z-10 flex flex-col justify-end gap-3 p-4 sm:min-h-[228px] sm:flex-row sm:items-end sm:justify-between sm:gap-5 sm:p-7 lg:min-h-[248px] lg:p-8">
           <div className="min-w-0 max-w-2xl">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--gym-orange,#fb5001)] sm:text-[11px]">
-              {formatDate(data.today, locale)}
+              {formatDate(snapshot.today, locale)}
             </p>
             <h2 className="mt-1 font-heading text-[22px] font-extrabold leading-[1.12] tracking-tight text-white sm:mt-2 sm:text-[34px] lg:text-[40px]">
               {t("admin.overview.hello", { name })}
@@ -239,12 +247,12 @@ export function OverviewPage() {
               {t("admin.overview.hint")}
             </p>
           </div>
-          {data.queue > 0 && hasPermission("subscribers:approve") ? (
+          {snapshot.queue > 0 && hasPermission("subscribers:approve") ? (
             <Link
               to={APP_ROUTES.admin.registrationRequests}
               className="inline-flex h-10 w-fit shrink-0 items-center justify-center gap-1.5 self-start rounded-full bg-[var(--gym-lime,#fb5001)] px-4 text-[12.5px] font-bold text-white rtl:self-end sm:h-11 sm:gap-2 sm:self-auto sm:px-5 sm:text-[13px] sm:rtl:self-auto shadow-sm transition-opacity hover:opacity-90 active:scale-[0.98]"
             >
-              {t("admin.overview.queueCta", { count: data.queue })}
+              {t("admin.overview.queueCta", { count: snapshot.queue })}
               <Chevron className="size-3.5 sm:size-4" strokeWidth={2} />
             </Link>
           ) : null}
@@ -255,21 +263,25 @@ export function OverviewPage() {
         <Kpi
           delay={0.04}
           label={t("admin.overview.stats.subscribers")}
-          value={data.subscribers.total}
-          hint={t("admin.overview.stats.subscribersHint", { count: data.subscribers.active })}
+          value={isLoading ? null : snapshot.subscribers.total}
+          hint={t("admin.overview.stats.subscribersHint", {
+            count: snapshot.subscribers.active,
+          })}
           icon={<Users className="size-4" strokeWidth={1.8} />}
         />
         <Kpi
           delay={0.08}
           label={t("admin.overview.stats.activeSubs")}
-          value={data.subscriptions.active}
-          hint={t("admin.overview.stats.activeSubsHint", { count: data.subscriptions.expiring })}
+          value={isLoading ? null : snapshot.subscriptions.active}
+          hint={t("admin.overview.stats.activeSubsHint", {
+            count: snapshot.subscriptions.expiring,
+          })}
           icon={<CreditCard className="size-4" strokeWidth={1.8} />}
         />
         <Kpi
           delay={0.12}
           label={t("admin.overview.stats.adherence")}
-          value={data.adherence.overall ?? 0}
+          value={isLoading ? null : snapshot.adherence.overall}
           suffix="%"
           delta={adherenceDelta}
           hint={t("admin.overview.stats.vsLastWeek")}
@@ -278,8 +290,10 @@ export function OverviewPage() {
         <Kpi
           delay={0.16}
           label={t("admin.overview.stats.queue")}
-          value={data.queue}
-          hint={t("admin.overview.stats.queueHint", { count: data.requests })}
+          value={isLoading ? null : snapshot.queue}
+          hint={t("admin.overview.stats.queueHint", {
+            count: snapshot.requests,
+          })}
           icon={<Inbox className="size-4" strokeWidth={1.8} />}
         />
       </div>
@@ -297,12 +311,12 @@ export function OverviewPage() {
             </div>
             <div className="flex gap-5">
               <AdherenceRing
-                value={data.adherence.workout}
+                value={snapshot.adherence.workout}
                 label={t("admin.overview.charts.workout")}
                 color="#111111"
               />
               <AdherenceRing
-                value={data.adherence.nutrition}
+                value={snapshot.adherence.nutrition}
                 label={t("admin.overview.charts.nutrition")}
                 color="#7A9A16"
               />
@@ -395,7 +409,7 @@ export function OverviewPage() {
             </ResponsiveContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
               <p className="font-heading text-[28px] font-extrabold leading-none text-[var(--gym-ink,#111111)]">
-                <Count value={data.subscriptions.active} />
+                <Count value={snapshot.subscriptions.active} />
               </p>
               <p className="mt-1 text-[11px] font-bold text-[#8c8c8c]">{t("admin.overview.charts.live")}</p>
             </div>
@@ -418,7 +432,7 @@ export function OverviewPage() {
             {t("admin.overview.charts.packages")}
           </p>
           <ul className="mt-5 flex flex-col gap-4">
-            {data.packages.map((row, index) => (
+            {snapshot.packages.map((row, index) => (
               <li key={row.pkg.id}>
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="text-[14px] font-bold text-[var(--gym-ink,#111111)]">
@@ -440,8 +454,8 @@ export function OverviewPage() {
             ))}
           </ul>
           <p className="mt-5 text-[12px] font-medium text-[#8c8c8c]">
-            {t("admin.overview.programs.workouts", { count: data.programs.workouts })} ·{" "}
-            {t("admin.overview.programs.nutrition", { count: data.programs.nutrition })}
+            {t("admin.overview.programs.workouts", { count: snapshot.programs.workouts })} ·{" "}
+            {t("admin.overview.programs.nutrition", { count: snapshot.programs.nutrition })}
           </p>
         </motion.section>
 
@@ -451,7 +465,7 @@ export function OverviewPage() {
               {t("admin.overview.charts.progress")}
             </p>
             <p className="text-[12px] font-semibold text-[#8c8c8c]">
-              {t("admin.overview.progress.checkIns", { count: data.checkIns.now })}
+              {t("admin.overview.progress.checkIns", { count: snapshot.checkIns.now })}
               {checkInDelta !== 0 ? (
                 <span className={cn("ms-1", checkInDelta > 0 ? "text-[#2F7D32]" : "text-[#C44536]")}>
                   {signed(checkInDelta)}
@@ -460,31 +474,31 @@ export function OverviewPage() {
             </p>
           </div>
           <div className="mt-5 grid grid-cols-3 gap-2">
-            <ProgressStat label={t("admin.overview.progress.onTrack")} value={data.progress.onTrack} tone="live" />
+            <ProgressStat label={t("admin.overview.progress.onTrack")} value={snapshot.progress.onTrack} tone="live" />
             <ProgressStat
               label={t("admin.overview.progress.attention")}
-              value={data.progress.attention}
+              value={snapshot.progress.attention}
               tone="warn"
             />
-            <ProgressStat label={t("admin.overview.progress.quiet")} value={data.progress.quiet} tone="muted" />
+            <ProgressStat label={t("admin.overview.progress.quiet")} value={snapshot.progress.quiet} tone="muted" />
           </div>
           <div className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-[#F4F4F4]">
             <motion.div
               className="h-full bg-[var(--gym-lime,#fb5001)]"
               initial={{ width: 0 }}
-              animate={{ width: `${(data.progress.onTrack / progressTotal) * 100}%` }}
+              animate={{ width: `${(snapshot.progress.onTrack / progressTotal) * 100}%` }}
               transition={{ duration: 0.7, delay: 0.4, ease: EASE }}
             />
             <motion.div
               className="h-full bg-[#C9A227]"
               initial={{ width: 0 }}
-              animate={{ width: `${(data.progress.attention / progressTotal) * 100}%` }}
+              animate={{ width: `${(snapshot.progress.attention / progressTotal) * 100}%` }}
               transition={{ duration: 0.7, delay: 0.48, ease: EASE }}
             />
             <motion.div
               className="h-full bg-[#D4D4D4]"
               initial={{ width: 0 }}
-              animate={{ width: `${(data.progress.quiet / progressTotal) * 100}%` }}
+              animate={{ width: `${(snapshot.progress.quiet / progressTotal) * 100}%` }}
               transition={{ duration: 0.7, delay: 0.56, ease: EASE }}
             />
           </div>
@@ -497,10 +511,10 @@ export function OverviewPage() {
             <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#8c8c8c]">
               {t("admin.overview.attention.title")}
             </p>
-            <span className="text-[12px] font-bold text-[#8c8c8c]">{data.priority.length}</span>
+            <span className="text-[12px] font-bold text-[#8c8c8c]">{snapshot.priority.length}</span>
           </div>
           <ul className="mt-2 flex flex-col">
-            {data.priority.map((item) => (
+            {snapshot.priority.map((item) => (
               <li key={item.id} className="border-b border-black/[0.05] last:border-b-0">
                 <Link
                   to={item.href}
@@ -539,7 +553,7 @@ export function OverviewPage() {
                 </Link>
               </li>
             ))}
-            {!data.priority.length ? (
+            {!snapshot.priority.length ? (
               <li className="py-10 text-center text-[13px] font-medium text-[#8c8c8c]">
                 {t("admin.overview.attention.empty")}
               </li>
@@ -572,22 +586,31 @@ export function OverviewPage() {
                 </span>
               </Link>
             ))}
-            {hasPermission("workouts:manage") ? (
+            {hasPermission("workouts:manage") ||
+            hasPermission("nutrition:manage") ? (
               <div className="mt-1 grid grid-cols-2 gap-2">
-                <Link
-                  to={APP_ROUTES.admin.workouts}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#F4F4F4] text-[12px] font-bold text-[var(--gym-ink,#111111)]"
-                >
-                  <Dumbbell className="size-3.5" strokeWidth={1.8} />
-                  {t("admin.overview.actions.workouts")}
-                </Link>
-                <Link
-                  to={APP_ROUTES.admin.nutrition}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#F4F4F4] text-[12px] font-bold text-[var(--gym-ink,#111111)]"
-                >
-                  <Apple className="size-3.5" strokeWidth={1.8} />
-                  {t("admin.overview.actions.nutrition")}
-                </Link>
+                {hasPermission("workouts:manage") ? (
+                  <Link
+                    to={APP_ROUTES.admin.workouts}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#F4F4F4] text-[12px] font-bold text-[var(--gym-ink,#111111)]"
+                  >
+                    <Dumbbell className="size-3.5" strokeWidth={1.8} />
+                    {t("admin.overview.actions.workouts")}
+                  </Link>
+                ) : (
+                  <span />
+                )}
+                {hasPermission("nutrition:manage") ? (
+                  <Link
+                    to={APP_ROUTES.admin.nutrition}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#F4F4F4] text-[12px] font-bold text-[var(--gym-ink,#111111)]"
+                  >
+                    <Apple className="size-3.5" strokeWidth={1.8} />
+                    {t("admin.overview.actions.nutrition")}
+                  </Link>
+                ) : (
+                  <span />
+                )}
               </div>
             ) : null}
           </div>
@@ -624,7 +647,7 @@ function Kpi({
   delay,
 }: {
   label: string
-  value: number
+  value: number | null
   hint: string
   icon: ReactNode
   suffix?: string
@@ -643,18 +666,26 @@ function Kpi({
         </span>
       </div>
       <p className="mt-2 flex items-end gap-2 font-heading text-[24px] font-extrabold leading-none tracking-tight text-[var(--gym-ink,#111111)] sm:mt-3 sm:text-[28px] lg:text-[32px]">
-        <Count value={value} />
-        {suffix ? <span className="text-[18px] sm:text-[20px]">{suffix}</span> : null}
-        {delta != null && delta !== 0 ? (
-          <span
-            className={cn(
-              "mb-0.5 text-[12px] font-bold sm:text-[13px]",
-              delta > 0 ? "text-[#2F7D32]" : "text-[#C44536]",
-            )}
-          >
-            {signed(delta)}
-          </span>
-        ) : null}
+        {value == null ? (
+          <span>…</span>
+        ) : (
+          <>
+            <Count value={value} />
+            {suffix ? (
+              <span className="text-[18px] sm:text-[20px]">{suffix}</span>
+            ) : null}
+            {delta != null && delta !== 0 ? (
+              <span
+                className={cn(
+                  "mb-0.5 text-[12px] font-bold sm:text-[13px]",
+                  delta > 0 ? "text-[#2F7D32]" : "text-[#C44536]",
+                )}
+              >
+                {signed(delta)}
+              </span>
+            ) : null}
+          </>
+        )}
       </p>
       <p className="mt-2 text-[12px] font-medium text-[#8c8c8c]">{hint}</p>
     </motion.div>

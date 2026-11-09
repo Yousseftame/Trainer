@@ -1,0 +1,112 @@
+rules_version = '2';
+
+/**
+ * Cost-aware media storage:
+ * - PDFs / docs under content/pdfs|docs → Firebase Storage (private, size-capped)
+ * - Videos under content/videos → optional small uploads only; prefer external CDN
+ * - Content binaries are staff-read only from the client SDK.
+ *   Subscribers receive short-lived signed URLs from Cloud Functions after entitlement checks.
+ * Deletes require content:manage so admin deleteContentAsset can clean objects.
+ */
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isNotSuspended() {
+      return isSignedIn() && request.auth.token.status != 'suspended';
+    }
+
+    function isActiveAccount() {
+      return isNotSuspended() &&
+        request.auth.token.status != 'rejected' &&
+        request.auth.token.status != 'pending';
+    }
+
+    function isHeadCoach() {
+      return isActiveAccount() && request.auth.token.role == 'head_coach';
+    }
+
+    function isStaff() {
+      return isActiveAccount() && (
+        request.auth.token.role in [
+          'head_coach',
+          'assistant',
+          'trainer',
+          'nutritionist',
+          'physiotherapist'
+        ]
+      );
+    }
+
+    function hasPermission(perm) {
+      return isHeadCoach() || (
+        isStaff() && (perm in request.auth.token.permissions)
+      );
+    }
+
+    function underLimit(maxBytes) {
+      return request.resource.size < maxBytes;
+    }
+
+    function canReadContentObject() {
+      return hasPermission('content:manage') || hasPermission('subscribers:read');
+    }
+
+    match /content/pdfs/{allPaths=**} {
+      allow read: if canReadContentObject();
+      allow create, update: if hasPermission('content:manage')
+        && underLimit(25 * 1024 * 1024)
+        && (
+          request.resource.contentType == 'application/pdf' ||
+          request.resource.contentType.matches('application/.*word.*') ||
+          request.resource.contentType.matches('application/vnd\\..*')
+        );
+      allow delete: if hasPermission('content:manage');
+    }
+
+    match /content/docs/{allPaths=**} {
+      allow read: if canReadContentObject();
+      allow create, update: if hasPermission('content:manage')
+        && underLimit(25 * 1024 * 1024)
+        && (
+          request.resource.contentType == 'application/pdf' ||
+          request.resource.contentType.matches('application/.*word.*') ||
+          request.resource.contentType.matches('application/vnd\\..*') ||
+          request.resource.contentType.matches('text/.*') ||
+          request.resource.contentType.matches('image/.*')
+        );
+      allow delete: if hasPermission('content:manage');
+    }
+
+    match /content/videos/{allPaths=**} {
+      allow read: if canReadContentObject();
+      // Prefer Bunny/Cloudflare/Mux for the video library; local Storage is a soft cap.
+      allow create, update: if hasPermission('content:manage')
+        && underLimit(80 * 1024 * 1024)
+        && request.resource.contentType.matches('video/.*');
+      allow delete: if hasPermission('content:manage');
+    }
+
+    // Progress photos — private per subscriber.
+    // progress:read = view; progress:write = staff upload/delete for any subscriber.
+    match /progress/photos/{subscriberId}/{allPaths=**} {
+      allow read: if isActiveAccount() && (
+        hasPermission('progress:read') ||
+        request.auth.uid == subscriberId
+      );
+      allow create, update: if isActiveAccount()
+        && underLimit(8 * 1024 * 1024)
+        && request.resource.contentType.matches('image/.*')
+        && (
+          hasPermission('progress:write') ||
+          request.auth.uid == subscriberId
+        );
+      allow delete: if isActiveAccount() && (
+        hasPermission('progress:write') ||
+        request.auth.uid == subscriberId
+      );
+    }
+  }
+}

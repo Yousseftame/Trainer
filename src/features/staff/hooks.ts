@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   deleteStaffMember,
   fetchStaffMembers,
+  purgeDemoStaffMembers,
   saveStaffMember,
   toggleStaffStatus,
   type SaveStaffInput,
@@ -41,6 +42,16 @@ export function useDeleteStaffMemberMutation() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => deleteStaffMember(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: STAFF_QUERY_KEY })
+    },
+  })
+}
+
+export function usePurgeDemoStaffMutation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => purgeDemoStaffMembers(),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: STAFF_QUERY_KEY })
     },

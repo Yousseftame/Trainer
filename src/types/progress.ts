@@ -9,6 +9,9 @@ export type BodyMeasurement = {
   armsCm?: number
   thighsCm?: number
   notes?: string
+  createdAt?: string
+  updatedAt?: string
+  createdBy?: string
 }
 
 export type ProgressPhotoPose = "front" | "side" | "back"
@@ -16,11 +19,19 @@ export type ProgressPhotoPose = "front" | "side" | "back"
 export type ProgressPhoto = {
   id: string
   subscriberId: string
+  /** Firebase Storage object path — never store base64 here */
   storagePath: string
+  /** Cached download URL (optional; prefer resolveProgressPhotoUrl) */
+  downloadUrl?: string
   takenAt: string
   pose?: ProgressPhotoPose
   caption?: string
+  mimeType?: string
+  sizeBytes?: number
+  sizeLabel?: string
+  uploadedBy?: string
   createdAt: string
+  updatedAt?: string
 }
 
 export type PerformanceRecord = {
@@ -31,27 +42,9 @@ export type PerformanceRecord = {
   value: number
   unit: "kg" | "reps"
   notes?: string
-}
-
-export type WorkoutLogEntry = {
-  id: string
-  subscriberId: string
-  assignmentId: string
-  dayId: string
+  programId?: string
   exerciseId?: string
-  completedAt: string
-  performanceNotes?: string
-  setsCompleted?: number
-  repsCompleted?: string
-}
-
-export type NutritionLogEntry = {
-  id: string
-  subscriberId: string
-  assignmentId: string
-  dayId: string
-  mealId?: string
-  adhered: boolean
-  loggedAt: string
-  notes?: string
+  createdAt?: string
+  updatedAt?: string
+  createdBy?: string
 }

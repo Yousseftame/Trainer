@@ -2,6 +2,8 @@ import type { AppUser } from "@/types/user"
 import type { Permission } from "@/lib/permissions/permissions"
 import { ROLE_PERMISSIONS } from "@/lib/permissions/permissions"
 import type { Role } from "@/lib/permissions/roles"
+import { adminNav, flattenNavItems } from "@/config/navigation"
+import { APP_ROUTES } from "@/config/constants"
 
 type PermissionSubject = Pick<AppUser, "role" | "permissions"> | null | undefined
 
@@ -12,7 +14,9 @@ type PermissibleItem<T> = T & {
 
 function resolvePermissions(subject: PermissionSubject): readonly Permission[] {
   if (!subject) return []
-  if (subject.permissions?.length) return subject.permissions
+  // Explicit array (including empty) wins — never invent role defaults for
+  // staff who were intentionally granted zero module permissions.
+  if (Array.isArray(subject.permissions)) return subject.permissions
   return ROLE_PERMISSIONS[subject.role as Role] ?? []
 }
 
@@ -47,4 +51,25 @@ export function filterByPermission<T extends { permission?: Permission; children
       }
       return !item.permission || can(subject, item.permission)
     }) as PermissibleItem<T>[]
+}
+
+/**
+ * First admin module the user may open (sidebar order).
+ * Returns null when the account has no module permissions at all.
+ */
+export function resolveAdminHomePath(
+  subject: PermissionSubject,
+): string | null {
+  const leaves = flattenNavItems(adminNav)
+  for (const item of leaves) {
+    if (!item.permission || can(subject, item.permission)) {
+      return item.to
+    }
+  }
+  return null
+}
+
+/** Safe landing for staff after login / denied module — never /unauthorized. */
+export function resolveAdminLandingPath(subject: PermissionSubject): string {
+  return resolveAdminHomePath(subject) ?? APP_ROUTES.admin.root
 }

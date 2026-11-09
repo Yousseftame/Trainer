@@ -41,33 +41,9 @@ export type UserIdentityInput = {
   phone?: string
 }
 
-function readStaffCacheByEmail(email: string) {
-  if (typeof window === "undefined" || !window.localStorage) return null
-  try {
-    const cached = window.localStorage.getItem("derpyfit_staff_cache")
-    if (!cached) return null
-    const parsed = JSON.parse(cached) as Array<{
-      id: string
-      email: string
-      displayName?: string
-      role?: Role
-      status?: UserStatus
-      permissions?: Permission[]
-      avatarUrl?: string
-      phone?: string
-    }>
-    return (
-      parsed.find((s) => (s.email || "").trim().toLowerCase() === email) ?? null
-    )
-  } catch {
-    return null
-  }
-}
-
 /**
  * Maps identity → AppUser.
- * Prefer Auth custom claims (role / status / permissions). Staff cache is only a
- * temporary bridge until bootstrapStaffClaims runs; demo subscriber lists are not used.
+ * Auth custom claims (bootstrapStaffClaims / Admin SDK) are the only privilege source.
  */
 export function mapUserIdentity(identity: UserIdentityInput): AppUser {
   const now = new Date().toISOString()
@@ -89,49 +65,6 @@ export function mapUserIdentity(identity: UserIdentityInput): AppUser {
           ? [...PERMISSIONS]
           : [...(identity.permissions ?? [])],
       status: identity.status ?? "active",
-      locale: localeFromDocument(),
-      createdAt,
-      updatedAt,
-    }
-  }
-
-  const staffMember = readStaffCacheByEmail(email)
-  if (staffMember) {
-    return {
-      uid: identity.uid,
-      email: identity.email,
-      displayName:
-        staffMember.displayName ||
-        identity.displayName?.trim() ||
-        "Staff",
-      photoURL: identity.photoURL ?? staffMember.avatarUrl ?? undefined,
-      phone: staffMember.phone,
-      role: staffMember.role ?? "assistant",
-      permissions:
-        staffMember.role === "head_coach"
-          ? [...PERMISSIONS]
-          : ([...(staffMember.permissions ?? [])] as Permission[]),
-      status: staffMember.status ?? "active",
-      locale: localeFromDocument(),
-      createdAt,
-      updatedAt,
-    }
-  }
-
-  const allowlistCoach =
-    email === "coach@derpyfit.com" ||
-    email === "admin@derpyfit.com" ||
-    email === "omar@derpyfit.com"
-
-  if (allowlistCoach) {
-    return {
-      uid: identity.uid,
-      email: identity.email,
-      displayName: identity.displayName?.trim() || "Coach Omar",
-      photoURL: identity.photoURL ?? undefined,
-      role: "head_coach",
-      permissions: [...PERMISSIONS],
-      status: "active",
       locale: localeFromDocument(),
       createdAt,
       updatedAt,

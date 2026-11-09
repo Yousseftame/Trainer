@@ -1,4 +1,4 @@
-﻿import { useState } from "react"
+﻿import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import {
   Check,
@@ -10,7 +10,14 @@ import {
   Square,
   X,
 } from "lucide-react"
-import { PERMISSIONS, ROLE_PERMISSIONS, type Permission } from "@/lib/permissions/permissions"
+import { useAuth } from "@/features/auth/auth-context"
+import {
+  PERMISSIONS,
+  ROLE_PERMISSIONS,
+  withRequiredPermissions,
+  withoutPermissionDependents,
+  type Permission,
+} from "@/lib/permissions/permissions"
 import { PERMISSION_MODULES, type StaffMember, type StaffRole, type StaffStatus } from "@/types/staff"
 import { useLocale } from "@/hooks/useLocale"
 import { appToast } from "@/lib/toast"
@@ -80,31 +87,77 @@ export function StaffMemberFormDialog({
 }: StaffMemberFormDialogProps) {
   const { locale } = useLocale()
   const isAr = locale === "ar"
+  const { user, hasPermission } = useAuth()
+  const callerIsHeadCoach = user?.role === "head_coach"
+  const editingSelf = Boolean(
+    initialMember && user?.uid && initialMember.id === user.uid,
+  )
+  /** Role / permissions / status locked for your own account — server enforces too. */
+  const privilegesLocked = editingSelf || initialMember?.role === "head_coach"
 
-  const [displayName, setDisplayName] = useState(initialMember?.displayName || "")
-  const [email, setEmail] = useState(initialMember?.email || "")
+  const [displayName, setDisplayName] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [phone, setPhone] = useState(initialMember?.phone || "")
-  const [role, setRole] = useState<StaffRole>(initialMember?.role || "assistant")
-  const [status, setStatus] = useState<StaffStatus>(initialMember?.status || "active")
-  const [titleEn, setTitleEn] = useState(initialMember?.customTitle?.en || "")
-  const [titleAr, setTitleAr] = useState(initialMember?.customTitle?.ar || "")
-  const [notes, setNotes] = useState(initialMember?.notes || "")
-
-  const [selectedPermissions, setSelectedPermissions] = useState<Permission[]>(
-    initialMember
-      ? [...initialMember.permissions]
-      : [...ROLE_PERMISSIONS.assistant],
-  )
-
+  const [phone, setPhone] = useState("")
+  const [role, setRole] = useState<StaffRole>("assistant")
+  const [status, setStatus] = useState<StaffStatus>("active")
+  const [titleEn, setTitleEn] = useState("")
+  const [titleAr, setTitleAr] = useState("")
+  const [notes, setNotes] = useState("")
+  const [selectedPermissions, setSelectedPermissions] = useState<Permission[]>([
+    ...ROLE_PERMISSIONS.assistant,
+  ])
   const [saving, setSaving] = useState(false)
+
+  // Re-hydrate when the dialog opens (or switches member) so edit shows live values.
+  useEffect(() => {
+    if (!open) return
+    setDisplayName(initialMember?.displayName?.trim() || "")
+    setEmail(initialMember?.email?.trim().toLowerCase() || "")
+    setPassword("")
+    setShowPassword(false)
+    setPhone(initialMember?.phone?.trim() || "")
+    setRole(initialMember?.role || "assistant")
+    setStatus(
+      initialMember?.role === "head_coach"
+        ? "active"
+        : initialMember?.status || "active",
+    )
+    setTitleEn(initialMember?.customTitle?.en?.trim() || "")
+    setTitleAr(initialMember?.customTitle?.ar?.trim() || "")
+    setNotes(initialMember?.notes?.trim() || "")
+    setSelectedPermissions(
+      initialMember
+        ? withRequiredPermissions([...(initialMember.permissions ?? [])])
+        : [...ROLE_PERMISSIONS.assistant],
+    )
+    setSaving(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- hydrate on open / member id only
+  }, [open, initialMember?.id])
 
   if (!open) return null
 
   const isHeadCoach = role === "head_coach"
+  const availableRoles = ROLES_LIST.filter((item) => {
+    if (item.key !== "head_coach") return true
+    // Head coach role is fixed for the existing founder account; new ones are not created here.
+    return Boolean(initialMember && initialMember.role === "head_coach")
+  })
+  const permissionModules = PERMISSION_MODULES.map((module) => ({
+    ...module,
+    permissions: module.permissions.filter((perm) => {
+      if (perm.key === "staff:manage" && !callerIsHeadCoach && !isHeadCoach) {
+        return false
+      }
+      // Non–head-coach managers may only assign permissions they already hold.
+      if (!callerIsHeadCoach && !hasPermission(perm.key)) return false
+      return true
+    }),
+  }))
 
   function handleRoleChange(newRole: StaffRole) {
+    if (privilegesLocked) return
     setRole(newRole)
     if (newRole === "head_coach") {
       setSelectedPermissions([...PERMISSIONS])
@@ -115,32 +168,47 @@ export function StaffMemberFormDialog({
   }
 
   function togglePermission(perm: Permission) {
-    if (isHeadCoach) return
-    setSelectedPermissions((prev) =>
-      prev.includes(perm) ? prev.filter((p) => p !== perm) : [...prev, perm],
-    )
+    if (isHeadCoach || privilegesLocked) return
+    if (perm === "staff:manage" && !callerIsHeadCoach) return
+    if (!callerIsHeadCoach && !hasPermission(perm)) return
+    setSelectedPermissions((prev) => {
+      if (prev.includes(perm)) {
+        // Clearing a view permission also clears write/manage dependents.
+        return withoutPermissionDependents(prev, perm)
+      }
+      // Enabling write/edit/approve auto-enables required view permissions.
+      return withRequiredPermissions([...prev, perm])
+    })
   }
 
   function toggleModulePermissions(modulePerms: Permission[]) {
-    if (isHeadCoach) return
+    if (isHeadCoach || privilegesLocked) return
     const allSelected = modulePerms.every((p) => selectedPermissions.includes(p))
     if (allSelected) {
-      setSelectedPermissions((prev) =>
-        prev.filter((p) => !modulePerms.includes(p)),
-      )
+      setSelectedPermissions((prev) => {
+        let next = [...prev]
+        for (const perm of modulePerms) {
+          next = withoutPermissionDependents(next, perm)
+        }
+        return next
+      })
     } else {
-      const merged = new Set([...selectedPermissions, ...modulePerms])
-      setSelectedPermissions(Array.from(merged))
+      setSelectedPermissions((prev) =>
+        withRequiredPermissions([...prev, ...modulePerms]),
+      )
     }
   }
 
   function selectAll() {
-    if (isHeadCoach) return
-    setSelectedPermissions([...PERMISSIONS])
+    if (isHeadCoach || privilegesLocked) return
+    const allowed = callerIsHeadCoach
+      ? [...PERMISSIONS]
+      : PERMISSIONS.filter((perm) => hasPermission(perm))
+    setSelectedPermissions(withRequiredPermissions(allowed))
   }
 
   function clearAll() {
-    if (isHeadCoach) return
+    if (isHeadCoach || privilegesLocked) return
     setSelectedPermissions([])
   }
 
@@ -162,15 +230,30 @@ export function StaffMemberFormDialog({
 
     setSaving(true)
     try {
+      // Never trust client-side privilege edits on your own account.
+      const safeRole = editingSelf
+        ? (initialMember?.role ?? role)
+        : role
+      const safeStatus = editingSelf
+        ? (initialMember?.status ?? status)
+        : safeRole === "head_coach"
+          ? "active"
+          : status
+      const safePermissions = editingSelf
+        ? [...(initialMember?.permissions ?? selectedPermissions)]
+        : safeRole === "head_coach"
+          ? [...PERMISSIONS]
+          : withRequiredPermissions(selectedPermissions)
+
       await onSave({
         id: initialMember?.id,
         displayName: displayName.trim(),
         email: email.trim(),
         password: password.trim() || undefined,
         phone: phone.trim() || undefined,
-        role,
-        status: isHeadCoach ? "active" : status,
-        permissions: isHeadCoach ? [...PERMISSIONS] : selectedPermissions,
+        role: safeRole,
+        status: safeStatus,
+        permissions: safePermissions,
         customTitle:
           titleEn.trim() || titleAr.trim()
             ? {
@@ -268,9 +351,10 @@ export function StaffMemberFormDialog({
                 type="email"
                 required
                 value={email}
+                disabled={Boolean(initialMember)}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="staff@derpyfit.com"
-                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none focus:border-[var(--gym-ink,#111111)]"
+                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none focus:border-[var(--gym-ink,#111111)] disabled:cursor-not-allowed disabled:opacity-70"
               />
             </div>
 
@@ -326,10 +410,10 @@ export function StaffMemberFormDialog({
               <select
                 value={role}
                 onChange={(e) => handleRoleChange(e.target.value as StaffRole)}
-                disabled={initialMember?.role === "head_coach"}
-                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-bold text-[var(--gym-ink,#111111)] outline-none focus:border-[var(--gym-ink,#111111)]"
+                disabled={privilegesLocked}
+                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-bold text-[var(--gym-ink,#111111)] outline-none focus:border-[var(--gym-ink,#111111)] disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {ROLES_LIST.map((r) => (
+                {availableRoles.map((r) => (
                   <option key={r.key} value={r.key}>
                     {isAr ? `${r.ar} (${r.en})` : `${r.en} (${r.ar})`}
                   </option>
@@ -349,13 +433,19 @@ export function StaffMemberFormDialog({
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as StaffStatus)}
-                disabled={isHeadCoach}
-                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-bold text-[var(--gym-ink,#111111)] outline-none focus:border-[var(--gym-ink,#111111)]"
+                disabled={privilegesLocked || isHeadCoach}
+                className="h-11 w-full rounded-xl border border-black/10 bg-[#F8F8F8] px-3.5 text-[14px] font-bold text-[var(--gym-ink,#111111)] outline-none focus:border-[var(--gym-ink,#111111)] disabled:cursor-not-allowed disabled:opacity-70"
               >
                 <option value="active">{isAr ? "نشط ومفعل (Active)" : "Active (Full access permitted)"}</option>
                 <option value="suspended">{isAr ? "محظور / معلق (Suspended)" : "Suspended (Access blocked)"}</option>
               </select>
-              {isHeadCoach ? (
+              {editingSelf ? (
+                <p className="mt-1 text-[11px] font-bold text-amber-700">
+                  {isAr
+                    ? "لا يمكنك تعديل دورك أو صلاحياتك أو حالة حسابك — يُطلب ذلك من كبير المدربين."
+                    : "You cannot change your own role, permissions, or status — another head coach must do that."}
+                </p>
+              ) : isHeadCoach ? (
                 <p className="mt-1 text-[11px] font-bold text-amber-700">
                   {isAr ? "حساب كبير المدربين محمي ولا يمكن حظره أو تعليقه." : "Head Coach account is permanently active and cannot be suspended."}
                 </p>
@@ -418,7 +508,7 @@ export function StaffMemberFormDialog({
                 </p>
               </div>
 
-              {!isHeadCoach ? (
+              {!isHeadCoach && !privilegesLocked ? (
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -442,7 +532,7 @@ export function StaffMemberFormDialog({
 
             {/* List of Modules */}
             <div className="space-y-3">
-              {PERMISSION_MODULES.map((mod) => {
+              {permissionModules.map((mod) => {
                 const modulePermKeys = mod.permissions.map((p) => p.key)
                 const allModuleChecked = modulePermKeys.every((k) =>
                   selectedPermissions.includes(k),
@@ -471,7 +561,7 @@ export function StaffMemberFormDialog({
                         </p>
                       </div>
 
-                      {!isHeadCoach ? (
+                      {!isHeadCoach && !privilegesLocked ? (
                         <button
                           type="button"
                           onClick={() => toggleModulePermissions(modulePermKeys)}
@@ -519,7 +609,7 @@ export function StaffMemberFormDialog({
                             <input
                               type="checkbox"
                               checked={checked}
-                              disabled={isHeadCoach}
+                              disabled={isHeadCoach || privilegesLocked}
                               onChange={() => togglePermission(perm.key)}
                               className="size-4 shrink-0 mt-0.5 rounded text-[var(--gym-ink,#111111)] focus:ring-0"
                             />

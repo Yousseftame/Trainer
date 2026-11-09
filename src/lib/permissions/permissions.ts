@@ -14,6 +14,7 @@ export const PERMISSIONS = [
   "nutrition:manage",
   "content:manage",
   "progress:read",
+  "progress:write",
   "physicalTherapy:read",
   "physicalTherapy:manage",
   "reports:read",
@@ -23,6 +24,72 @@ export const PERMISSIONS = [
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]
+
+/**
+ * Write / manage / approve / export always imply the module view permission.
+ * Enabling a dependent permission must also enable its prerequisites.
+ */
+export const PERMISSION_REQUIRES: Partial<
+  Record<Permission, readonly Permission[]>
+> = {
+  "subscribers:write": ["subscribers:read"],
+  "subscribers:approve": ["subscribers:read"],
+  "progress:write": ["progress:read"],
+  "physicalTherapy:manage": ["physicalTherapy:read"],
+  "reports:export": ["reports:read"],
+  // Subscriptions UI needs the people directory to assign seats meaningfully.
+  "subscriptions:manage": ["subscribers:read"],
+}
+
+/** Expand a permission set so every write/manage also includes its required view. */
+export function withRequiredPermissions(
+  permissions: readonly Permission[],
+): Permission[] {
+  const next = new Set<Permission>(permissions)
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const perm of [...next]) {
+      const requires = PERMISSION_REQUIRES[perm]
+      if (!requires) continue
+      for (const required of requires) {
+        if (!next.has(required)) {
+          next.add(required)
+          changed = true
+        }
+      }
+    }
+  }
+  return PERMISSIONS.filter((perm) => next.has(perm))
+}
+
+/**
+ * When removing a view permission, also drop dependents that required it.
+ * Example: clearing subscribers:read also clears write + approve.
+ */
+export function withoutPermissionDependents(
+  permissions: readonly Permission[],
+  removed: Permission,
+): Permission[] {
+  const next = new Set<Permission>(permissions)
+  next.delete(removed)
+
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const [perm, requires] of Object.entries(PERMISSION_REQUIRES) as Array<
+      [Permission, readonly Permission[]]
+    >) {
+      if (!next.has(perm)) continue
+      if (requires.some((req) => !next.has(req))) {
+        next.delete(perm)
+        changed = true
+      }
+    }
+  }
+
+  return PERMISSIONS.filter((perm) => next.has(perm))
+}
 
 /** Default permission sets — server/custom claims remain source of truth. */
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
@@ -37,6 +104,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "nutrition:manage",
     "content:manage",
     "progress:read",
+    "progress:write",
     "physicalTherapy:read",
     "physicalTherapy:manage",
     "reports:read",
@@ -46,12 +114,14 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "workouts:manage",
     "content:manage",
     "progress:read",
+    "progress:write",
     "reports:read",
   ],
   nutritionist: [
     "subscribers:read",
     "nutrition:manage",
     "progress:read",
+    "progress:write",
     "reports:read",
   ],
   physiotherapist: [
@@ -60,6 +130,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "physicalTherapy:manage",
     "workouts:manage",
     "progress:read",
+    "progress:write",
   ],
   subscriber: [],
 }

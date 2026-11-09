@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   ChevronDown,
   Plus,
@@ -17,8 +17,10 @@ import { FilterChip, StatCard } from "@/components/dashboard/StatCard"
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
 import { StaffMemberDetailDialog } from "@/components/dashboard/StaffMemberDetailDialog"
 import { StaffMemberFormDialog } from "@/components/dashboard/StaffMemberFormDialog"
+import { useAuth } from "@/features/auth/auth-context"
 import {
   useDeleteStaffMemberMutation,
+  usePurgeDemoStaffMutation,
   useSaveStaffMemberMutation,
   useStaffMembersQuery,
   useToggleStaffStatusMutation,
@@ -49,6 +51,7 @@ const ROLE_META: Record<
 export function StaffPage() {
   const { locale } = useLocale()
   const isAr = locale === "ar"
+  const { user } = useAuth()
   useDocumentTitle(isAr ? "الموظفون والصلاحيات الإدارية" : "Staff & Administrative Permissions")
 
   const [query, setQuery] = useState("")
@@ -68,10 +71,28 @@ export function StaffPage() {
     onConfirm: () => Promise<void> | void
   } | null>(null)
 
-  const { data: staff = [] } = useStaffMembersQuery()
+  const {
+    data: staff = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useStaffMembersQuery()
   const saveMutation = useSaveStaffMemberMutation()
   const toggleStatusMutation = useToggleStaffStatusMutation()
   const deleteMutation = useDeleteStaffMemberMutation()
+  const purgeDemoMutation = usePurgeDemoStaffMutation()
+  const purgedRef = useRef(false)
+
+  // Remove leftover client-seeded demo staff docs from Firestore once.
+  useEffect(() => {
+    if (purgedRef.current || isLoading || isError) return
+    purgedRef.current = true
+    void purgeDemoMutation.mutateAsync().catch(() => {
+      purgedRef.current = false
+    })
+    // intentionally once after first successful list load
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, isError])
 
   // Stats
   const stats = useMemo(() => {
@@ -110,6 +131,14 @@ export function StaffPage() {
         isAr
           ? "حساب كبير المدربين محمي ولا يمكن حظره أو تعليقه"
           : "Head Coach account is protected and cannot be suspended.",
+      )
+      return
+    }
+    if (user?.uid && member.id === user.uid) {
+      appToast.error(
+        isAr
+          ? "لا يمكنك حظر أو تفعيل حسابك الشخصي"
+          : "You cannot change the status of your own account.",
       )
       return
     }
@@ -175,6 +204,14 @@ export function StaffPage() {
       )
       return
     }
+    if (user?.uid && member.id === user.uid) {
+      appToast.error(
+        isAr
+          ? "لا يمكنك حذف حسابك الشخصي"
+          : "You cannot delete your own account.",
+      )
+      return
+    }
 
     setConfirmDialog({
       open: true,
@@ -205,28 +242,55 @@ export function StaffPage() {
     })
   }
 
+  if (isError) {
+    return (
+      <div className="rounded-[24px] bg-white p-8 text-center">
+        <p className="text-[14px] font-medium text-[#C44536]">
+          {isAr
+            ? "تعذر تحميل فريق العمل الإداري"
+            : "Could not load administrative staff"}
+        </p>
+        <button
+          type="button"
+          onClick={() => void refetch()}
+          className="mt-4 inline-flex h-10 items-center rounded-full bg-[var(--gym-ink,#111111)] px-4 text-[13px] font-bold text-white"
+        >
+          {isAr ? "إعادة المحاولة" : "Retry"}
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
       {/* Stat Cards */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
         <StatCard
           label={isAr ? "إجمالي الفريق الإداري" : "Total Staff Members"}
-          value={stats.total}
+          value={isLoading ? "…" : stats.total}
           icon={<Users className="size-4" strokeWidth={1.8} />}
         />
         <StatCard
           label={isAr ? "الحسابات النشطة" : "Active Staff"}
-          value={stats.active}
+          value={isLoading ? "…" : stats.active}
           icon={<UserCheck className="size-4 text-emerald-600" strokeWidth={1.8} />}
         />
         <StatCard
           label={isAr ? "الحسابات المحظورة" : "Suspended Accounts"}
-          value={stats.suspended}
+          value={isLoading ? "…" : stats.suspended}
           icon={<UserX className="size-4 text-red-500" strokeWidth={1.8} />}
         />
         <StatCard
           label={isAr ? "كبير المدربين (المؤسس)" : "Head Coach Account"}
-          value={stats.headCoach ? (isAr ? "مفعل ودائم" : "Protected") : "—"}
+          value={
+            isLoading
+              ? "…"
+              : stats.headCoach
+                ? isAr
+                  ? "مفعل ودائم"
+                  : "Protected"
+                : "—"
+          }
           icon={<ShieldCheck className="size-4 text-[var(--gym-ink,#111111)]" strokeWidth={1.8} />}
         />
       </div>
@@ -243,8 +307,8 @@ export function StaffPage() {
             </p>
             <p className="mt-1 text-blue-900/90">
               {isAr
-                ? "يحتفظ كبير المدربين بكامل الصلاحيات الإدارية دون قيود. لا تُعد واجهة المستخدم (UI) وحدها حدود الأمان، بل يتم إنفاذ الصلاحيات وحظر الحسابات على مستوى السيرفر وقواعد بيانات Firestore لضمان حماية بيانات المشتركين الحساسة."
-                : "The Head Coach retains full administrative privileges. Frontend visibility controls are never treated as the security boundary — permissions, account blocks, and role restrictions are enforced directly through backend Firestore security rules and token claims."}
+                ? "يحتفظ كبير المدربين بكامل الصلاحيات. إنشاء الحسابات والحظر والحذف وتحديث الصلاحيات يتم عبر Cloud Functions مع مزامنة Firebase Auth و Claims — كتابة staff من المتصفح أو DevTools مرفوضة في قواعد Firestore."
+                : "The Head Coach retains full privileges. Create, suspend, delete, and permission changes run through Cloud Functions that sync Firebase Auth + custom claims — direct staff writes from the browser or DevTools are denied by Firestore rules."}
             </p>
           </div>
         </div>
@@ -470,6 +534,7 @@ export function StaffPage() {
         ]}
         actions={(row) => {
           const isHead = row.role === "head_coach"
+          const isSelf = Boolean(user?.uid && row.id === user.uid)
           return (
             <div className="flex items-center gap-1.5">
               {/* Display Details Modal Action */}
@@ -490,7 +555,7 @@ export function StaffPage() {
               />
 
               {/* Suspend / Reactivate Action */}
-              {!isHead ? (
+              {!isHead && !isSelf ? (
                 <TableAction
                   label={
                     row.status === "active"
@@ -507,7 +572,7 @@ export function StaffPage() {
               ) : null}
 
               {/* Delete Action */}
-              {!isHead ? (
+              {!isHead && !isSelf ? (
                 <button
                   type="button"
                   onClick={() => void handleDelete(row)}
@@ -541,11 +606,17 @@ export function StaffPage() {
 
       {/* Staff Create/Edit Dialog */}
       <StaffMemberFormDialog
+        key={editingMember?.id ?? "staff-create"}
         open={formOpen}
-        onClose={() => setFormOpen(false)}
+        onClose={() => {
+          setFormOpen(false)
+          setEditingMember(null)
+        }}
         initialMember={editingMember}
         onSave={async (input) => {
           await saveMutation.mutateAsync(input)
+          setFormOpen(false)
+          setEditingMember(null)
         }}
       />
 

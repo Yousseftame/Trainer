@@ -1,32 +1,36 @@
-﻿import { useMemo, useState, type ReactNode } from "react"
+﻿import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { Link } from "react-router-dom"
 import { useTranslation } from "react-i18next"
-import { AlertTriangle, Bell, ChevronRight, CreditCard, Download, Inbox, Send } from "lucide-react"
+import {
+  AlertTriangle,
+  Bell,
+  ChevronRight,
+  CreditCard,
+  Download,
+  Inbox,
+  Send,
+} from "lucide-react"
 import { StatCard } from "@/components/dashboard/StatCard"
 import { APP_ROUTES } from "@/config/constants"
 import { useAuth } from "@/features/auth/auth-context"
 import {
-  DEMO_NOTICES,
-  REPORT_TABS,
-  activityRows,
-  adherenceRows,
-  adherenceTotals,
-  contentUsageRows,
-  contentUsageStats,
   daysFromToday,
   exportReport,
-  expiringSubscriptions,
   noticePerson,
-  packageRows,
-  progressRows,
-  reportPulse,
-  type DemoNotice,
+  REPORT_TABS,
+  deriveReportsDesk,
+  useDispatchNoticeMutation,
+  useMarkNoticeReadWhenOpened,
+  useOpsNoticesQuery,
+  useReportsDeskQuery,
   type ExportKind,
+  type ExpiringSubscriptionRow,
   type NoticeStatus,
+  type OpsNotice,
   type ReportTab,
-} from "@/features/reports/demo"
-import { getSubscriberById } from "@/features/subscribers/demo"
-import { getPackageById } from "@/features/subscriptions/demo"
+} from "@/features/reports"
+import type { Subscriber } from "@/features/subscribers/types"
+import type { CatalogPackage } from "@/features/subscriptions/types"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatDate, formatKg, initials } from "@/lib/format"
@@ -56,6 +60,10 @@ function statusDot(status: NoticeStatus) {
   return "bg-[#22c55e]"
 }
 
+function isUnreadNotice(notice: OpsNotice) {
+  return notice.unread === true
+}
+
 export function ReportsPage() {
   const { t } = useTranslation()
   const { locale } = useLocale()
@@ -66,32 +74,62 @@ export function ReportsPage() {
   const canSend = hasPermission("notifications:send")
   const [tab, setTab] = useState<ReportTab>("inbox")
   const [inboxFilter, setInboxFilter] = useState<"all" | NoticeStatus>("all")
-  const [notices, setNotices] = useState(DEMO_NOTICES)
-  const [openId, setOpenId] = useState<string | undefined>(
-    DEMO_NOTICES.find((item) => item.status === "queued")?.id ?? DEMO_NOTICES[0]?.id,
+  const [openId, setOpenId] = useState<string | undefined>()
+  /** Only true after a deliberate inbox click — auto-preview does not clear unread. */
+  const [readOpenedId, setReadOpenedId] = useState<string | undefined>()
+
+  const { data: desk, isLoading, isError, refetch } = useReportsDeskQuery()
+  const { data: liveNotices } = useOpsNoticesQuery()
+  const deskWithLiveNotices = useMemo(() => {
+    if (!desk) return desk
+    if (!liveNotices) return desk
+    return { ...desk, notices: liveNotices }
+  }, [desk, liveNotices])
+  const derived = useMemo(
+    () => deriveReportsDesk(deskWithLiveNotices),
+    [deskWithLiveNotices],
+  )
+  const dispatchMutation = useDispatchNoticeMutation()
+
+  const notices = derived.notices
+
+  const inbox = notices.filter((item) =>
+    inboxFilter === "all" ? true : item.status === inboxFilter,
+  )
+  const openNotice =
+    inbox.find((item) => item.id === openId) ?? inbox[0] ?? undefined
+  const unreadCount = derived.pulse.unread
+
+  useMarkNoticeReadWhenOpened(
+    readOpenedId,
+    notices,
+    !isLoading && !isError && tab === "inbox",
   )
 
-  const pulse = useMemo(() => reportPulse(), [])
-  const expiring = useMemo(() => expiringSubscriptions(), [])
-  const activity = useMemo(() => activityRows(), [])
-  const packages = useMemo(() => packageRows(), [])
-  const adherence = useMemo(() => adherenceRows(), [])
-  const progress = useMemo(() => progressRows(), [])
-  const content = useMemo(() => contentUsageRows(), [])
-  const contentStats = useMemo(() => contentUsageStats(content), [content])
-  const totals = useMemo(() => adherenceTotals(), [])
+  function openInboxNotice(id: string) {
+    setOpenId(id)
+    setReadOpenedId(id)
+  }
 
-  const inbox = notices.filter((item) => (inboxFilter === "all" ? true : item.status === inboxFilter))
-  const openNotice = inbox.find((item) => item.id === openId) ?? inbox[0]
-  const queuedCount = notices.filter((item) => item.status === "queued").length
+  useEffect(() => {
+    if (!openId && inbox[0]) setOpenId(inbox[0].id)
+  }, [inbox, openId])
 
-  function sendNotice(id: string) {
-    setNotices((current) =>
-      current.map((item) =>
-        item.id === id ? { ...item, status: "sent", sentAt: new Date().toISOString() } : item,
-      ),
-    )
-    appToast.success(t("admin.reports.toast.sent"))
+  // Keep selection valid when the live inbox reshuffles
+  useEffect(() => {
+    if (openId && !inbox.some((item) => item.id === openId) && inbox[0]) {
+      setOpenId(inbox[0].id)
+    }
+  }, [inbox, openId])
+
+  async function sendNotice(id: string) {
+    try {
+      await dispatchMutation.mutateAsync(id)
+      appToast.success(t("admin.reports.toast.sent"))
+      void refetch()
+    } catch {
+      appToast.error(t("admin.reports.toast.sendFailed"))
+    }
   }
 
   function runExport(kind: ExportKind) {
@@ -99,7 +137,11 @@ export function ReportsPage() {
       appToast.error(t("admin.reports.toast.noExport"))
       return
     }
-    exportReport(kind)
+    if (!desk) {
+      appToast.error(t("admin.reports.toast.noExport"))
+      return
+    }
+    exportReport(kind, deskWithLiveNotices ?? desk)
     appToast.success(t("admin.reports.toast.exported"))
   }
 
@@ -107,6 +149,36 @@ export function ReportsPage() {
     setInboxFilter(next)
     const first = notices.find((item) => next === "all" || item.status === next)
     setOpenId(first?.id)
+    // Filter change only previews — do not mark read until a click.
+  }
+
+  const subscriberById = useMemo(() => {
+    const map = new Map<string, Subscriber>()
+    for (const item of desk?.subscribers ?? []) map.set(item.id, item)
+    return map
+  }, [desk?.subscribers])
+
+  const packageById = useMemo(() => {
+    const map = new Map<string, CatalogPackage>()
+    for (const item of desk?.packages ?? []) map.set(item.id, item)
+    return map
+  }, [desk?.packages])
+
+  if (isError) {
+    return (
+      <div className="rounded-[24px] bg-white p-8 text-center">
+        <p className="text-[14px] font-medium text-[#C44536]">
+          {t("admin.reports.empty.loadError")}
+        </p>
+        <button
+          type="button"
+          onClick={() => void refetch()}
+          className="mt-4 inline-flex h-10 items-center rounded-full bg-[var(--gym-ink,#111111)] px-4 text-[13px] font-bold text-white"
+        >
+          {t("admin.common.retry")}
+        </button>
+      </div>
+    )
   }
 
   return (
@@ -114,22 +186,22 @@ export function ReportsPage() {
       <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4 lg:gap-4">
         <StatCard
           label={t("admin.reports.stats.expiring")}
-          value={pulse.expiring}
+          value={isLoading ? "…" : derived.pulse.expiring}
           icon={<CreditCard className="size-4" strokeWidth={1.8} />}
         />
         <StatCard
           label={t("admin.reports.stats.attention")}
-          value={pulse.attention}
+          value={isLoading ? "…" : derived.pulse.attention}
           icon={<AlertTriangle className="size-4" strokeWidth={1.8} />}
         />
         <StatCard
           label={t("admin.reports.stats.pending")}
-          value={pulse.pendingRequests}
+          value={isLoading ? "…" : derived.pulse.pendingRequests}
           icon={<Inbox className="size-4" strokeWidth={1.8} />}
         />
         <StatCard
-          label={t("admin.reports.stats.queued")}
-          value={queuedCount}
+          label={t("admin.reports.stats.unread")}
+          value={isLoading ? "…" : unreadCount}
           icon={<Bell className="size-4" strokeWidth={1.8} />}
         />
       </div>
@@ -149,6 +221,11 @@ export function ReportsPage() {
               )}
             >
               {t(`admin.reports.tabs.${item}`)}
+              {item === "inbox" && unreadCount > 0 ? (
+                <span className="ms-2 inline-flex min-w-5 items-center justify-center rounded-full bg-[var(--gym-lime,#fb5001)] px-1.5 py-0.5 text-[10px] font-bold text-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>
@@ -160,19 +237,22 @@ export function ReportsPage() {
               open={openNotice}
               filter={inboxFilter}
               onFilter={pickInboxFilter}
-              onOpen={setOpenId}
+              onOpen={openInboxNotice}
               onSend={sendNotice}
               canSend={canSend}
               canExport={canExport}
               onExport={() => runExport("notices")}
               locale={locale}
+              subscribers={desk?.subscribers ?? []}
+              requests={desk?.registrationRequests ?? []}
+              sending={dispatchMutation.isPending}
             />
           ) : null}
           {tab === "activity" ? (
             <ActivityPane
-              rows={activity}
-              thisWeek={pulse.checkInsThisWeek}
-              lastWeek={pulse.checkInsLastWeek}
+              rows={derived.activity}
+              thisWeek={derived.pulse.checkInsThisWeek}
+              lastWeek={derived.pulse.checkInsLastWeek}
               canExport={canExport}
               onExport={() => runExport("roster")}
               locale={locale}
@@ -180,8 +260,10 @@ export function ReportsPage() {
           ) : null}
           {tab === "billing" ? (
             <BillingPane
-              packages={packages}
-              expiring={expiring}
+              packages={derived.packages}
+              expiring={derived.expiring}
+              subscriberById={subscriberById}
+              packageById={packageById}
               canExport={canExport}
               onExport={() => runExport("expiring")}
               locale={locale}
@@ -189,22 +271,30 @@ export function ReportsPage() {
           ) : null}
           {tab === "adherence" ? (
             <AdherencePane
-              rows={adherence}
-              totals={totals}
+              rows={derived.adherence}
+              totals={derived.totals}
               canExport={canExport}
               onExport={() => runExport("adherence")}
             />
           ) : null}
           {tab === "progress" ? (
             <ProgressPane
-              rows={progress}
+              rows={derived.progress}
               canExport={canExport}
               onExport={() => runExport("progress")}
               locale={locale}
             />
           ) : null}
-          {tab === "content" ? <ContentPane rows={content} stats={contentStats} locale={locale} /> : null}
-          {tab === "export" ? <ExportPane canExport={canExport} onExport={runExport} /> : null}
+          {tab === "content" ? (
+            <ContentPane
+              rows={derived.content}
+              stats={derived.contentStats}
+              locale={locale}
+            />
+          ) : null}
+          {tab === "export" ? (
+            <ExportPane canExport={canExport} onExport={runExport} />
+          ) : null}
         </div>
       </section>
     </div>
@@ -222,9 +312,12 @@ function InboxPane({
   canExport,
   onExport,
   locale,
+  subscribers,
+  requests,
+  sending,
 }: {
-  notices: DemoNotice[]
-  open?: DemoNotice
+  notices: OpsNotice[]
+  open?: OpsNotice
   filter: "all" | NoticeStatus
   onFilter: (value: "all" | NoticeStatus) => void
   onOpen: (id: string) => void
@@ -233,10 +326,20 @@ function InboxPane({
   canExport: boolean
   onExport: () => void
   locale: AppLocale
+  subscribers: Subscriber[]
+  requests: import("@/features/subscribers/types").RegistrationRequest[]
+  sending: boolean
 }) {
   const { t } = useTranslation()
-  const filters: Array<"all" | NoticeStatus> = ["all", "queued", "sent", "failed"]
-  const person = open ? noticePerson(open) : undefined
+  const filters: Array<"all" | NoticeStatus> = [
+    "all",
+    "queued",
+    "sent",
+    "failed",
+  ]
+  const person = open
+    ? noticePerson(open, subscribers, requests)
+    : undefined
   const href = open?.subscriberId
     ? APP_ROUTES.admin.subscriberDetail(open.subscriberId)
     : APP_ROUTES.admin.registrationRequests
@@ -257,7 +360,9 @@ function InboxPane({
                   : "text-[#8c8c8c] hover:text-[var(--gym-ink,#111111)]",
               )}
             >
-              {item === "all" ? t("admin.common.all") : t(`admin.reports.noticeStatus.${item}`)}
+              {item === "all"
+                ? t("admin.common.all")
+                : t(`admin.reports.noticeStatus.${item}`)}
             </button>
           ))}
         </div>
@@ -270,12 +375,17 @@ function InboxPane({
         <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,380px)] lg:gap-5">
           <ul className="min-w-0 rounded-[22px] border border-black/[0.08] p-1.5">
             {notices.map((notice, index) => {
-              const who = noticePerson(notice)
+              const who = noticePerson(notice, subscribers, requests)
               const active = notice.id === open.id
+              const unread = isUnreadNotice(notice)
               return (
                 <li
                   key={notice.id}
-                  className={cn(!active && index < notices.length - 1 && "border-b border-black/[0.05]")}
+                  className={cn(
+                    !active &&
+                      index < notices.length - 1 &&
+                      "border-b border-black/[0.05]",
+                  )}
                 >
                   <button
                     type="button"
@@ -284,21 +394,63 @@ function InboxPane({
                       "flex w-full items-start gap-3 rounded-[16px] px-3 py-3 text-start transition-colors",
                       active
                         ? "border border-[var(--gym-ink,#111111)] bg-[var(--gym-ink,#111111)]/[0.04]"
-                        : "border border-transparent hover:bg-black/[0.02]",
+                        : unread
+                          ? "border border-transparent bg-[var(--gym-lime,#fb5001)]/[0.06] hover:bg-[var(--gym-lime,#fb5001)]/[0.1]"
+                          : "border border-transparent hover:bg-black/[0.02]",
                     )}
                   >
-                    <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", statusDot(notice.status))} />
+                    <span className="mt-1.5 flex size-2.5 shrink-0 items-center justify-center">
+                      {unread ? (
+                        <span
+                          className="size-2.5 rounded-full bg-[var(--gym-lime,#fb5001)]"
+                          aria-label={t("admin.reports.unreadBadge")}
+                        />
+                      ) : (
+                        <span
+                          className={cn(
+                            "size-2 rounded-full opacity-70",
+                            statusDot(notice.status),
+                          )}
+                          title={t(`admin.reports.noticeStatus.${notice.status}`)}
+                        />
+                      )}
+                    </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-baseline justify-between gap-3">
-                        <span className="truncate text-[14px] font-semibold text-[var(--gym-ink,#111111)]">
-                          {who?.displayName ?? t(`admin.reports.noticeKind.${notice.kind}`)}
+                        <span
+                          className={cn(
+                            "truncate text-[14px] text-[var(--gym-ink,#111111)]",
+                            unread ? "font-extrabold" : "font-semibold",
+                          )}
+                        >
+                          {who?.displayName ??
+                            t(`admin.reports.noticeKind.${notice.kind}`)}
                         </span>
-                        <span className="shrink-0 text-[11px] font-medium text-[#8c8c8c]">
-                          {formatDate(notice.sentAt ?? notice.scheduledAt ?? notice.createdAt, locale)}
+                        <span className="inline-flex shrink-0 items-center gap-1.5">
+                          {unread ? (
+                            <span className="rounded-full bg-[var(--gym-lime,#fb5001)] px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white">
+                              {t("admin.reports.unreadBadge")}
+                            </span>
+                          ) : null}
+                          <span className="text-[11px] font-medium text-[#8c8c8c]">
+                            {formatDate(
+                              notice.sentAt ??
+                                notice.scheduledAt ??
+                                notice.createdAt,
+                              locale,
+                            )}
+                          </span>
                         </span>
                       </span>
-                      <span className="mt-0.5 block truncate text-[13px] text-[#5F6B6B]">
-                        {notice.subject[locale]}
+                      <span
+                        className={cn(
+                          "mt-0.5 block truncate text-[13px]",
+                          unread
+                            ? "font-medium text-[var(--gym-ink,#111111)]/80"
+                            : "text-[#5F6B6B]",
+                        )}
+                      >
+                        {(notice.staffSubject ?? notice.subject)[locale]}
                       </span>
                     </span>
                   </button>
@@ -311,6 +463,7 @@ function InboxPane({
                         canSend={canSend}
                         onSend={onSend}
                         locale={locale}
+                        sending={sending}
                       />
                     </div>
                   ) : null}
@@ -330,6 +483,7 @@ function InboxPane({
               canSend={canSend}
               onSend={onSend}
               locale={locale}
+              sending={sending}
             />
           </aside>
         </div>
@@ -346,7 +500,7 @@ function ActivityPane({
   onExport,
   locale,
 }: {
-  rows: ReturnType<typeof activityRows>
+  rows: ReturnType<typeof deriveReportsDesk>["activity"]
   thisWeek: number
   lastWeek: number
   canExport: boolean
@@ -355,6 +509,9 @@ function ActivityPane({
 }) {
   const { t } = useTranslation()
   const quiet = rows.filter((item) => !item.loggedThisWeek).length
+  if (!rows.length) {
+    return <EmptyNote>{t("admin.reports.empty.activity")}</EmptyNote>
+  }
   return (
     <div>
       <PaneHead
@@ -365,11 +522,25 @@ function ActivityPane({
       />
       <ul>
         {rows.map((row) => (
-          <RowLink key={row.subscriber.id} to={APP_ROUTES.admin.subscriberDetail(row.subscriber.id)} name={row.subscriber.displayName}>
-            <span className={row.loggedThisWeek ? "text-[var(--gym-ink,#111111)]" : "text-[#8c8c8c]"}>
-              {row.loggedThisWeek ? t("admin.reports.activity.logged") : t("admin.reports.activity.quiet")}
+          <RowLink
+            key={row.subscriber.id}
+            to={APP_ROUTES.admin.subscriberDetail(row.subscriber.id)}
+            name={row.subscriber.displayName}
+          >
+            <span
+              className={
+                row.loggedThisWeek
+                  ? "text-[var(--gym-ink,#111111)]"
+                  : "text-[#8c8c8c]"
+              }
+            >
+              {row.loggedThisWeek
+                ? t("admin.reports.activity.logged")
+                : t("admin.reports.activity.quiet")}
             </span>
-            <span className="hidden sm:inline">{formatDate(row.lastCheckIn, locale)}</span>
+            <span className="hidden sm:inline">
+              {formatDate(row.lastCheckIn, locale)}
+            </span>
             <span>
               {row.thisWeekWorkout} · {row.thisWeekNutrition}
             </span>
@@ -383,12 +554,16 @@ function ActivityPane({
 function BillingPane({
   packages,
   expiring,
+  subscriberById,
+  packageById,
   canExport,
   onExport,
   locale,
 }: {
-  packages: ReturnType<typeof packageRows>
-  expiring: ReturnType<typeof expiringSubscriptions>
+  packages: ReturnType<typeof deriveReportsDesk>["packages"]
+  expiring: ExpiringSubscriptionRow[]
+  subscriberById: Map<string, Subscriber>
+  packageById: Map<string, CatalogPackage>
   canExport: boolean
   onExport: () => void
   locale: AppLocale
@@ -397,26 +572,37 @@ function BillingPane({
   return (
     <div>
       <PaneHead canExport={canExport} onExport={onExport} />
-      <ul>
-        {packages.map((row) => (
-          <li key={row.pkg.id} className="border-b border-black/[0.05] py-4">
-            <div className="flex items-baseline justify-between gap-3">
-              <p className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
-                {row.pkg.name[locale]}
+      {packages.length === 0 ? (
+        <EmptyNote>{t("admin.reports.empty.packages")}</EmptyNote>
+      ) : (
+        <ul>
+          {packages.map((row) => (
+            <li key={row.pkg.id} className="border-b border-black/[0.05] py-4">
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
+                  {row.pkg.name[locale]}
+                </p>
+                <p className="text-[13px] font-medium text-[#8c8c8c]">
+                  {row.share}%
+                </p>
+              </div>
+              <p className="mt-1 text-[13px] text-[#5F6B6B]">
+                {row.active} {t("admin.reports.billing.active").toLowerCase()} ·{" "}
+                {row.pending}{" "}
+                {t("admin.reports.billing.pending").toLowerCase()} ·{" "}
+                {row.expiring}{" "}
+                {t("admin.reports.billing.expiring").toLowerCase()}
               </p>
-              <p className="text-[13px] font-medium text-[#8c8c8c]">{row.share}%</p>
-            </div>
-            <p className="mt-1 text-[13px] text-[#5F6B6B]">
-              {row.active} {t("admin.reports.billing.active").toLowerCase()} · {row.pending}{" "}
-              {t("admin.reports.billing.pending").toLowerCase()} · {row.expiring}{" "}
-              {t("admin.reports.billing.expiring").toLowerCase()}
-            </p>
-            <div className="mt-3 h-1 overflow-hidden rounded-full bg-black/[0.06]">
-              <div className="h-full rounded-full bg-[var(--gym-ink,#111111)]" style={{ width: `${row.share}%` }} />
-            </div>
-          </li>
-        ))}
-      </ul>
+              <div className="mt-3 h-1 overflow-hidden rounded-full bg-black/[0.06]">
+                <div
+                  className="h-full rounded-full bg-[var(--gym-ink,#111111)]"
+                  style={{ width: `${row.share}%` }}
+                />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
       <p className="mt-6 text-[12px] font-semibold tracking-[0.06em] text-[#8c8c8c] uppercase">
         {t("admin.reports.billing.expiringList")}
       </p>
@@ -425,8 +611,8 @@ function BillingPane({
       ) : (
         <ul className="mt-1">
           {expiring.map((item) => {
-            const subscriber = getSubscriberById(item.subscriberId)
-            const pkg = getPackageById(item.packageId)
+            const subscriber = subscriberById.get(item.subscriberId)
+            const pkg = packageById.get(item.packageId)
             const days = daysFromToday(item.endsAt)
             return (
               <RowLink
@@ -436,8 +622,16 @@ function BillingPane({
               >
                 <span>{pkg?.name[locale]}</span>
                 <span>{formatDate(item.endsAt, locale)}</span>
-                <span className={days != null && days <= 7 ? "text-[#C44536]" : "text-[var(--gym-ink,#111111)]"}>
-                  {days != null ? t("admin.reports.daysLeft", { count: days }) : "—"}
+                <span
+                  className={
+                    days != null && days <= 7
+                      ? "text-[#C44536]"
+                      : "text-[var(--gym-ink,#111111)]"
+                  }
+                >
+                  {days != null
+                    ? t("admin.reports.daysLeft", { count: days })
+                    : "—"}
                 </span>
               </RowLink>
             )
@@ -454,12 +648,15 @@ function AdherencePane({
   canExport,
   onExport,
 }: {
-  rows: ReturnType<typeof adherenceRows>
-  totals: ReturnType<typeof adherenceTotals>
+  rows: ReturnType<typeof deriveReportsDesk>["adherence"]
+  totals: ReturnType<typeof deriveReportsDesk>["totals"]
   canExport: boolean
   onExport: () => void
 }) {
   const { t } = useTranslation()
+  if (!rows.length) {
+    return <EmptyNote>{t("admin.reports.empty.adherence")}</EmptyNote>
+  }
   return (
     <div>
       <PaneHead
@@ -477,7 +674,11 @@ function AdherencePane({
               to={`${APP_ROUTES.admin.progress}?subscriber=${row.subscriber.id}`}
               name={row.subscriber.displayName}
             >
-              <DeltaLine label={t("admin.reports.adherence.workout")} value={pct(row.workoutThis)} delta={workoutDelta} />
+              <DeltaLine
+                label={t("admin.reports.adherence.workout")}
+                value={pct(row.workoutThis)}
+                delta={workoutDelta}
+              />
               <DeltaLine
                 label={t("admin.reports.adherence.nutrition")}
                 value={pct(row.nutritionThis)}
@@ -497,15 +698,22 @@ function ProgressPane({
   onExport,
   locale,
 }: {
-  rows: ReturnType<typeof progressRows>
+  rows: ReturnType<typeof deriveReportsDesk>["progress"]
   canExport: boolean
   onExport: () => void
   locale: AppLocale
 }) {
   const { t } = useTranslation()
+  if (!rows.length) {
+    return <EmptyNote>{t("admin.reports.empty.progress")}</EmptyNote>
+  }
   return (
     <div>
-      <PaneHead summary={t("admin.reports.progress.privacy")} canExport={canExport} onExport={onExport} />
+      <PaneHead
+        summary={t("admin.reports.progress.privacy")}
+        canExport={canExport}
+        onExport={onExport}
+      />
       <ul>
         {rows.map((row) => (
           <RowLink
@@ -517,8 +725,12 @@ function ProgressPane({
               {row.weightKg != null ? formatKg(row.weightKg, locale) : "—"}
               {row.deltaKg != null ? ` · ${signed(row.deltaKg)} kg` : ""}
             </span>
-            <span className="hidden sm:inline">{formatDate(row.lastCheckIn, locale)}</span>
-            <span className="capitalize">{t(`admin.progress.filter.${row.bucket}`)}</span>
+            <span className="hidden sm:inline">
+              {formatDate(row.lastCheckIn, locale)}
+            </span>
+            <span className="capitalize">
+              {t(`admin.progress.filter.${row.bucket}`)}
+            </span>
           </RowLink>
         ))}
       </ul>
@@ -531,11 +743,14 @@ function ContentPane({
   stats,
   locale,
 }: {
-  rows: ReturnType<typeof contentUsageRows>
-  stats: ReturnType<typeof contentUsageStats>
+  rows: ReturnType<typeof deriveReportsDesk>["content"]
+  stats: ReturnType<typeof deriveReportsDesk>["contentStats"]
   locale: AppLocale
 }) {
   const { t } = useTranslation()
+  if (!rows.length) {
+    return <EmptyNote>{t("admin.reports.empty.content")}</EmptyNote>
+  }
   return (
     <div>
       <PaneHead
@@ -543,16 +758,25 @@ function ContentPane({
       />
       <ul>
         {rows.map((row) => (
-          <li key={row.id} className="flex items-center justify-between gap-3 border-b border-black/[0.05] py-3.5">
+          <li
+            key={row.id}
+            className="flex items-center justify-between gap-3 border-b border-black/[0.05] py-3.5"
+          >
             <div className="min-w-0">
-              <p className="truncate text-[14px] font-semibold text-[var(--gym-ink,#111111)]">{row.title[locale]}</p>
+              <p className="truncate text-[14px] font-semibold text-[var(--gym-ink,#111111)]">
+                {row.title[locale]}
+              </p>
               <p className="mt-0.5 text-[12px] text-[#8c8c8c]">
-                {row.activePrograms} {t("admin.reports.content.programs").toLowerCase()} · {row.subscribers}{" "}
+                {row.activePrograms}{" "}
+                {t("admin.reports.content.programs").toLowerCase()} ·{" "}
+                {row.subscribers}{" "}
                 {t("admin.reports.content.people").toLowerCase()}
               </p>
             </div>
             <p className="shrink-0 text-[12px] font-medium text-[#8c8c8c]">
-              {row.linked ? t("admin.content.linked") : t("admin.content.unlinked")}
+              {row.linked
+                ? t("admin.content.linked")
+                : t("admin.content.unlinked")}
             </p>
           </li>
         ))}
@@ -569,12 +793,22 @@ function ExportPane({
   onExport: (kind: ExportKind) => void
 }) {
   const { t } = useTranslation()
-  const packs: ExportKind[] = ["expiring", "adherence", "progress", "packages", "notices", "roster"]
+  const packs: ExportKind[] = [
+    "expiring",
+    "adherence",
+    "progress",
+    "packages",
+    "notices",
+    "roster",
+  ]
   if (!canExport) return <EmptyNote>{t("admin.reports.toast.noExport")}</EmptyNote>
   return (
     <ul>
       {packs.map((kind) => (
-        <li key={kind} className="flex items-center justify-between gap-3 border-b border-black/[0.05] py-3.5">
+        <li
+          key={kind}
+          className="flex items-center justify-between gap-3 border-b border-black/[0.05] py-3.5"
+        >
           <div className="min-w-0">
             <p className="text-[14px] font-semibold text-[var(--gym-ink,#111111)]">
               {t(`admin.reports.export.${kind}`)}
@@ -604,26 +838,44 @@ function NoticeDetail({
   canSend,
   onSend,
   locale,
+  sending,
 }: {
-  notice: DemoNotice
+  notice: OpsNotice
   person?: { displayName: string }
   href: string
   canSend: boolean
   onSend: (id: string) => void
   locale: AppLocale
+  sending: boolean
 }) {
   const { t } = useTranslation()
   return (
     <article>
-      <p className="text-[11px] font-semibold tracking-[0.08em] text-[#8c8c8c] uppercase">
-        {t(`admin.reports.noticeKind.${notice.kind}`)} · {t(`admin.reports.noticeStatus.${notice.status}`)}
+      <p className="flex flex-wrap items-center gap-2 text-[11px] font-semibold tracking-[0.08em] text-[#8c8c8c] uppercase">
+        <span>
+          {t(`admin.reports.noticeKind.${notice.kind}`)} ·{" "}
+          {t(`admin.reports.noticeStatus.${notice.status}`)}
+        </span>
+        {isUnreadNotice(notice) ? (
+          <span className="rounded-full bg-[var(--gym-lime,#fb5001)] px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white normal-case">
+            {t("admin.reports.unreadBadge")}
+          </span>
+        ) : null}
       </p>
       <h2 className="mt-2 font-heading text-[18px] font-extrabold tracking-tight text-[var(--gym-ink,#111111)] xl:text-[20px]">
-        {notice.subject[locale]}
+        {(notice.staffSubject ?? notice.subject)[locale]}
       </h2>
-      <p className="mt-3 text-[14px] leading-[1.7] text-[#5F6B6B]">{notice.detail[locale]}</p>
+      <p className="mt-3 text-[14px] leading-[1.7] text-[#5F6B6B]">
+        {(notice.staffDetail ?? notice.detail)[locale]}
+      </p>
+      {notice.lastError ? (
+        <p className="mt-2 text-[12px] font-medium text-[#C44536]">
+          {notice.lastError}
+        </p>
+      ) : null}
       <p className="mt-4 text-[12px] font-medium text-[#8c8c8c]">
         {t("admin.reports.channel.email")}
+        {notice.fcmSent ? ` · ${t("admin.reports.channel.push")}` : ""}
         {person ? ` · ${person.displayName}` : ""}
         {` · ${formatDate(notice.sentAt ?? notice.scheduledAt ?? notice.createdAt, locale)}`}
       </p>
@@ -631,11 +883,14 @@ function NoticeDetail({
         {canSend && notice.status !== "sent" ? (
           <button
             type="button"
+            disabled={sending}
             onClick={() => onSend(notice.id)}
-            className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-4 text-[13px] font-bold text-white"
+            className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-4 text-[13px] font-bold text-white disabled:opacity-60"
           >
             <Send className="size-3.5" strokeWidth={2} />
-            {notice.status === "failed" ? t("admin.reports.retry") : t("admin.reports.send")}
+            {notice.status === "failed"
+              ? t("admin.reports.retry")
+              : t("admin.reports.send")}
           </button>
         ) : null}
         <Link
@@ -664,13 +919,17 @@ function PaneHead({
   return (
     <div className="mb-1 flex flex-wrap items-center justify-between gap-2 pb-3">
       {summary || aside ? (
-        <p className="text-[13px] leading-relaxed text-[#8c8c8c]">{summary ?? aside}</p>
+        <p className="text-[13px] leading-relaxed text-[#8c8c8c]">
+          {summary ?? aside}
+        </p>
       ) : (
         <span />
       )}
       <div className="flex items-center gap-3">
         {summary && aside ? (
-          <p className="text-[13px] font-medium text-[var(--gym-ink,#111111)]">{aside}</p>
+          <p className="text-[13px] font-medium text-[var(--gym-ink,#111111)]">
+            {aside}
+          </p>
         ) : null}
         <CsvButton show={Boolean(canExport && onExport)} onClick={onExport} />
       </div>
@@ -678,7 +937,13 @@ function PaneHead({
   )
 }
 
-function CsvButton({ show, onClick }: { show?: boolean; onClick?: () => void }) {
+function CsvButton({
+  show,
+  onClick,
+}: {
+  show?: boolean
+  onClick?: () => void
+}) {
   const { t } = useTranslation()
   if (!show || !onClick) return null
   return (
@@ -711,23 +976,42 @@ function RowLink({
         <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[#F4F4F4] font-heading text-[11px] font-bold text-[var(--gym-ink,#111111)]">
           {initials(name)}
         </span>
-        <span className="min-w-0 flex-1 truncate font-semibold text-[var(--gym-ink,#111111)]">{name}</span>
+        <span className="min-w-0 flex-1 truncate font-semibold text-[var(--gym-ink,#111111)]">
+          {name}
+        </span>
         <span className="flex min-w-0 flex-col items-end gap-0.5 text-[12px] text-[#5F6B6B] sm:flex-row sm:items-center sm:gap-5 sm:text-[13px]">
           {children}
         </span>
-        <ChevronRight className="size-4 shrink-0 text-[#C5C5C5] rtl:rotate-180" strokeWidth={1.8} />
+        <ChevronRight
+          className="size-4 shrink-0 text-[#C5C5C5] rtl:rotate-180"
+          strokeWidth={1.8}
+        />
       </Link>
     </li>
   )
 }
 
-function DeltaLine({ label, value, delta }: { label: string; value: string; delta: string | null }) {
+function DeltaLine({
+  label,
+  value,
+  delta,
+}: {
+  label: string
+  value: string
+  delta: string | null
+}) {
   return (
     <span className="inline-flex items-baseline gap-1.5">
       <span className="text-[#8c8c8c]">{label}</span>
       <span className="font-medium text-[var(--gym-ink,#111111)]">{value}</span>
       {delta ? (
-        <span className={delta.startsWith("−") ? "text-[#C44536]" : "text-[#8c8c8c]"}>{delta}</span>
+        <span
+          className={
+            delta.startsWith("−") ? "text-[#C44536]" : "text-[#8c8c8c]"
+          }
+        >
+          {delta}
+        </span>
       ) : null}
     </span>
   )
@@ -735,7 +1019,10 @@ function DeltaLine({ label, value, delta }: { label: string; value: string; delt
 
 function EmptyNote({ children }: { children: ReactNode }) {
   return (
-    <div role="status" className="py-16 text-center text-[13px] font-medium text-[#8c8c8c]">
+    <div
+      role="status"
+      className="py-16 text-center text-[13px] font-medium text-[#8c8c8c]"
+    >
       {children}
     </div>
   )

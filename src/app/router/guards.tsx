@@ -5,6 +5,10 @@ import { currentSubscriptionFor, getPackageById } from "@/features/subscriptions
 import { canAccessPackageEntitlement } from "@/features/subscriptions/entitlements"
 import { FullPageSpinner } from "@/components/feedback/FullPageSpinner"
 import { APP_ROUTES } from "@/config/constants"
+import {
+  resolveAdminHomePath,
+  resolveAdminLandingPath,
+} from "@/lib/permissions/can"
 import type { Permission } from "@/lib/permissions/permissions"
 import type { PackageEntitlementKey } from "@/types/subscription"
 
@@ -47,7 +51,7 @@ export function RequireRole({ allowed }: RequireRoleProps) {
 
   if (!ok) {
     if (isAdmin) {
-      return <Navigate to={APP_ROUTES.admin.root} replace />
+      return <Navigate to={resolveAdminLandingPath(user)} replace />
     }
     if (isSubscriber) {
       return <Navigate to={APP_ROUTES.subscriber.root} replace />
@@ -71,7 +75,7 @@ export function RequireGuest() {
     if (isSubscriber && !isAdmin) {
       return <Navigate to={APP_ROUTES.subscriber.root} replace />
     }
-    return <Navigate to={APP_ROUTES.admin.root} replace />
+    return <Navigate to={resolveAdminLandingPath(user)} replace />
   }
 
   return <Outlet />
@@ -82,7 +86,14 @@ type RequirePermissionProps = {
 }
 
 export function RequirePermission({ permission }: RequirePermissionProps) {
-  const { hasPermission, isSubscriber, isAdmin } = useAuth()
+  const { hasPermission, isSubscriber, isAdmin, status, user } = useAuth()
+  const location = useLocation()
+
+  // Wait for claims — avoid flashing a page then bouncing away.
+  if (status === "loading" || status === "idle") {
+    return <FullPageSpinner />
+  }
+
   if (!hasLiveFirebaseSession()) {
     return <Navigate to={APP_ROUTES.public.login} replace />
   }
@@ -98,7 +109,14 @@ export function RequirePermission({ permission }: RequirePermissionProps) {
   }
 
   if (!hasPermission(permission)) {
-    return <Navigate to={APP_ROUTES.errors.unauthorized} replace />
+    const home = resolveAdminHomePath(user)
+    const fallback = APP_ROUTES.admin.root
+    const target = home && home !== location.pathname ? home : fallback
+    // Stay inside the admin shell — never dump staff on /unauthorized.
+    if (target === location.pathname) {
+      return <Navigate to={fallback} replace />
+    }
+    return <Navigate to={target} replace />
   }
 
   return <Outlet />
@@ -109,11 +127,11 @@ export function RequirePermission({ permission }: RequirePermissionProps) {
  * Authentication and role checks remain separate upstream.
  */
 export function RequireActiveSubscription() {
-  const { hasActiveSubscription, isAdmin } = useAuth()
+  const { hasActiveSubscription, isAdmin, user } = useAuth()
 
   // Admins never belong on /app — bounce them home
   if (isAdmin) {
-    return <Navigate to={APP_ROUTES.admin.root} replace />
+    return <Navigate to={resolveAdminLandingPath(user)} replace />
   }
 
   if (!hasActiveSubscription) {
@@ -135,7 +153,7 @@ export function RequirePackageEntitlement({
   const { isAdmin, user, hasActiveSubscription } = useAuth()
 
   if (isAdmin) {
-    return <Navigate to={APP_ROUTES.admin.root} replace />
+    return <Navigate to={resolveAdminLandingPath(user)} replace />
   }
 
   if (!hasActiveSubscription || !user) {

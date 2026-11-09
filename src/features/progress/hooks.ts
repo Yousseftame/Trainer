@@ -7,6 +7,7 @@ import {
   fetchMeasurements,
   fetchPerformance,
   fetchPhotos,
+  resolveProgressPhotoUrl,
   saveMeasurement,
   savePerformance,
   savePhoto,
@@ -14,11 +15,15 @@ import {
   type SavePerformanceInput,
   type SavePhotoInput,
 } from "@/features/progress/service"
+import type { ProgressPhoto } from "@/types/progress"
 
 export const PROGRESS_QUERY_KEYS = {
+  all: ["progress"] as const,
   measurements: ["progress", "measurements"] as const,
   photos: ["progress", "photos"] as const,
   performance: ["progress", "performance"] as const,
+  photoUrl: (storagePath: string) =>
+    ["progress", "photo-url", storagePath] as const,
 }
 
 export function useMeasurementsQuery(subscriberId?: string) {
@@ -28,7 +33,6 @@ export function useMeasurementsQuery(subscriberId?: string) {
       : PROGRESS_QUERY_KEYS.measurements,
     queryFn: async () => {
       const items = await fetchMeasurements(subscriberId)
-      if (!subscriberId) return items
       return [...items].sort(
         (a, b) =>
           new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime(),
@@ -48,7 +52,6 @@ export function usePhotosQuery(subscriberId?: string) {
       : PROGRESS_QUERY_KEYS.photos,
     queryFn: async () => {
       const items = await fetchPhotos(subscriberId)
-      if (!subscriberId) return items
       return [...items].sort(
         (a, b) => new Date(a.takenAt).getTime() - new Date(b.takenAt).getTime(),
       )
@@ -67,7 +70,6 @@ export function usePerformanceQuery(subscriberId?: string) {
       : PROGRESS_QUERY_KEYS.performance,
     queryFn: async () => {
       const items = await fetchPerformance(subscriberId)
-      if (!subscriberId) return items
       return [...items].sort(
         (a, b) =>
           new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime(),
@@ -80,12 +82,26 @@ export function usePerformanceQuery(subscriberId?: string) {
   })
 }
 
+export function useProgressPhotoUrlQuery(
+  photo?: Pick<ProgressPhoto, "storagePath" | "downloadUrl"> | null,
+) {
+  const key = photo?.storagePath || photo?.downloadUrl || ""
+  return useQuery({
+    queryKey: PROGRESS_QUERY_KEYS.photoUrl(key),
+    queryFn: () => resolveProgressPhotoUrl(photo!),
+    enabled: Boolean(photo && key),
+    staleTime: QUERY_STALE_TIMES.catalog,
+  })
+}
+
 export function useSaveMeasurementMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: SaveMeasurementInput) => saveMeasurement(input),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: PROGRESS_QUERY_KEYS.measurements })
+      void queryClient.invalidateQueries({
+        queryKey: PROGRESS_QUERY_KEYS.measurements,
+      })
     },
   })
 }
@@ -95,7 +111,9 @@ export function useSavePhotoMutation() {
   return useMutation({
     mutationFn: (input: SavePhotoInput) => savePhoto(input),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: PROGRESS_QUERY_KEYS.photos })
+      void queryClient.invalidateQueries({
+        queryKey: PROGRESS_QUERY_KEYS.photos,
+      })
     },
   })
 }
@@ -105,7 +123,9 @@ export function useSavePerformanceMutation() {
   return useMutation({
     mutationFn: (input: SavePerformanceInput) => savePerformance(input),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: PROGRESS_QUERY_KEYS.performance })
+      void queryClient.invalidateQueries({
+        queryKey: PROGRESS_QUERY_KEYS.performance,
+      })
     },
   })
 }
@@ -115,7 +135,9 @@ export function useDeleteMeasurementMutation() {
   return useMutation({
     mutationFn: (id: string) => deleteMeasurement(id),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: PROGRESS_QUERY_KEYS.measurements })
+      void queryClient.invalidateQueries({
+        queryKey: PROGRESS_QUERY_KEYS.measurements,
+      })
     },
   })
 }
@@ -125,7 +147,9 @@ export function useDeletePhotoMutation() {
   return useMutation({
     mutationFn: (id: string) => deletePhoto(id),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: PROGRESS_QUERY_KEYS.photos })
+      void queryClient.invalidateQueries({
+        queryKey: PROGRESS_QUERY_KEYS.photos,
+      })
     },
   })
 }
@@ -135,7 +159,9 @@ export function useDeletePerformanceMutation() {
   return useMutation({
     mutationFn: (id: string) => deletePerformance(id),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: PROGRESS_QUERY_KEYS.performance })
+      void queryClient.invalidateQueries({
+        queryKey: PROGRESS_QUERY_KEYS.performance,
+      })
     },
   })
 }

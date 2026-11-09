@@ -33,6 +33,7 @@ import {
   useWorkoutProgramsQuery,
 } from "@/features/workouts/hooks"
 import { useSubscriberPTQuery } from "@/features/physicalTherapy/hooks"
+import { exerciseConflictsWithRestriction } from "@/features/physicalTherapy/service"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatDate } from "@/lib/format"
@@ -62,7 +63,9 @@ export function WorkoutPlanPage() {
     subscriberId,
     enabled: Boolean(subscriberId),
   })
-  const { data: contentAssets = [] } = useContentAssetsQuery()
+  const { data: contentAssets = [] } = useContentAssetsQuery({
+    audience: "subscriber",
+  })
 
   const activeProgram = useMemo(() => {
     return (
@@ -572,16 +575,16 @@ export function WorkoutPlanPage() {
                   const notes = resolveBilingualText(exercise.notes, locale)
                   const hasVideo = Boolean(exercise.videoUrl || exercise.videoContentId)
 
-                  const ptContraindication = ptRecord?.restrictions?.find((r) => {
-                    const probEn = (r.prohibited?.en || "").toLowerCase()
-                    const probAr = r.prohibited?.ar || ""
-                    const exNameEn = (typeof exercise.name === "string" ? exercise.name : exercise.name?.en || "").toLowerCase()
-                    const exNameAr = typeof exercise.name === "string" ? "" : exercise.name?.ar || ""
-                    return (
-                      Boolean(probEn && (exNameEn.includes(probEn) || probEn.includes(exNameEn))) ||
-                      Boolean(probAr && (exNameAr.includes(probAr) || probAr.includes(exNameAr)))
-                    )
-                  })
+                  const exerciseLabel =
+                    typeof exercise.name === "string"
+                      ? exercise.name
+                      : `${exercise.name?.en || ""} ${exercise.name?.ar || ""}`
+                  const ptContraindication =
+                    ptRecord?.status !== "cleared"
+                      ? ptRecord?.restrictions?.find((r) =>
+                          exerciseConflictsWithRestriction(exerciseLabel, r),
+                        )
+                      : undefined
 
                   return (
                     <div

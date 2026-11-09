@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react"
 import { createPortal } from "react-dom"
 import { ArrowLeftRight, Camera, X } from "lucide-react"
+import { ProgressPhotoImage } from "@/components/dashboard/ProgressPhotoImage"
 import { useLocale } from "@/hooks/useLocale"
 import { formatDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
@@ -164,23 +165,7 @@ export function PhotoComparisonDialog({
                 </div>
 
                 <div className="relative flex aspect-[3/4] w-full items-center justify-center overflow-hidden rounded-2xl bg-[var(--gym-ink,#111111)] shadow-xs">
-                  {photoA?.storagePath?.startsWith("data:") || photoA?.storagePath?.startsWith("http") ? (
-                    <img
-                      src={photoA.storagePath}
-                      alt="Photo A"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center text-white/80 p-4 text-center">
-                      <Camera className="size-10 mb-2 opacity-50" />
-                      <span className="font-heading text-[20px] font-extrabold">
-                        {photoA?.pose?.toUpperCase()}
-                      </span>
-                      <span className="text-[12px] opacity-75 mt-1">
-                        {formatDate(photoA?.takenAt || "", locale)}
-                      </span>
-                    </div>
-                  )}
+                  {photoA ? <ProgressPhotoImage photo={photoA} /> : null}
                   <span className="absolute bottom-2.5 start-2.5 rounded-lg bg-black/70 px-2 py-1 text-[11px] font-bold text-white backdrop-blur-xs">
                     {formatDate(photoA?.takenAt || "", locale)}
                   </span>
@@ -213,23 +198,7 @@ export function PhotoComparisonDialog({
                 </div>
 
                 <div className="relative flex aspect-[3/4] w-full items-center justify-center overflow-hidden rounded-2xl bg-[var(--gym-ink,#111111)] shadow-xs">
-                  {photoB?.storagePath?.startsWith("data:") || photoB?.storagePath?.startsWith("http") ? (
-                    <img
-                      src={photoB.storagePath}
-                      alt="Photo B"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center text-white/80 p-4 text-center">
-                      <Camera className="size-10 mb-2 opacity-50" />
-                      <span className="font-heading text-[20px] font-extrabold">
-                        {photoB?.pose?.toUpperCase()}
-                      </span>
-                      <span className="text-[12px] opacity-75 mt-1">
-                        {formatDate(photoB?.takenAt || "", locale)}
-                      </span>
-                    </div>
-                  )}
+                  {photoB ? <ProgressPhotoImage photo={photoB} /> : null}
                   <span className="absolute bottom-2.5 start-2.5 rounded-lg bg-black/70 px-2 py-1 text-[11px] font-bold text-white backdrop-blur-xs">
                     {formatDate(photoB?.takenAt || "", locale)}
                   </span>

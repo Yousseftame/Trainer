@@ -2,17 +2,26 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   query,
   setDoc,
   where,
 } from "firebase/firestore"
-import { getDb } from "@/lib/firebase/firestore"
 import {
-  DEMO_MEASUREMENTS,
-  DEMO_PHOTOS,
-  DEMO_LIFTS,
-} from "@/features/progress/demo"
+  deleteObject,
+  getDownloadURL,
+  ref,
+  uploadBytesResumable,
+} from "firebase/storage"
+import {
+  buildProgressPhotoStoragePath,
+  formatBytesLabel,
+  isRenderablePhotoSrc,
+  PROGRESS_UPLOAD_LIMITS,
+} from "@/features/progress/paths"
+import { getDb } from "@/lib/firebase/firestore"
+import { getFirebaseStorage } from "@/lib/firebase/storage"
 import type {
   BodyMeasurement,
   PerformanceRecord,
@@ -24,39 +33,173 @@ const MEASUREMENTS_COLLECTION = "progress_measurements"
 const PHOTOS_COLLECTION = "progress_photos"
 const PERFORMANCE_COLLECTION = "progress_performance"
 
-const STORAGE_KEY_MEASUREMENTS = "derpyfit_progress_measurements_v1"
-const STORAGE_KEY_PHOTOS = "derpyfit_progress_photos_v1"
-const STORAGE_KEY_PERFORMANCE = "derpyfit_progress_performance_v1"
+const LEGACY_KEYS = [
+  "derpyfit_progress_measurements_v1",
+  "derpyfit_progress_photos_v1",
+  "derpyfit_progress_performance_v1",
+] as const
 
-function readLocalCache<T>(key: string): T[] | null {
-  if (typeof window === "undefined") return null
-  try {
-    const raw = window.localStorage.getItem(key)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? (parsed as T[]) : null
-  } catch {
-    return null
-  }
-}
-
-function writeLocalCache<T>(key: string, items: T[]): void {
-  if (typeof window === "undefined") return
-  try {
-    window.localStorage.setItem(key, JSON.stringify(items))
-  } catch {
-    // Ignore storage quota limits
-  }
+try {
+  for (const key of LEGACY_KEYS) window.localStorage.removeItem(key)
+} catch {
+  // ignore
 }
 
 function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(obj)) {
-    if (v !== undefined) {
-      out[k] = v
-    }
+    if (v !== undefined) out[k] = v
   }
   return out as T
+}
+
+function asNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) {
+    return Number(value)
+  }
+  return undefined
+}
+
+function normalizeMeasurement(
+  id: string,
+  raw: Record<string, unknown>,
+): BodyMeasurement {
+  return {
+    id,
+    subscriberId: String(raw.subscriberId ?? ""),
+    recordedAt:
+      typeof raw.recordedAt === "string"
+        ? raw.recordedAt
+        : new Date().toISOString(),
+    weightKg: asNumber(raw.weightKg),
+    chestCm: asNumber(raw.chestCm),
+    waistCm: asNumber(raw.waistCm),
+    hipsCm: asNumber(raw.hipsCm),
+    armsCm: asNumber(raw.armsCm),
+    thighsCm: asNumber(raw.thighsCm),
+    notes: typeof raw.notes === "string" ? raw.notes : undefined,
+    createdAt: typeof raw.createdAt === "string" ? raw.createdAt : undefined,
+    updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : undefined,
+    createdBy: typeof raw.createdBy === "string" ? raw.createdBy : undefined,
+  }
+}
+
+function normalizePhoto(
+  id: string,
+  raw: Record<string, unknown>,
+): ProgressPhoto {
+  const storagePath =
+    typeof raw.storagePath === "string" ? raw.storagePath : ""
+  return {
+    id,
+    subscriberId: String(raw.subscriberId ?? ""),
+    storagePath,
+    downloadUrl:
+      typeof raw.downloadUrl === "string"
+        ? raw.downloadUrl
+        : isRenderablePhotoSrc(storagePath)
+          ? storagePath
+          : undefined,
+    takenAt:
+      typeof raw.takenAt === "string" ? raw.takenAt : new Date().toISOString(),
+    pose: (raw.pose as ProgressPhotoPose) || "front",
+    caption: typeof raw.caption === "string" ? raw.caption : undefined,
+    mimeType: typeof raw.mimeType === "string" ? raw.mimeType : undefined,
+    sizeBytes: asNumber(raw.sizeBytes),
+    sizeLabel:
+      typeof raw.sizeLabel === "string"
+        ? raw.sizeLabel
+        : formatBytesLabel(asNumber(raw.sizeBytes)),
+    uploadedBy: typeof raw.uploadedBy === "string" ? raw.uploadedBy : undefined,
+    createdAt:
+      typeof raw.createdAt === "string"
+        ? raw.createdAt
+        : new Date().toISOString(),
+    updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : undefined,
+  }
+}
+
+function normalizePerformance(
+  id: string,
+  raw: Record<string, unknown>,
+): PerformanceRecord {
+  return {
+    id,
+    subscriberId: String(raw.subscriberId ?? ""),
+    recordedAt:
+      typeof raw.recordedAt === "string"
+        ? raw.recordedAt
+        : new Date().toISOString(),
+    name: String(raw.name ?? ""),
+    value: asNumber(raw.value) ?? 0,
+    unit: raw.unit === "reps" ? "reps" : "kg",
+    notes: typeof raw.notes === "string" ? raw.notes : undefined,
+    programId: typeof raw.programId === "string" ? raw.programId : undefined,
+    exerciseId: typeof raw.exerciseId === "string" ? raw.exerciseId : undefined,
+    createdAt: typeof raw.createdAt === "string" ? raw.createdAt : undefined,
+    updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : undefined,
+    createdBy: typeof raw.createdBy === "string" ? raw.createdBy : undefined,
+  }
+}
+
+async function uploadProgressPhotoFile(
+  path: string,
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<string> {
+  const storageRef = ref(getFirebaseStorage(), path)
+  const task = uploadBytesResumable(storageRef, file, {
+    contentType: file.type || "image/jpeg",
+    customMetadata: {
+      uploadedAt: new Date().toISOString(),
+    },
+  })
+
+  await new Promise<void>((resolve, reject) => {
+    task.on(
+      "state_changed",
+      (snap) => {
+        if (!onProgress || snap.totalBytes <= 0) return
+        onProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100))
+      },
+      reject,
+      () => resolve(),
+    )
+  })
+
+  return getDownloadURL(task.snapshot.ref)
+}
+
+async function deleteStoragePath(path?: string | null): Promise<void> {
+  if (!path || isRenderablePhotoSrc(path) || !path.startsWith("progress/")) {
+    return
+  }
+  try {
+    await deleteObject(ref(getFirebaseStorage(), path))
+  } catch {
+    // Object may already be gone
+  }
+}
+
+/** Resolve a displayable URL for a progress photo (Storage path or cached URL). */
+export async function resolveProgressPhotoUrl(
+  photo: Pick<ProgressPhoto, "storagePath" | "downloadUrl">,
+): Promise<string | null> {
+  if (photo.downloadUrl && isRenderablePhotoSrc(photo.downloadUrl)) {
+    return photo.downloadUrl
+  }
+  if (isRenderablePhotoSrc(photo.storagePath)) {
+    return photo.storagePath
+  }
+  if (!photo.storagePath || !photo.storagePath.startsWith("progress/")) {
+    return null
+  }
+  try {
+    return await getDownloadURL(ref(getFirebaseStorage(), photo.storagePath))
+  } catch {
+    return null
+  }
 }
 
 // ==========================================
@@ -66,30 +209,24 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
 export async function fetchMeasurements(
   subscriberId?: string,
 ): Promise<BodyMeasurement[]> {
-  const db = getDb()
-  if (db) {
-    try {
-      const colRef = collection(db, MEASUREMENTS_COLLECTION)
-      const snap = subscriberId
-        ? await getDocs(query(colRef, where("subscriberId", "==", subscriberId)))
-        : await getDocs(colRef)
-      if (!snap.empty) {
-        const items = snap.docs.map((d) => d.data() as BodyMeasurement)
-        if (!subscriberId) writeLocalCache(STORAGE_KEY_MEASUREMENTS, items)
-        return items
-      }
-      if (subscriberId) return []
-    } catch (err) {
-      console.warn("Firestore fetchMeasurements error, falling back to cache/demo:", err)
-    }
+  try {
+    const db = getDb()
+    const colRef = collection(db, MEASUREMENTS_COLLECTION)
+    const snap = subscriberId
+      ? await getDocs(query(colRef, where("subscriberId", "==", subscriberId)))
+      : await getDocs(colRef)
+    return snap.docs
+      .map((d) =>
+        normalizeMeasurement(d.id, d.data() as Record<string, unknown>),
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime(),
+      )
+  } catch (err) {
+    console.warn("[progress] Failed to load measurements:", err)
+    throw err instanceof Error ? err : new Error("Failed to load measurements")
   }
-
-  const cached = readLocalCache<BodyMeasurement>(STORAGE_KEY_MEASUREMENTS)
-  const all = cached && cached.length ? cached : DEMO_MEASUREMENTS
-  if (!cached) writeLocalCache(STORAGE_KEY_MEASUREMENTS, DEMO_MEASUREMENTS)
-  return subscriberId
-    ? all.filter((m) => m.subscriberId === subscriberId)
-    : all
 }
 
 export type SaveMeasurementInput = {
@@ -103,60 +240,52 @@ export type SaveMeasurementInput = {
   armsCm?: number
   thighsCm?: number
   notes?: string
+  createdBy?: string
 }
 
-export async function saveMeasurement(input: SaveMeasurementInput): Promise<BodyMeasurement> {
-  const current = await fetchMeasurements()
-  const measurementId = input.id || `m-${Date.now()}`
+export async function saveMeasurement(
+  input: SaveMeasurementInput,
+): Promise<BodyMeasurement> {
+  if (!input.subscriberId) throw new Error("Subscriber is required")
+  const now = new Date().toISOString()
+  const db = getDb()
+  const existing = input.id
+    ? await getDoc(doc(db, MEASUREMENTS_COLLECTION, input.id))
+    : null
+  const id = existing?.id ?? doc(collection(db, MEASUREMENTS_COLLECTION)).id
+
   const record: BodyMeasurement = {
-    id: measurementId,
+    id,
     subscriberId: input.subscriberId,
-    recordedAt: input.recordedAt || new Date().toISOString(),
+    recordedAt: input.recordedAt || now,
     weightKg: input.weightKg,
     chestCm: input.chestCm,
     waistCm: input.waistCm,
     hipsCm: input.hipsCm,
     armsCm: input.armsCm,
     thighsCm: input.thighsCm,
-    notes: input.notes,
+    notes: input.notes?.trim() || undefined,
+    createdAt:
+      typeof existing?.data()?.createdAt === "string"
+        ? (existing.data()!.createdAt as string)
+        : now,
+    updatedAt: now,
+    createdBy:
+      input.createdBy ||
+      (typeof existing?.data()?.createdBy === "string"
+        ? (existing.data()!.createdBy as string)
+        : undefined),
   }
 
-  const existingIndex = current.findIndex((m) => m.id === measurementId)
-  const next = existingIndex >= 0
-    ? current.map((m) => (m.id === measurementId ? record : m))
-    : [record, ...current]
-
-  writeLocalCache(STORAGE_KEY_MEASUREMENTS, next)
-
-  const db = getDb()
-  if (db) {
-    try {
-      await setDoc(
-        doc(db, MEASUREMENTS_COLLECTION, measurementId),
-        stripUndefined(record as unknown as Record<string, unknown>),
-        { merge: true },
-      )
-    } catch (err) {
-      console.warn("Firestore saveMeasurement error:", err)
-    }
-  }
-
+  await setDoc(
+    doc(db, MEASUREMENTS_COLLECTION, id),
+    stripUndefined({ ...record }),
+  )
   return record
 }
 
 export async function deleteMeasurement(id: string): Promise<void> {
-  const current = await fetchMeasurements()
-  const next = current.filter((m) => m.id !== id)
-  writeLocalCache(STORAGE_KEY_MEASUREMENTS, next)
-
-  const db = getDb()
-  if (db) {
-    try {
-      await deleteDoc(doc(db, MEASUREMENTS_COLLECTION, id))
-    } catch (err) {
-      console.warn("Firestore deleteMeasurement error:", err)
-    }
-  }
+  await deleteDoc(doc(getDb(), MEASUREMENTS_COLLECTION, id))
 }
 
 // ==========================================
@@ -166,124 +295,165 @@ export async function deleteMeasurement(id: string): Promise<void> {
 export async function fetchPhotos(
   subscriberId?: string,
 ): Promise<ProgressPhoto[]> {
-  const db = getDb()
-  if (db) {
-    try {
-      const colRef = collection(db, PHOTOS_COLLECTION)
-      const snap = subscriberId
-        ? await getDocs(query(colRef, where("subscriberId", "==", subscriberId)))
-        : await getDocs(colRef)
-      if (!snap.empty) {
-        const items = snap.docs.map((d) => d.data() as ProgressPhoto)
-        if (!subscriberId) writeLocalCache(STORAGE_KEY_PHOTOS, items)
-        return items
-      }
-      if (subscriberId) return []
-    } catch (err) {
-      console.warn("Firestore fetchPhotos error, falling back to cache/demo:", err)
-    }
+  try {
+    const db = getDb()
+    const colRef = collection(db, PHOTOS_COLLECTION)
+    const snap = subscriberId
+      ? await getDocs(query(colRef, where("subscriberId", "==", subscriberId)))
+      : await getDocs(colRef)
+    return snap.docs
+      .map((d) => normalizePhoto(d.id, d.data() as Record<string, unknown>))
+      .sort(
+        (a, b) =>
+          new Date(b.takenAt).getTime() - new Date(a.takenAt).getTime(),
+      )
+  } catch (err) {
+    console.warn("[progress] Failed to load photos:", err)
+    throw err instanceof Error ? err : new Error("Failed to load progress photos")
   }
-
-  const cached = readLocalCache<ProgressPhoto>(STORAGE_KEY_PHOTOS)
-  const all = cached && cached.length ? cached : DEMO_PHOTOS
-  if (!cached) writeLocalCache(STORAGE_KEY_PHOTOS, DEMO_PHOTOS)
-  return subscriberId
-    ? all.filter((p) => p.subscriberId === subscriberId)
-    : all
 }
 
 export type SavePhotoInput = {
   id?: string
   subscriberId: string
-  storagePath: string
   takenAt: string
   pose?: ProgressPhotoPose
   caption?: string
+  file?: File | null
+  /** @deprecated Prefer uploading `file` to Storage */
+  storagePath?: string
+  uploadedBy?: string
+  onUploadProgress?: (percent: number) => void
 }
 
 export async function savePhoto(input: SavePhotoInput): Promise<ProgressPhoto> {
-  const current = await fetchPhotos()
-  const photoId = input.id || `p-${Date.now()}`
+  if (!input.subscriberId) throw new Error("Subscriber is required")
   const now = new Date().toISOString()
-  const record: ProgressPhoto = {
-    id: photoId,
-    subscriberId: input.subscriberId,
-    storagePath: input.storagePath,
-    takenAt: input.takenAt || now,
-    pose: input.pose || "front",
-    caption: input.caption,
-    createdAt: now,
+  const db = getDb()
+  const existingSnap = input.id
+    ? await getDoc(doc(db, PHOTOS_COLLECTION, input.id))
+    : null
+  const existing = existingSnap?.exists()
+    ? normalizePhoto(
+        existingSnap.id,
+        existingSnap.data() as Record<string, unknown>,
+      )
+    : null
+
+  const id = existing?.id ?? doc(collection(db, PHOTOS_COLLECTION)).id
+  const file = input.file ?? null
+  const pose = input.pose || existing?.pose || "front"
+
+  if (!existing && !file && !isRenderablePhotoSrc(input.storagePath)) {
+    throw new Error("Please select a progress photo to upload")
   }
 
-  const existingIndex = current.findIndex((p) => p.id === photoId)
-  const next = existingIndex >= 0
-    ? current.map((p) => (p.id === photoId ? record : p))
-    : [record, ...current]
+  if (file && file.size > PROGRESS_UPLOAD_LIMITS.photoBytes) {
+    throw new Error(
+      `Photo exceeds ${formatBytesLabel(PROGRESS_UPLOAD_LIMITS.photoBytes)} limit`,
+    )
+  }
 
-  writeLocalCache(STORAGE_KEY_PHOTOS, next)
+  let storagePath = existing?.storagePath || ""
+  let downloadUrl = existing?.downloadUrl
+  let previousPathToDelete: string | null = null
+  let mimeType = existing?.mimeType
+  let sizeBytes = existing?.sizeBytes
 
-  const db = getDb()
-  if (db) {
-    try {
-      await setDoc(
-        doc(db, PHOTOS_COLLECTION, photoId),
-        stripUndefined(record as unknown as Record<string, unknown>),
-        { merge: true },
-      )
-    } catch (err) {
-      console.warn("Firestore savePhoto error:", err)
+  if (file) {
+    const nextPath = buildProgressPhotoStoragePath({
+      subscriberId: input.subscriberId,
+      photoId: id,
+      pose,
+      mimeType: file.type,
+      takenAt: input.takenAt || existing?.takenAt || now,
+    })
+    if (
+      existing?.storagePath &&
+      existing.storagePath.startsWith("progress/") &&
+      existing.storagePath !== nextPath
+    ) {
+      previousPathToDelete = existing.storagePath
     }
+    downloadUrl = await uploadProgressPhotoFile(
+      nextPath,
+      file,
+      input.onUploadProgress,
+    )
+    storagePath = nextPath
+    mimeType = file.type || "image/jpeg"
+    sizeBytes = file.size
+  } else if (input.storagePath && isRenderablePhotoSrc(input.storagePath)) {
+    // Legacy path — keep working for already-saved data URLs, but do not encourage
+    storagePath = input.storagePath
+    downloadUrl = input.storagePath
+  }
+
+  const record: ProgressPhoto = {
+    id,
+    subscriberId: input.subscriberId,
+    storagePath,
+    downloadUrl,
+    takenAt: input.takenAt || existing?.takenAt || now,
+    pose,
+    caption: input.caption?.trim() || existing?.caption,
+    mimeType,
+    sizeBytes,
+    sizeLabel: formatBytesLabel(sizeBytes),
+    uploadedBy: input.uploadedBy || existing?.uploadedBy,
+    createdAt: existing?.createdAt || now,
+    updatedAt: now,
+  }
+
+  await setDoc(
+    doc(db, PHOTOS_COLLECTION, id),
+    stripUndefined({ ...record }),
+  )
+
+  if (previousPathToDelete) {
+    await deleteStoragePath(previousPathToDelete)
   }
 
   return record
 }
 
 export async function deletePhoto(id: string): Promise<void> {
-  const current = await fetchPhotos()
-  const next = current.filter((p) => p.id !== id)
-  writeLocalCache(STORAGE_KEY_PHOTOS, next)
-
   const db = getDb()
-  if (db) {
-    try {
-      await deleteDoc(doc(db, PHOTOS_COLLECTION, id))
-    } catch (err) {
-      console.warn("Firestore deletePhoto error:", err)
-    }
-  }
+  const snap = await getDoc(doc(db, PHOTOS_COLLECTION, id))
+  const existing = snap.exists()
+    ? normalizePhoto(snap.id, snap.data() as Record<string, unknown>)
+    : null
+  await deleteDoc(doc(db, PHOTOS_COLLECTION, id))
+  if (existing) await deleteStoragePath(existing.storagePath)
 }
 
 // ==========================================
-// Performance / Lifts
+// Performance
 // ==========================================
 
 export async function fetchPerformance(
   subscriberId?: string,
 ): Promise<PerformanceRecord[]> {
-  const db = getDb()
-  if (db) {
-    try {
-      const colRef = collection(db, PERFORMANCE_COLLECTION)
-      const snap = subscriberId
-        ? await getDocs(query(colRef, where("subscriberId", "==", subscriberId)))
-        : await getDocs(colRef)
-      if (!snap.empty) {
-        const items = snap.docs.map((d) => d.data() as PerformanceRecord)
-        if (!subscriberId) writeLocalCache(STORAGE_KEY_PERFORMANCE, items)
-        return items
-      }
-      if (subscriberId) return []
-    } catch (err) {
-      console.warn("Firestore fetchPerformance error, falling back to cache/demo:", err)
-    }
+  try {
+    const db = getDb()
+    const colRef = collection(db, PERFORMANCE_COLLECTION)
+    const snap = subscriberId
+      ? await getDocs(query(colRef, where("subscriberId", "==", subscriberId)))
+      : await getDocs(colRef)
+    return snap.docs
+      .map((d) =>
+        normalizePerformance(d.id, d.data() as Record<string, unknown>),
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime(),
+      )
+  } catch (err) {
+    console.warn("[progress] Failed to load performance:", err)
+    throw err instanceof Error
+      ? err
+      : new Error("Failed to load performance records")
   }
-
-  const cached = readLocalCache<PerformanceRecord>(STORAGE_KEY_PERFORMANCE)
-  const all = cached && cached.length ? cached : DEMO_LIFTS
-  if (!cached) writeLocalCache(STORAGE_KEY_PERFORMANCE, DEMO_LIFTS)
-  return subscriberId
-    ? all.filter((l) => l.subscriberId === subscriberId)
-    : all
 }
 
 export type SavePerformanceInput = {
@@ -294,56 +464,55 @@ export type SavePerformanceInput = {
   value: number
   unit?: "kg" | "reps"
   notes?: string
+  programId?: string
+  exerciseId?: string
+  createdBy?: string
 }
 
-export async function savePerformance(input: SavePerformanceInput): Promise<PerformanceRecord> {
-  const current = await fetchPerformance()
-  const perfId = input.id || `l-${Date.now()}`
+export async function savePerformance(
+  input: SavePerformanceInput,
+): Promise<PerformanceRecord> {
+  if (!input.subscriberId) throw new Error("Subscriber is required")
+  const cleanName = input.name.trim()
+  if (!cleanName) throw new Error("Lift / metric name is required")
+  if (!Number.isFinite(input.value)) throw new Error("Value is required")
+
+  const now = new Date().toISOString()
+  const db = getDb()
+  const existing = input.id
+    ? await getDoc(doc(db, PERFORMANCE_COLLECTION, input.id))
+    : null
+  const id = existing?.id ?? doc(collection(db, PERFORMANCE_COLLECTION)).id
+
   const record: PerformanceRecord = {
-    id: perfId,
+    id,
     subscriberId: input.subscriberId,
-    recordedAt: input.recordedAt || new Date().toISOString(),
-    name: input.name,
+    recordedAt: input.recordedAt || now,
+    name: cleanName,
     value: input.value,
     unit: input.unit || "kg",
-    notes: input.notes,
+    notes: input.notes?.trim() || undefined,
+    programId: input.programId,
+    exerciseId: input.exerciseId,
+    createdAt:
+      typeof existing?.data()?.createdAt === "string"
+        ? (existing.data()!.createdAt as string)
+        : now,
+    updatedAt: now,
+    createdBy:
+      input.createdBy ||
+      (typeof existing?.data()?.createdBy === "string"
+        ? (existing.data()!.createdBy as string)
+        : undefined),
   }
 
-  const existingIndex = current.findIndex((l) => l.id === perfId)
-  const next = existingIndex >= 0
-    ? current.map((l) => (l.id === perfId ? record : l))
-    : [record, ...current]
-
-  writeLocalCache(STORAGE_KEY_PERFORMANCE, next)
-
-  const db = getDb()
-  if (db) {
-    try {
-      await setDoc(
-        doc(db, PERFORMANCE_COLLECTION, perfId),
-        stripUndefined(record as unknown as Record<string, unknown>),
-        { merge: true },
-      )
-    } catch (err) {
-      console.warn("Firestore savePerformance error:", err)
-    }
-  }
-
+  await setDoc(
+    doc(db, PERFORMANCE_COLLECTION, id),
+    stripUndefined({ ...record }),
+  )
   return record
 }
 
 export async function deletePerformance(id: string): Promise<void> {
-  const current = await fetchPerformance()
-  const next = current.filter((l) => l.id !== id)
-  writeLocalCache(STORAGE_KEY_PERFORMANCE, next)
-
-  const db = getDb()
-  if (db) {
-    try {
-      await deleteDoc(doc(db, PERFORMANCE_COLLECTION, id))
-    } catch (err) {
-      console.warn("Firestore deletePerformance error:", err)
-    }
-  }
+  await deleteDoc(doc(getDb(), PERFORMANCE_COLLECTION, id))
 }
-

@@ -159,18 +159,26 @@
     "cta": "Back home"
   },
   "admin": {
+    "access": {
+      "noneTitle": "No module access yet",
+      "noneHint": "Your staff account is signed in, but no dashboard modules are assigned. Ask the head coach to grant permissions for the pages you need."
+    },
     "common": {
       "all": "All",
       "actions": "Actions",
       "view": "View",
       "manage": "Manage",
       "back": "Back",
+      "retry": "Try again",
       "demoOnly": "Demo only — Firebase is not connected yet"
     },
     "overview": {
       "hello": "Welcome back, {{name}}",
       "hint": "This week’s studio pulse — current seats, adherence, and what needs a decision.",
       "queueCta": "{{count}} need a look",
+      "empty": {
+        "loadError": "Could not load the studio overview. Check your connection and try again."
+      },
       "stats": {
         "subscribers": "Roster",
         "subscribersHint": "{{count}} active accounts",
@@ -647,7 +655,9 @@
         "pending": "Approvals",
         "pendingHint": "Registration requests waiting",
         "queued": "Emails queued",
-        "queuedHint": "Operational email, not WhatsApp"
+        "queuedHint": "Operational email, not WhatsApp",
+        "unread": "Unread",
+        "unreadHint": "Notices you have not opened yet"
       },
       "noticeKind": {
         "registration": "Registration",
@@ -660,8 +670,10 @@
         "sent": "Sent",
         "failed": "Failed"
       },
+      "unreadBadge": "New",
       "channel": {
-        "email": "Email"
+        "email": "Email",
+        "push": "Push alarm"
       },
       "inbox": {
         "title": "Operational emails",
@@ -731,11 +743,18 @@
         "rosterHint": "Current accounts with package, dates, and last check-in. Rejected requests excluded."
       },
       "empty": {
-        "inbox": "No emails in this slice.",
-        "expiring": "No active subscriptions end in the next 21 days."
+        "inbox": "No operational notices yet — they appear when registrations, approvals, activations, or expirations fire.",
+        "expiring": "No active subscriptions end in the next 21 days.",
+        "activity": "No active subscribers to report on yet.",
+        "packages": "No live packages to summarize.",
+        "adherence": "No adherence data yet — logs and assigned programs will fill this desk.",
+        "progress": "No progress summaries yet.",
+        "content": "No content assets linked for usage reporting.",
+        "loadError": "Could not load the reports desk. Check permissions and try again."
       },
       "toast": {
-        "sent": "Email marked sent — Firebase mail is not connected yet",
+        "sent": "Notice dispatched — email queued and staff push attempted",
+        "sendFailed": "Could not dispatch this notice. Check Functions logs and try again.",
         "exported": "Snapshot downloaded",
         "noExport": "Your role can read reports but cannot export them"
       }

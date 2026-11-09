@@ -58,7 +58,9 @@ export function NutritionPlanPage() {
     subscriberId,
     enabled: Boolean(subscriberId),
   })
-  const { data: contentAssets = [] } = useContentAssetsQuery()
+  const { data: contentAssets = [] } = useContentAssetsQuery({
+    audience: "subscriber",
+  })
 
   const activePlan = useMemo(() => {
     return allPrograms.find((p) => p.status === "active") ?? allPrograms[0] ?? null

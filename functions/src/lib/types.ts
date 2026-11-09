@@ -18,6 +18,7 @@ export const ALL_STAFF_PERMISSIONS = [
   "nutrition:manage",
   "content:manage",
   "progress:read",
+  "progress:write",
   "physicalTherapy:read",
   "physicalTherapy:manage",
   "reports:read",

@@ -212,6 +212,14 @@ export const PERMISSION_MODULES: PermissionModuleGroup[] = [
           ar: "متابعة سجلات الوزن ونسب الالتزام والصور الشخصية للمشترك.",
         },
       },
+      {
+        key: "progress:write",
+        label: { en: "Edit Subscriber Progress", ar: "تعديل تقدم المشتركين" },
+        description: {
+          en: "Add or delete measurements, progress photos, and performance records for any subscriber.",
+          ar: "إضافة أو حذف القياسات وصور التطور وسجلات الأداء لأي مشترك.",
+        },
+      },
     ],
   },
   {

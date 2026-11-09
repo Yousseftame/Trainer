@@ -188,9 +188,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 await callBootstrapStaffClaims()
                 await firebaseUser.getIdToken(true)
                 user = await mapFirebaseUserWithClaims(firebaseUser)
-              } catch {
-                // ignore bootstrap failures
+              } catch (err) {
+                const message =
+                  err instanceof Error ? err.message : String(err ?? "")
+                if (/suspended|permission-denied|user-disabled/i.test(message)) {
+                  setLocalSession(null)
+                  await firebaseSignOut(auth).catch(() => undefined)
+                  setState({
+                    status: "unauthenticated",
+                    user: null,
+                    subscriptionStatus: null,
+                    error: null,
+                  })
+                  return
+                }
               }
+            }
+            if (user.status === "suspended" || user.status === "rejected") {
+              setLocalSession(null)
+              await firebaseSignOut(auth).catch(() => undefined)
+              setState({
+                status: "unauthenticated",
+                user: null,
+                subscriptionStatus: null,
+                error: null,
+              })
+              return
             }
             setState({
               status: "authenticated",

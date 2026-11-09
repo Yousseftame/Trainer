@@ -19,18 +19,21 @@ import { ContentPreviewDialog } from "@/components/dashboard/ContentPreviewDialo
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
 import { BRAND_LOGO_ON_DARK } from "@/components/shared/BrandLogo"
 import { APP_ROUTES } from "@/config/constants"
-import {
-  evaluateSubscriberContentAccess,
-  type DemoContentAsset,
-} from "@/features/content/demo"
+import { evaluateSubscriberContentAccess } from "@/features/content/access"
 import { useContentAssetsQuery } from "@/features/content/hooks"
 import { useNutritionProgramsQuery } from "@/features/nutrition/hooks"
 import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
 import {
   currentSubscriptionFor,
   getPackageById,
-} from "@/features/subscriptions/demo"
+} from "@/features/subscriptions/cache"
+import {
+  usePackagesQuery,
+  useSubscriberSubscriptionsQuery,
+} from "@/features/subscriptions/hooks"
 import { useWorkoutProgramsQuery } from "@/features/workouts/hooks"
+import type { CatalogPackage } from "@/features/subscriptions/types"
+import type { ContentAsset } from "@/types/content"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatDuration } from "@/lib/format"
@@ -50,7 +53,9 @@ export function LibraryPage() {
   useDocumentTitle(isAr ? "مكتبة المحتوى والملفات" : "Resource Library")
 
   const { subscriber: currentSubscriber, subscriberId } = usePanelSubscriber()
-  const { data: assets = [] } = useContentAssetsQuery()
+  const { data: assets = [] } = useContentAssetsQuery({ audience: "subscriber" })
+  const { data: mySubs = [] } = useSubscriberSubscriptionsQuery(subscriberId)
+  usePackagesQuery()
   const { data: workoutPrograms = [] } = useWorkoutProgramsQuery({
     subscriberId,
     enabled: Boolean(subscriberId),
@@ -63,17 +68,20 @@ export function LibraryPage() {
   const [filter, setFilter] = useState<LibraryFilter>("all")
   const [query, setQuery] = useState("")
   const [unlockedOnly, setUnlockedOnly] = useState(false)
-  const [previewAsset, setPreviewAsset] = useState<DemoContentAsset | null>(null)
+  const [previewAsset, setPreviewAsset] = useState<ContentAsset | null>(null)
 
-  // 2. Identify subscription & package tier
   const subscription = useMemo(() => {
     if (!subscriberId) return null
-    return currentSubscriptionFor(subscriberId)
-  }, [subscriberId])
+    return (
+      mySubs.find((s) => s.status === "active" || s.status === "suspended") ??
+      mySubs[0] ??
+      currentSubscriptionFor(subscriberId)
+    )
+  }, [subscriberId, mySubs])
 
   const currentPackage = useMemo(() => {
     if (!subscription) return null
-    return getPackageById(subscription.packageId)
+    return getPackageById(subscription.packageId) as CatalogPackage | undefined
   }, [subscription])
 
   // 3. Identify active workout and nutrition programs
@@ -91,15 +99,12 @@ export function LibraryPage() {
     const publicAssets = assets.filter((item) => item.category !== "reference")
 
     return publicAssets.map((asset) => {
-      const access = currentSubscriber
-        ? evaluateSubscriberContentAccess(asset, currentSubscriber.id)
-        : {
-            allowed: false,
-            reason: {
-              en: "Sign in with an active subscriber account",
-              ar: "سجل الدخول بحساب مشترك نشط",
-            },
-          }
+      const access = evaluateSubscriberContentAccess({
+        asset,
+        subscriber: currentSubscriber,
+        subscription,
+        pkg: currentPackage,
+      })
 
       // Check linkage with active workout program
       const isLinkedToWorkout = Boolean(
@@ -141,6 +146,8 @@ export function LibraryPage() {
   }, [
     assets,
     currentSubscriber,
+    subscription,
+    currentPackage,
     activeWorkoutProgram,
     activeNutritionProgram,
   ])

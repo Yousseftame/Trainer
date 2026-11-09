@@ -1,10 +1,26 @@
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import {auth, db} from "../../config/firebase.js";
 import {COLLECTIONS} from "../../config/collections.js";
-import {ALL_STAFF_PERMISSIONS, type UserStatus} from "../../lib/types.js";
+import {ALL_STAFF_PERMISSIONS} from "../../lib/types.js";
 import {stripUndefined} from "../../lib/utils.js";
+import {
+  parseStaffRole,
+  parseStaffStatus,
+  sanitizePermissions,
+} from "../../shared/staff.js";
 
-/** Ensures signed-in staff have custom claims used by rules + callables. */
+const BOOTSTRAP_ALLOWLIST = new Set([
+  "coach@derpyfit.com",
+  "admin@derpyfit.com",
+  "omar@derpyfit.com",
+]);
+
+/**
+ * Syncs Auth custom claims from the staff directory (source of truth).
+ * Allowlist minting is first-run only (empty staff collection) — never a standing
+ * privilege escalation path once a staff directory exists.
+ * Never invents extra permissions beyond the staff profile.
+ */
 export const bootstrapStaffClaims = onCall(async (request) => {
   if (!request.auth?.uid) {
     throw new HttpsError("unauthenticated", "Sign in required.");
@@ -15,17 +31,15 @@ export const bootstrapStaffClaims = onCall(async (request) => {
     (request.auth.token.email as string | undefined)?.toLowerCase() ?? "";
 
   const staffSnap = await db.collection(COLLECTIONS.staff).doc(uid).get();
-  let role = "head_coach";
-  let status: UserStatus = "active";
+  let role = parseStaffRole("assistant");
+  let status = parseStaffStatus("active");
   let permissions: string[] = [];
 
   if (staffSnap.exists) {
     const data = staffSnap.data() ?? {};
-    role = String(data.role ?? "assistant");
-    status = (String(data.status ?? "active") as UserStatus) || "active";
-    permissions = Array.isArray(data.permissions)
-      ? (data.permissions as string[])
-      : [];
+    role = parseStaffRole(data.role, "assistant");
+    status = parseStaffStatus(data.status, "active");
+    permissions = sanitizePermissions(data.permissions, role);
   } else {
     const byEmail = await db
       .collection(COLLECTIONS.staff)
@@ -35,41 +49,49 @@ export const bootstrapStaffClaims = onCall(async (request) => {
 
     if (!byEmail.empty) {
       const data = byEmail.docs[0].data();
-      role = String(data.role ?? "assistant");
-      status = (String(data.status ?? "active") as UserStatus) || "active";
-      permissions = Array.isArray(data.permissions)
-        ? (data.permissions as string[])
-        : [];
+      role = parseStaffRole(data.role, "assistant");
+      status = parseStaffStatus(data.status, "active");
+      permissions = sanitizePermissions(data.permissions, role);
       if (byEmail.docs[0].id !== uid) {
+        // Relink profile to the live Auth uid — never trust client-writable fields.
         await db.collection(COLLECTIONS.staff).doc(uid).set(
           stripUndefined({
             ...data,
             id: uid,
+            role,
+            status,
+            permissions,
             updatedAt: new Date().toISOString(),
           }),
           {merge: true},
         );
       }
     } else {
-      const allowlist = new Set([
-        "coach@derpyfit.com",
-        "admin@derpyfit.com",
-        "omar@derpyfit.com",
-      ]);
-      if (!allowlist.has(email)) {
+      if (!BOOTSTRAP_ALLOWLIST.has(email)) {
         throw new HttpsError(
           "permission-denied",
           "No staff profile found for this account.",
         );
       }
+
+      const existingStaff = await db.collection(COLLECTIONS.staff).limit(1).get();
+      if (!existingStaff.empty) {
+        throw new HttpsError(
+          "permission-denied",
+          "Staff directory already initialized. Ask a head coach to add this account.",
+        );
+      }
+
+      role = "head_coach";
+      status = "active";
       permissions = [...ALL_STAFF_PERMISSIONS];
       await db.collection(COLLECTIONS.staff).doc(uid).set(
         stripUndefined({
           id: uid,
           displayName: request.auth.token.name || "Head Coach",
           email,
-          role: "head_coach",
-          status: "active",
+          role,
+          status,
           permissions,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -79,9 +101,15 @@ export const bootstrapStaffClaims = onCall(async (request) => {
     }
   }
 
-  if (role === "head_coach") {
-    permissions = [...ALL_STAFF_PERMISSIONS];
+  if (status === "suspended") {
+    throw new HttpsError(
+      "permission-denied",
+      "Account is suspended.",
+    );
   }
+
+  // Claims mirror the staff document exactly (head coach → full set via sanitize).
+  permissions = sanitizePermissions(permissions, role);
 
   await auth.setCustomUserClaims(uid, {role, status, permissions});
   return {ok: true, role, status, permissions};

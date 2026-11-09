@@ -7,6 +7,7 @@ import {
   applyAuthAccess,
   normalizeBilingual,
 } from "../../shared/subscribers.js";
+import {enqueueNotice} from "../../shared/notices.js";
 
 export const rejectRegistrationRequest = onCall(async (request) => {
   const caller = assertStaffCaller(request.auth, "subscribers:approve");
@@ -73,5 +74,32 @@ export const rejectRegistrationRequest = onCall(async (request) => {
   });
 
   await reqRef.set(updatedReq);
+
+  const email = String(existing.email ?? "").trim().toLowerCase();
+  const displayName = String(existing.displayName ?? email);
+  if (email) {
+    await enqueueNotice({
+      kind: "approval",
+      toEmail: email,
+      toName: displayName,
+      subscriberId,
+      requestId,
+      dedupeKey: `rejection:${requestId}`,
+      subject: {
+        en: `${displayName}'s request was not approved`,
+        ar: `لم يُقبل طلب ${displayName}`,
+      },
+      detail: {
+        en:
+          reviewNotesLocalized?.en ||
+          "Your registration request was not approved at this time.",
+        ar:
+          reviewNotesLocalized?.ar ||
+          "لم تتم الموافقة على طلب التسجيل في الوقت الحالي.",
+      },
+      alarmStaff: false,
+    });
+  }
+
   return {request: updatedReq, rejectedBy: caller.uid};
 });

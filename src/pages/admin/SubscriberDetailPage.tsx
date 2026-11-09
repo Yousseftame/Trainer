@@ -1,4 +1,4 @@
-﻿import { useMemo, useState, type ReactNode } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import {
@@ -32,20 +32,27 @@ import {
 } from "@/components/dashboard/SubscriptionActionDialog"
 import { APP_ROUTES } from "@/config/constants"
 import { useAuth } from "@/features/auth/auth-context"
-import { mealCount, type DemoNutritionProgram } from "@/features/nutrition/demo"
 import {
-  DEMO_TODAY,
-  adherenceScore,
-  daysSinceCheckIn,
-  firstMeasurement,
-  getRosterPerson,
-  latestMeasurement,
-  latestWeek,
-  photosFor,
-  previousMeasurement,
-  programsFor,
-  weightDelta,
-} from "@/features/progress/demo"
+  useNutritionLogsQuery,
+  useNutritionProgramsQuery,
+} from "@/features/nutrition/hooks"
+import {
+  adherenceScoreFromWeeks,
+  computeAdherenceWeeks,
+  latestAdherenceWeek,
+} from "@/features/progress/adherence"
+import { useSubscriberPTRecordsQuery } from "@/features/physicalTherapy/hooks"
+import {
+  useMeasurementsQuery,
+  usePhotosQuery,
+} from "@/features/progress/hooks"
+import {
+  daysSince,
+  firstMeasurement as firstFromList,
+  latestMeasurement as latestFromList,
+  previousMeasurement as previousFromList,
+  weightDelta as weightDeltaFromList,
+} from "@/features/progress/metrics"
 import { subscriberDisplayName } from "@/features/subscribers"
 import {
   useDeleteSubscriberMutation,
@@ -64,7 +71,12 @@ import {
   useSubscriptionsQuery,
   useUpdateSubscriptionLifecycleMutation,
 } from "@/features/subscriptions/hooks"
-import { trainingDayCount, type DemoWorkoutProgram } from "@/features/workouts/demo"
+import {
+  useWorkoutLogsQuery,
+  useWorkoutProgramsQuery,
+} from "@/features/workouts/hooks"
+import { mealCount, trainingDayCount } from "@/lib/program-text"
+import type { NutritionProgram, WorkoutProgram } from "@/types/program"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatBmi, formatDate, formatKg, initials } from "@/lib/format"
@@ -138,6 +150,30 @@ export function SubscriberDetailPage() {
     [allSubscriptions, subscriberId],
   )
 
+  const { data: measurements = [] } = useMeasurementsQuery(
+    subscriberId || undefined,
+  )
+  const { data: photos = [] } = usePhotosQuery(subscriberId || undefined)
+  const { data: ptRecords = [] } = useSubscriberPTRecordsQuery(
+    subscriberId || undefined,
+  )
+  const { data: workoutPrograms = [] } = useWorkoutProgramsQuery({
+    subscriberId,
+    enabled: Boolean(subscriberId),
+  })
+  const { data: nutritionPrograms = [] } = useNutritionProgramsQuery({
+    subscriberId,
+    enabled: Boolean(subscriberId),
+  })
+  const { data: workoutLogs = [] } = useWorkoutLogsQuery({
+    subscriberId,
+    enabled: Boolean(subscriberId),
+  })
+  const { data: nutritionLogs = [] } = useNutritionLogsQuery({
+    subscriberId,
+    enabled: Boolean(subscriberId),
+  })
+
   if (!subscriber) {
     return (
       <section className="rounded-[24px] bg-white p-8">
@@ -164,21 +200,51 @@ export function SubscriberDetailPage() {
         currentPackage?.entitlements ?? current.entitlementsSnapshot,
       )
     : null
-  const programs = programsFor(subscriber.id)
+  const programs = {
+    workouts: workoutPrograms,
+    nutrition: nutritionPrograms,
+  }
   const activeWorkout = programs.workouts.find((item) => item.status === "active")
-  const activeNutrition = programs.nutrition.find((item) => item.status === "active")
-  const latest = latestMeasurement(subscriber.id)
-  const first = firstMeasurement(subscriber.id)
-  const previous = previousMeasurement(subscriber.id)
-  const photos = photosFor(subscriber.id)
-  const latestPhotos = photos.filter((item) => item.takenAt === photos[photos.length - 1]?.takenAt)
-  const week = latestWeek(subscriber.id)
-  const roster = getRosterPerson(subscriber.id)
+  const activeNutrition = programs.nutrition.find(
+    (item) => item.status === "active",
+  )
+  const latest = latestFromList(measurements)
+  const first = firstFromList(measurements)
+  const previous = previousFromList(measurements)
+  const latestPhotos = photos.filter(
+    (item) => item.takenAt === photos[photos.length - 1]?.takenAt,
+  )
+  const adherenceWeeks = computeAdherenceWeeks({
+    workoutLogs,
+    nutritionLogs,
+    workoutPrograms: programs.workouts,
+    nutritionPrograms: programs.nutrition,
+  })
+  const week = latestAdherenceWeek(adherenceWeeks)
   const remaining = remainingDays(current?.endsAt)
-  const days = daysSinceCheckIn(subscriber.id)
-  const delta = weightDelta(subscriber.id)
+  const days = daysSince(latest?.recordedAt)
+  const delta = weightDeltaFromList(measurements, subscriber.startingWeightKg)
   const bmi = formatBmi(latest?.weightKg, subscriber.heightCm)
-  const adherence = adherenceScore(subscriber.id)
+  const adherence = adherenceScoreFromWeeks(adherenceWeeks)
+  const activePt =
+    ptRecords.find((r) => r.status === "active" || r.status === "recovering") ??
+    ptRecords[0]
+  const rosterBucket =
+    !latest?.recordedAt
+      ? "quiet"
+      : days != null && days > 14
+        ? "attention"
+        : adherence != null && adherence < 70
+          ? "attention"
+          : "ontrack"
+  const rosterTone =
+    rosterBucket === "quiet"
+      ? "muted"
+      : rosterBucket === "attention"
+        ? days != null && days > 14
+          ? "danger"
+          : "warning"
+        : "success"
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
@@ -209,12 +275,10 @@ export function SubscriberDetailPage() {
                 {currentPackage ? (
                   <StatusBadge label={currentPackage.name[locale]} tone="info" />
                 ) : null}
-                {roster ? (
-                  <StatusBadge
-                    label={t(`admin.progress.filter.${roster.bucket}`)}
-                    tone={roster.tone}
-                  />
-                ) : null}
+                <StatusBadge
+                  label={t(`admin.progress.filter.${rosterBucket}`)}
+                  tone={rosterTone}
+                />
               </div>
               <p className="mt-1 text-[13px] font-medium text-[#8c8c8c]">
                 {t("admin.subscribers.joined", { date: formatDate(subscriber.createdAt, locale) })}
@@ -673,6 +737,63 @@ export function SubscriberDetailPage() {
       <section className="rounded-[24px] bg-white p-5 sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
+            {locale === "ar" ? "العلاج الطبيعي والتأهيل" : "Physical therapy & rehab"}
+          </h3>
+          <Link
+            to={APP_ROUTES.admin.physicalTherapy}
+            className="text-[13px] font-bold text-[var(--gym-ink,#111111)]"
+          >
+            {locale === "ar" ? "فتح الوحدة" : "Open module"}
+          </Link>
+        </div>
+        {activePt ? (
+          <div className="mt-4 rounded-[18px] bg-[#F4F4F4] p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[14px] font-bold text-[var(--gym-ink,#111111)]">
+                {activePt.injuryTitle[locale] || activePt.injuryTitle.en}
+              </p>
+              <StatusBadge
+                label={
+                  activePt.status === "active"
+                    ? locale === "ar"
+                      ? "تأهيل نشط"
+                      : "Active"
+                    : activePt.status === "recovering"
+                      ? locale === "ar"
+                        ? "شفاء"
+                        : "Recovering"
+                      : locale === "ar"
+                        ? "معافى"
+                        : "Cleared"
+                }
+                tone={
+                  activePt.status === "cleared"
+                    ? "success"
+                    : activePt.status === "active"
+                      ? "danger"
+                      : "warning"
+                }
+              />
+            </div>
+            <p className="mt-1 text-[12px] font-medium text-[#8c8c8c]">
+              {activePt.restrictions.length}{" "}
+              {locale === "ar" ? "موانع حركة" : "restrictions"} ·{" "}
+              {activePt.rehabExercises.length}{" "}
+              {locale === "ar" ? "تمارين تأهيل" : "rehab exercises"}
+            </p>
+          </div>
+        ) : (
+          <p className="mt-4 text-[13px] font-medium text-[#8c8c8c]">
+            {locale === "ar"
+              ? "لا يوجد ملف علاج طبيعي مسجل لهذا المشترك."
+              : "No physical therapy record for this subscriber yet."}
+          </p>
+        )}
+      </section>
+
+      <section className="rounded-[24px] bg-white p-5 sm:p-7">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
             {t("admin.subscribers.progressSnapshot")}
           </h3>
           <Link
@@ -932,7 +1053,7 @@ export function SubscriberDetailPage() {
 
 function remainingDays(endsAt: string | null | undefined) {
   if (!endsAt) return null
-  return Math.ceil((new Date(endsAt).getTime() - DEMO_TODAY.getTime()) / 86_400_000)
+  return Math.ceil((new Date(endsAt).getTime() - Date.now()) / 86_400_000)
 }
 
 function remainingLabel(days: number | null, t: (key: string, options?: Record<string, unknown>) => string) {
@@ -985,7 +1106,7 @@ function ProgramCard({
   )
 }
 
-function WorkoutSummary({ program, locale }: { program: DemoWorkoutProgram; locale: AppLocale }) {
+function WorkoutSummary({ program, locale }: { program: WorkoutProgram; locale: AppLocale }) {
   const { t } = useTranslation()
   return (
     <div className="mt-5">
@@ -1016,7 +1137,7 @@ function WorkoutSummary({ program, locale }: { program: DemoWorkoutProgram; loca
   )
 }
 
-function NutritionSummary({ program, locale }: { program: DemoNutritionProgram; locale: AppLocale }) {
+function NutritionSummary({ program, locale }: { program: NutritionProgram; locale: AppLocale }) {
   const { t } = useTranslation()
   return (
     <div className="mt-5">

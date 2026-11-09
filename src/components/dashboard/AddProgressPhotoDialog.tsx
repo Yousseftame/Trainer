@@ -1,11 +1,15 @@
-import { useState, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { Calendar, Camera, Upload, X } from "lucide-react"
+import {
+  formatBytesLabel,
+  PROGRESS_UPLOAD_LIMITS,
+} from "@/features/progress/paths"
+import type { SavePhotoInput } from "@/features/progress/service"
 import { useLocale } from "@/hooks/useLocale"
 import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 import type { ProgressPhotoPose } from "@/types/progress"
-import type { SavePhotoInput } from "@/features/progress/service"
 
 type AddProgressPhotoDialogProps = {
   open: boolean
@@ -15,11 +19,12 @@ type AddProgressPhotoDialogProps = {
   onSave: (input: SavePhotoInput) => Promise<unknown>
 }
 
-const POSES: Array<{ id: ProgressPhotoPose; labelEn: string; labelAr: string }> = [
-  { id: "front", labelEn: "Front Pose", labelAr: "وضعية أمامية" },
-  { id: "side", labelEn: "Side Pose", labelAr: "وضعية جانبية" },
-  { id: "back", labelEn: "Back Pose", labelAr: "وضعية خلفية" },
-]
+const POSES: Array<{ id: ProgressPhotoPose; labelEn: string; labelAr: string }> =
+  [
+    { id: "front", labelEn: "Front Pose", labelAr: "وضعية أمامية" },
+    { id: "side", labelEn: "Side Pose", labelAr: "وضعية جانبية" },
+    { id: "back", labelEn: "Back Pose", labelAr: "وضعية خلفية" },
+  ]
 
 export function AddProgressPhotoDialog({
   open,
@@ -33,67 +38,112 @@ export function AddProgressPhotoDialog({
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [pose, setPose] = useState<ProgressPhotoPose>("front")
-  const [takenAt, setTakenAt] = useState(() => new Date().toISOString().slice(0, 10))
+  const [takenAt, setTakenAt] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  )
   const [caption, setCaption] = useState("")
-  const [previewUrl, setPreviewUrl] = useState<string>("")
+  const [file, setFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState("")
+  const [uploadPercent, setUploadPercent] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    setPose("front")
+    setTakenAt(new Date().toISOString().slice(0, 10))
+    setCaption("")
+    setFile(null)
+    setPreviewUrl("")
+    setUploadPercent(null)
+    setSaving(false)
+  }, [open, subscriberId])
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl.startsWith("blob:")) URL.revokeObjectURL(previewUrl)
+    }
+  }, [previewUrl])
 
   if (!open) return null
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const picked = e.target.files?.[0]
+    if (!picked) return
 
-    if (file.size > 8 * 1024 * 1024) {
-      appToast.error(isAr ? "الحد الأقصى لحجم الصورة هو 8 ميجابايت" : "Max photo size is 8MB")
+    if (!picked.type.startsWith("image/")) {
+      appToast.error(
+        isAr ? "يرجى اختيار ملف صورة صالح" : "Please choose a valid image file",
+      )
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      if (typeof event.target?.result === "string") {
-        setPreviewUrl(event.target.result)
-      }
+    if (picked.size > PROGRESS_UPLOAD_LIMITS.photoBytes) {
+      appToast.error(
+        isAr
+          ? `الحد الأقصى لحجم الصورة هو ${formatBytesLabel(PROGRESS_UPLOAD_LIMITS.photoBytes)}`
+          : `Max photo size is ${formatBytesLabel(PROGRESS_UPLOAD_LIMITS.photoBytes)}`,
+      )
+      return
     }
-    reader.readAsDataURL(file)
+
+    if (previewUrl.startsWith("blob:")) URL.revokeObjectURL(previewUrl)
+    setFile(picked)
+    setPreviewUrl(URL.createObjectURL(picked))
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!previewUrl) {
-      appToast.error(isAr ? "يرجى تحديد أو رفع صورة التقدم" : "Please select or upload a progress photo")
+    if (!file) {
+      appToast.error(
+        isAr
+          ? "يرجى تحديد أو رفع صورة التقدم"
+          : "Please select or upload a progress photo",
+      )
       return
     }
 
     try {
       setSaving(true)
+      setUploadPercent(0)
       await onSave({
         subscriberId,
-        storagePath: previewUrl,
+        file,
         takenAt: `${takenAt}T12:00:00.000Z`,
         pose,
         caption: caption.trim() || undefined,
+        onUploadProgress: (percent) => setUploadPercent(percent),
       })
-      appToast.success(isAr ? "تمت إضافة صورة التقدم بنجاح" : "Progress photo added successfully")
+      appToast.success(
+        isAr
+          ? "تمت إضافة صورة التقدم بنجاح"
+          : "Progress photo added successfully",
+      )
       onClose()
-    } catch {
-      appToast.error(isAr ? "حدث خطأ أثناء حفظ الصورة" : "Failed to add progress photo")
+    } catch (err) {
+      appToast.error(
+        err instanceof Error
+          ? err.message
+          : isAr
+            ? "حدث خطأ أثناء حفظ الصورة"
+            : "Failed to add progress photo",
+      )
     } finally {
       setSaving(false)
+      setUploadPercent(null)
     }
   }
 
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      {/* Overlay Backdrop */}
       <div
         className="fixed inset-0 bg-black/50"
-        onClick={onClose}
+        onClick={() => {
+          if (!saving) onClose()
+        }}
         aria-hidden
       />
 
-      {/* Modal Dialog */}
-      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] bg-white p-5 sm:p-7 shadow-2xl">
+      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] bg-white p-5 shadow-2xl sm:p-7">
         <div className="flex items-center justify-between border-b border-[#F0F0F0] pb-4">
           <div className="flex items-center gap-3">
             <span className="flex size-10 items-center justify-center rounded-2xl bg-[var(--gym-ink,#111111)] text-[var(--gym-lime,#fb5001)]">
@@ -106,7 +156,9 @@ export function AddProgressPhotoDialog({
               {subscriberName ? (
                 <p className="text-[12px] font-bold text-[#8c8c8c]">
                   {isAr ? "المشترك: " : "Subscriber: "}
-                  <span className="text-[var(--gym-ink,#111111)]">{subscriberName}</span>
+                  <span className="text-[var(--gym-ink,#111111)]">
+                    {subscriberName}
+                  </span>
                 </p>
               ) : null}
             </div>
@@ -114,6 +166,7 @@ export function AddProgressPhotoDialog({
           <button
             type="button"
             onClick={onClose}
+            disabled={saving}
             className="flex size-8 items-center justify-center rounded-full bg-[#F4F4F4] text-[#8c8c8c] hover:bg-black/5"
           >
             <X className="size-4" />
@@ -121,7 +174,6 @@ export function AddProgressPhotoDialog({
         </div>
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-          {/* Pose Selector Tabs */}
           <div>
             <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
               {isAr ? "وضعية الصورة" : "Photo Pose"}
@@ -148,7 +200,6 @@ export function AddProgressPhotoDialog({
             </div>
           </div>
 
-          {/* Date Picker */}
           <div>
             <label className="mb-1.5 flex items-center gap-1.5 text-[12px] font-bold text-[var(--gym-ink,#111111)]">
               <Calendar className="size-3.5 text-[#8c8c8c]" />
@@ -163,7 +214,6 @@ export function AddProgressPhotoDialog({
             />
           </div>
 
-          {/* Photo Upload Area */}
           <div>
             <label className="mb-1.5 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
               {isAr ? "ملف الصورة" : "Photo File"}
@@ -172,7 +222,7 @@ export function AddProgressPhotoDialog({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               onChange={handleFileSelect}
               className="hidden"
             />
@@ -186,6 +236,7 @@ export function AddProgressPhotoDialog({
                 />
                 <button
                   type="button"
+                  disabled={saving}
                   onClick={() => fileInputRef.current?.click()}
                   className="absolute bottom-3 end-3 rounded-full bg-black/75 px-3 py-1.5 text-[11px] font-bold text-white backdrop-blur-xs hover:bg-black"
                 >
@@ -200,30 +251,51 @@ export function AddProgressPhotoDialog({
               >
                 <Upload className="size-6 text-[#8c8c8c]" />
                 <p className="mt-2 text-[13px] font-bold text-[var(--gym-ink,#111111)]">
-                  {isAr ? "اضغط لاختيار صورة من جهازك" : "Click to select a photo"}
+                  {isAr
+                    ? "اضغط لاختيار صورة من جهازك"
+                    : "Click to select a photo"}
                 </p>
                 <p className="mt-0.5 text-[11px] text-[#8c8c8c]">
-                  PNG, JPG, WEBP (Max 8MB)
+                  JPG, PNG, WEBP (Max{" "}
+                  {formatBytesLabel(PROGRESS_UPLOAD_LIMITS.photoBytes)})
                 </p>
               </button>
             )}
+
+            {uploadPercent != null ? (
+              <div className="mt-3">
+                <div className="h-2 overflow-hidden rounded-full bg-black/10">
+                  <div
+                    className="h-full rounded-full bg-[var(--gym-lime,#fb5001)] transition-all"
+                    style={{ width: `${uploadPercent}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-[11px] font-bold text-[#6B7280]">
+                  {isAr
+                    ? `جاري الرفع ${uploadPercent}%`
+                    : `Uploading ${uploadPercent}%`}
+                </p>
+              </div>
+            ) : null}
           </div>
 
-          {/* Caption / Notes */}
           <div>
             <label className="mb-1 block text-[12px] font-bold text-[var(--gym-ink,#111111)]">
               {isAr ? "ملاحظات أو تعليق" : "Caption or Notes (Optional)"}
             </label>
             <input
               type="text"
-              placeholder={isAr ? "مثال: بعد انتهاء الأسبوع الرابع..." : "e.g. End of 4th week..."}
+              placeholder={
+                isAr
+                  ? "مثال: بعد انتهاء الأسبوع الرابع..."
+                  : "e.g. End of 4th week..."
+              }
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
               className="h-11 w-full rounded-2xl bg-[#F4F4F4] px-3.5 text-[13px] font-medium text-[var(--gym-ink,#111111)] outline-none"
             />
           </div>
 
-          {/* Action Buttons */}
           <div className="flex items-center justify-end gap-2.5 pt-3">
             <button
               type="button"
@@ -235,10 +307,16 @@ export function AddProgressPhotoDialog({
             </button>
             <button
               type="submit"
-              disabled={saving || !previewUrl}
+              disabled={saving || !file}
               className="inline-flex h-11 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] px-6 text-[13px] font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
             >
-              {saving ? (isAr ? "جاري الحفظ..." : "Saving...") : (isAr ? "حفظ الصورة" : "Save Photo")}
+              {saving
+                ? isAr
+                  ? "جاري الحفظ..."
+                  : "Saving..."
+                : isAr
+                  ? "حفظ الصورة"
+                  : "Save Photo"}
             </button>
           </div>
         </form>

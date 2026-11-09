@@ -1,5 +1,4 @@
-﻿import { useMemo, useState, type ReactNode } from "react"
-import { createPortal } from "react-dom"
+import { useMemo, useState, type ReactNode } from "react"
 import { Link } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import {
@@ -24,6 +23,7 @@ import {
   Upload,
   Users,
 } from "lucide-react"
+import { ConfirmActionDialog } from "@/components/dashboard/ConfirmActionDialog"
 import { ContentAssetFormDialog } from "@/components/dashboard/ContentAssetFormDialog"
 import { ContentAssociationDialog } from "@/components/dashboard/ContentAssociationDialog"
 import { ContentPreviewDialog } from "@/components/dashboard/ContentPreviewDialog"
@@ -35,27 +35,28 @@ import {
   contentStats,
   getContentLinks,
   isContentLinked,
-  type ContentFilter,
-  type DemoContentAsset,
-} from "@/features/content/demo"
+} from "@/features/content/access"
+import type { ContentFilter } from "@/features/content/paths"
 import {
   useContentAssetsQuery,
   useDeleteContentAssetMutation,
   useSaveContentAssetMutation,
   useUpdateContentAssociationsMutation,
 } from "@/features/content/hooks"
-import { subscriberDisplayName } from "@/features/subscribers/demo"
+import { useNutritionProgramsQuery } from "@/features/nutrition/hooks"
+import { subscriberDisplayName } from "@/features/subscribers/types"
 import { useSubscribersQuery } from "@/features/subscribers/hooks"
 import {
   usePackagesQuery,
   useSubscriptionsQuery,
 } from "@/features/subscriptions/hooks"
+import { useWorkoutProgramsQuery } from "@/features/workouts/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatDate, formatDuration } from "@/lib/format"
 import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
-import type { ContentCategory } from "@/types/content"
+import type { ContentAsset, ContentCategory } from "@/types/content"
 import type { PackageEntitlementKey } from "@/types/subscription"
 
 const FILTERS: ContentFilter[] = [
@@ -103,7 +104,7 @@ const PREVIEW: Record<ContentCategory, { className: string; icon: ReactNode }> =
 
 export function ContentLibraryPage() {
   const { t } = useTranslation()
-  const { locale, isRtl } = useLocale()
+  const { locale } = useLocale()
   const isAr = locale === "ar"
   const { user } = useAuth()
   useDocumentTitle(t("nav.content"))
@@ -111,7 +112,9 @@ export function ContentLibraryPage() {
   const { data: assets = [] } = useContentAssetsQuery()
   const { data: packages = [] } = usePackagesQuery()
   const { data: subscribers = [] } = useSubscribersQuery()
-  const { data: subscriptions = [] } = useSubscriptionsQuery()
+  useSubscriptionsQuery()
+  const { data: workoutPrograms = [] } = useWorkoutProgramsQuery()
+  const { data: nutritionPrograms = [] } = useNutritionProgramsQuery()
 
   const saveMutation = useSaveContentAssetMutation()
   const associateMutation = useUpdateContentAssociationsMutation()
@@ -125,25 +128,19 @@ export function ContentLibraryPage() {
   const [selectedId, setSelectedId] = useState<string>("")
   const [copiedPathId, setCopiedPathId] = useState<string | null>(null)
 
-  // Modals state
   const [formModal, setFormModal] = useState<{
     open: boolean
-    asset: DemoContentAsset | null
+    asset: ContentAsset | null
   }>({ open: false, asset: null })
   const [assocModal, setAssocModal] = useState<{
     open: boolean
-    asset: DemoContentAsset | null
+    asset: ContentAsset | null
     tab: "programs" | "subscribers" | "packages"
   }>({ open: false, asset: null, tab: "programs" })
-  const [previewAsset, setPreviewAsset] = useState<DemoContentAsset | null>(
-    null,
-  )
-  const [deleteTarget, setDeleteTarget] = useState<DemoContentAsset | null>(
-    null,
-  )
+  const [previewAsset, setPreviewAsset] = useState<ContentAsset | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<ContentAsset | null>(null)
 
   const list = useMemo(() => {
-    void subscriptions
     const q = query.trim().toLowerCase()
     const queryWords = q.split(/\s+/).filter(Boolean)
 
@@ -174,13 +171,22 @@ export function ContentLibraryPage() {
 
       return queryWords.every((word) => haystack.includes(word))
     })
-  }, [assets, subscriptions, filter, linkFilter, query])
+  }, [assets, filter, linkFilter, query])
 
   const selected =
     list.find((item) => item.id === selectedId) ?? list[0] ?? null
   const links = useMemo(
-    () => (selected ? getContentLinks(selected, subscribers, packages) : null),
-    [selected, subscribers, packages],
+    () =>
+      selected
+        ? getContentLinks(
+            selected,
+            subscribers,
+            packages,
+            workoutPrograms,
+            nutritionPrograms,
+          )
+        : null,
+    [selected, subscribers, packages, workoutPrograms, nutritionPrograms],
   )
   const stats = useMemo(() => contentStats(assets), [assets])
 
@@ -192,7 +198,7 @@ export function ContentLibraryPage() {
     if (first) setSelectedId(first.id)
   }
 
-  function handleCopyStoragePath(asset: DemoContentAsset) {
+  function handleCopyStoragePath(asset: ContentAsset) {
     void navigator.clipboard?.writeText(asset.storagePath)
     setCopiedPathId(asset.id)
     appToast.success(
@@ -609,88 +615,35 @@ export function ContentLibraryPage() {
         onEdit={(asset) => setFormModal({ open: true, asset })}
       />
 
-      {/* Delete Confirmation Modal */}
-      {deleteTarget && typeof document !== "undefined"
-        ? createPortal(
-            <div
-              className="fixed inset-0 z-[120] flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]"
-              onClick={() => {
-                if (!deleteMutation.isPending) setDeleteTarget(null)
-              }}
-            >
-              <div
-                role="dialog"
-                aria-modal="true"
-                dir={isRtl ? "rtl" : "ltr"}
-                onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[#FFE8E4] text-[#C44536]">
-                    <Trash2 className="size-5" strokeWidth={2} />
-                  </span>
-                  <div>
-                    <h3 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#111111)]">
-                      {isAr ? "تأكيد حذف المحتوى" : "Delete content asset"}
-                    </h3>
-                    <p className="text-[12px] font-medium text-[#8c8c8c]">
-                      {deleteTarget.title[locale]}
-                    </p>
-                  </div>
-                </div>
-                <p className="mt-4 text-[13px] font-medium leading-relaxed text-[#6B7280]">
-                  {isAr
-                    ? "سيتم حذف هذا المحتوى نهائياً من قاعدة البيانات وإلغاء ارتباطه بالبرامج والباقات والمشتركين. هل أنت متأكد؟"
-                    : "This content asset will be permanently removed from the library and unlinked from associated programs, packages, and subscribers."}
-                </p>
-                <p
-                  dir="ltr"
-                  className="mt-3 truncate rounded-xl bg-[#F4F4F4] px-3 py-2 font-mono text-[11px] font-semibold text-[#6B7280]"
-                >
-                  {deleteTarget.storagePath}
-                </p>
-                <div className="mt-6 flex items-center justify-end gap-2.5">
-                  <button
-                    type="button"
-                    disabled={deleteMutation.isPending}
-                    onClick={() => setDeleteTarget(null)}
-                    className="inline-flex h-10 items-center justify-center rounded-full bg-[#F4F4F4] px-5 text-[13px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/10"
-                  >
-                    {isAr ? "إلغاء" : "Cancel"}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={deleteMutation.isPending}
-                    onClick={async () => {
-                      const targetId = deleteTarget.id
-                      await deleteMutation.mutateAsync(targetId)
-                      setDeleteTarget(null)
-                      if (selectedId === targetId) {
-                        const remaining = list.filter((i) => i.id !== targetId)
-                        setSelectedId(remaining[0]?.id ?? "")
-                      }
-                      appToast.success(
-                        isAr
-                          ? "تم حذف المحتوى من المكتبة بنجاح"
-                          : "Content asset deleted from library",
-                      )
-                    }}
-                    className="inline-flex h-10 items-center justify-center rounded-full bg-[#C44536] px-5 text-[13px] font-bold text-white transition hover:opacity-95 disabled:opacity-50"
-                  >
-                    {deleteMutation.isPending
-                      ? isAr
-                        ? "جارٍ الحذف..."
-                        : "Deleting..."
-                      : isAr
-                        ? "نعم، حذف المحتوى"
-                        : "Delete permanently"}
-                  </button>
-                </div>
-              </div>
-            </div>,
-            document.body,
+      <ConfirmActionDialog
+        open={Boolean(deleteTarget)}
+        title={isAr ? "تأكيد حذف المحتوى" : "Delete content asset"}
+        description={
+          deleteTarget
+            ? isAr
+              ? `سيتم حذف «${deleteTarget.title.ar}» من Firestore، وحذف ملف Storage إن وُجد (${deleteTarget.storagePath}).`
+              : `Permanently delete “${deleteTarget.title.en}” from Firestore and remove the Storage object if present (${deleteTarget.storagePath}).`
+            : undefined
+        }
+        confirmLabel={isAr ? "حذف نهائياً" : "Delete permanently"}
+        tone="danger"
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (!deleteTarget) return
+          const targetId = deleteTarget.id
+          await deleteMutation.mutateAsync(targetId)
+          if (selectedId === targetId) {
+            const remaining = list.filter((i) => i.id !== targetId)
+            setSelectedId(remaining[0]?.id ?? "")
+          }
+          setDeleteTarget(null)
+          appToast.success(
+            isAr
+              ? "تم حذف المحتوى من المكتبة بنجاح"
+              : "Content asset deleted from library",
           )
-        : null}
+        }}
+      />
     </div>
   )
 }
@@ -701,7 +654,7 @@ function AssetCard({
   onSelect,
   onPreview,
 }: {
-  asset: DemoContentAsset
+  asset: ContentAsset
   active: boolean
   onSelect: () => void
   onPreview: () => void
@@ -801,7 +754,7 @@ function AssetPreview({
   asset,
   onPreview,
 }: {
-  asset: DemoContentAsset
+  asset: ContentAsset
   onPreview: () => void
 }) {
   const { t } = useTranslation()

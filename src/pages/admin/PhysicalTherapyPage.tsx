@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { Link } from "react-router-dom"
 import {
   Activity,
   AlertTriangle,
@@ -15,11 +16,14 @@ import { ConfirmActionDialog } from "@/components/dashboard/ConfirmActionDialog"
 import { PTRecordFormDialog } from "@/components/dashboard/PTRecordFormDialog"
 import { FilterChip, StatCard } from "@/components/dashboard/StatCard"
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
+import { APP_ROUTES } from "@/config/constants"
+import { useAuth } from "@/features/auth/auth-context"
 import {
   useDeletePTRecordMutation,
   usePTRecordsQuery,
   useSavePTRecordMutation,
 } from "@/features/physicalTherapy/hooks"
+import { subscriberDisplayName } from "@/features/subscribers/types"
 import { useSubscribersQuery } from "@/features/subscribers/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
@@ -47,6 +51,8 @@ const AREA_LABELS: Record<PTAffectedArea, { en: string; ar: string }> = {
 export function PhysicalTherapyPage() {
   const { locale } = useLocale()
   const isAr = locale === "ar"
+  const { user, hasPermission } = useAuth()
+  const canManage = hasPermission("physicalTherapy:manage")
   useDocumentTitle(isAr ? "العلاج الطبيعي والتأهيل الحركي" : "Physical Therapy & Rehabilitation")
 
   const [query, setQuery] = useState("")
@@ -54,7 +60,6 @@ export function PhysicalTherapyPage() {
   const [areaFilter, setAreaFilter] = useState<PTAffectedArea | "all">("all")
   const [selectedRecordId, setSelectedRecordId] = useState<string>("")
 
-  // Form Dialog
   const [formOpen, setFormOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState<PhysicalTherapyRecord | null>(null)
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -66,11 +71,21 @@ export function PhysicalTherapyPage() {
     onConfirm: () => Promise<void> | void
   } | null>(null)
 
-  const { data: records = [] } = usePTRecordsQuery()
+  const { data: records = [], isError, isLoading } = usePTRecordsQuery()
   const { data: subscribers = [] } = useSubscribersQuery()
+  const subscriberMap = useMemo(
+    () => new Map(subscribers.map((s) => [s.id, s])),
+    [subscribers],
+  )
 
   const saveMutation = useSavePTRecordMutation()
   const deleteMutation = useDeletePTRecordMutation()
+
+  function resolveSubscriberName(subscriberId: string, fallback?: string) {
+    const sub = subscriberMap.get(subscriberId)
+    if (sub) return subscriberDisplayName(sub, locale)
+    return fallback || subscriberId
+  }
 
   // Stats
   const stats = useMemo(() => {
@@ -89,8 +104,10 @@ export function PhysicalTherapyPage() {
       if (areaFilter !== "all" && item.affectedArea !== areaFilter) return false
       if (!q) return true
 
-      const sub = subscribers.find((s) => s.id === item.subscriberId)
-      const subName = sub?.displayName.toLowerCase() || item.subscriberName?.toLowerCase() || ""
+      const subName = resolveSubscriberName(
+        item.subscriberId,
+        item.subscriberName,
+      ).toLowerCase()
       const titleEn = item.injuryTitle.en.toLowerCase()
       const titleAr = item.injuryTitle.ar
 
@@ -101,17 +118,29 @@ export function PhysicalTherapyPage() {
         item.affectedArea.toLowerCase().includes(q)
       )
     })
-  }, [records, statusFilter, areaFilter, query, subscribers])
+  }, [records, statusFilter, areaFilter, query, subscriberMap, locale])
 
   const selectedRecord =
     filteredRecords.find((r) => r.id === selectedRecordId) ?? filteredRecords[0]
 
   async function handleToggleCleared(record: PhysicalTherapyRecord) {
+    if (!canManage || saveMutation.isPending) return
     const nextStatus: PTStatus = record.status === "cleared" ? "active" : "cleared"
     await saveMutation.mutateAsync({
-      ...record,
+      id: record.id,
+      subscriberId: record.subscriberId,
+      injuryTitle: record.injuryTitle,
+      affectedArea: record.affectedArea,
+      severity: record.severity,
       status: nextStatus,
-      clearanceDate: nextStatus === "cleared" ? new Date().toISOString().slice(0, 10) : null,
+      diagnosisDate: record.diagnosisDate,
+      clearanceDate:
+        nextStatus === "cleared" ? new Date().toISOString().slice(0, 10) : null,
+      nextEvaluationDate: record.nextEvaluationDate,
+      restrictions: record.restrictions,
+      rehabExercises: record.rehabExercises,
+      therapistNotes: record.therapistNotes,
+      updatedBy: user?.uid,
     })
     appToast.success(
       nextStatus === "cleared"
@@ -125,16 +154,19 @@ export function PhysicalTherapyPage() {
   }
 
   function handleDelete(record: PhysicalTherapyRecord) {
+    if (!canManage) return
+    const name = resolveSubscriberName(record.subscriberId, record.subscriberName)
     setConfirmDialog({
       open: true,
       title: isAr ? "حذف ملف العلاج الطبيعي" : "Delete Physical Therapy Record",
       description: isAr
-        ? `هل أنت متأكد من حذف ملف العلاج الطبيعي للمشترك "${record.subscriberName || record.subscriberId}"؟ هذا الإجراء لا يمكن التراجع عنه.`
-        : `Are you sure you want to delete the physical therapy record for "${record.subscriberName || record.subscriberId}"? This action cannot be undone.`,
+        ? `هل أنت متأكد من حذف ملف العلاج الطبيعي للمشترك "${name}"؟ هذا الإجراء لا يمكن التراجع عنه.`
+        : `Are you sure you want to delete the physical therapy record for "${name}"? This action cannot be undone.`,
       confirmLabel: isAr ? "تأكيد الحذف" : "Delete Record",
       tone: "danger",
       onConfirm: async () => {
         await deleteMutation.mutateAsync(record.id)
+        if (selectedRecordId === record.id) setSelectedRecordId("")
         appToast.success(isAr ? "تم حذف السجل بنجاح" : "Record deleted successfully")
       },
     })
@@ -198,17 +230,19 @@ export function PhysicalTherapyPage() {
                 <ChevronDown className="pointer-events-none absolute end-3 size-4 text-[#8c8c8c]" />
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingRecord(null)
-                  setFormOpen(true)
-                }}
-                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
-              >
-                <Plus className="size-4" strokeWidth={2} />
-                {isAr ? "تقييم تأهيلي جديد" : "New Assessment"}
-              </button>
+              {canManage ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingRecord(null)
+                    setFormOpen(true)
+                  }}
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
+                >
+                  <Plus className="size-4" strokeWidth={2} />
+                  {isAr ? "تقييم تأهيلي جديد" : "New Assessment"}
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -229,7 +263,20 @@ export function PhysicalTherapyPage() {
           </div>
         </div>
 
-        {filteredRecords.length === 0 ? (
+        {isError ? (
+          <div className="mt-5 flex min-h-40 flex-col items-center justify-center rounded-[20px] bg-[#FFE8E4] p-6 text-center">
+            <AlertTriangle className="mb-2 size-8 text-[#C44536]" strokeWidth={1.5} />
+            <p className="text-[14px] font-bold text-[#C44536]">
+              {isAr
+                ? "تعذر تحميل سجلات العلاج الطبيعي"
+                : "Failed to load physical therapy records"}
+            </p>
+          </div>
+        ) : isLoading ? (
+          <div className="mt-5 flex min-h-40 items-center justify-center rounded-[20px] bg-[#F4F4F4] text-[13px] font-medium text-[#8c8c8c]">
+            {isAr ? "جارٍ التحميل..." : "Loading..."}
+          </div>
+        ) : filteredRecords.length === 0 ? (
           <div className="mt-5 flex min-h-40 flex-col items-center justify-center rounded-[20px] bg-[#F4F4F4] p-6 text-center">
             <Activity className="size-8 text-[#8c8c8c] mb-2" strokeWidth={1.5} />
             <p className="text-[14px] font-bold text-[var(--gym-ink,#111111)]">
@@ -246,7 +293,6 @@ export function PhysicalTherapyPage() {
             {/* Left list */}
             <div className="flex max-h-[620px] flex-col gap-2 overflow-y-auto pe-1">
               {filteredRecords.map((rec) => {
-                const sub = subscribers.find((s) => s.id === rec.subscriberId)
                 const active = rec.id === (selectedRecord?.id ?? "")
                 const area = AREA_LABELS[rec.affectedArea]
 
@@ -264,7 +310,7 @@ export function PhysicalTherapyPage() {
                   >
                     <div className="flex items-center justify-between gap-1">
                       <p className="truncate text-[14px] font-bold">
-                        {sub?.displayName || rec.subscriberName || rec.subscriberId}
+                        {resolveSubscriberName(rec.subscriberId, rec.subscriberName)}
                       </p>
                       <span
                         className={cn(
@@ -325,10 +371,15 @@ export function PhysicalTherapyPage() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between border-b border-black/5 pb-4">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-heading text-[20px] font-extrabold tracking-tight text-[var(--gym-ink,#111111)]">
-                        {selectedRecord.subscriberName ||
-                          subscribers.find((s) => s.id === selectedRecord.subscriberId)?.displayName}
-                      </h2>
+                      <Link
+                        to={APP_ROUTES.admin.subscriberDetail(selectedRecord.subscriberId)}
+                        className="font-heading text-[20px] font-extrabold tracking-tight text-[var(--gym-ink,#111111)] hover:underline"
+                      >
+                        {resolveSubscriberName(
+                          selectedRecord.subscriberId,
+                          selectedRecord.subscriberName,
+                        )}
+                      </Link>
                       <StatusBadge
                         label={isAr ? AREA_LABELS[selectedRecord.affectedArea]?.ar : AREA_LABELS[selectedRecord.affectedArea]?.en}
                         tone="info"
@@ -385,49 +436,51 @@ export function PhysicalTherapyPage() {
                     </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleToggleCleared(selectedRecord)}
-                      className={cn(
-                        "inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[12px] font-bold transition shadow-xs",
-                        selectedRecord.status === "cleared"
-                          ? "bg-amber-50 text-amber-800 hover:bg-amber-100"
-                          : "bg-[var(--gym-ink,#111111)] text-white hover:opacity-90",
-                      )}
-                    >
-                      <CheckCircle2 className="size-3.5" />
-                      {selectedRecord.status === "cleared"
-                        ? isAr
-                          ? "إعادة فتح"
-                          : "Reopen"
-                        : isAr
-                          ? "اعتماد التعافي"
-                          : "Mark Cleared"}
-                    </button>
+                  {canManage ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={saveMutation.isPending}
+                        onClick={() => handleToggleCleared(selectedRecord)}
+                        className={cn(
+                          "inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[12px] font-bold transition shadow-xs disabled:opacity-50",
+                          selectedRecord.status === "cleared"
+                            ? "bg-amber-50 text-amber-800 hover:bg-amber-100"
+                            : "bg-[var(--gym-ink,#111111)] text-white hover:opacity-90",
+                        )}
+                      >
+                        <CheckCircle2 className="size-3.5" />
+                        {selectedRecord.status === "cleared"
+                          ? isAr
+                            ? "إعادة فتح"
+                            : "Reopen"
+                          : isAr
+                            ? "اعتماد التعافي"
+                            : "Mark Cleared"}
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingRecord(selectedRecord)
-                        setFormOpen(true)
-                      }}
-                      className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-xs hover:bg-black/5"
-                      title={isAr ? "تعديل الملف" : "Edit record"}
-                    >
-                      <Pencil className="size-4" />
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingRecord(selectedRecord)
+                          setFormOpen(true)
+                        }}
+                        className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-xs hover:bg-black/5"
+                        title={isAr ? "تعديل الملف" : "Edit record"}
+                      >
+                        <Pencil className="size-4" />
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(selectedRecord)}
-                      className="flex size-9 items-center justify-center rounded-full bg-white text-red-500 shadow-xs hover:bg-red-50"
-                      title={isAr ? "حذف السجل" : "Delete"}
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(selectedRecord)}
+                        className="flex size-9 items-center justify-center rounded-full bg-white text-red-500 shadow-xs hover:bg-red-50"
+                        title={isAr ? "حذف السجل" : "Delete"}
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* Contraindications & Exercise Alternatives */}
@@ -556,10 +609,18 @@ export function PhysicalTherapyPage() {
       {/* Form Dialog Modal */}
       <PTRecordFormDialog
         open={formOpen}
-        onClose={() => setFormOpen(false)}
+        onClose={() => {
+          setFormOpen(false)
+          setEditingRecord(null)
+        }}
         initialRecord={editingRecord}
         onSave={async (record) => {
-          await saveMutation.mutateAsync(record)
+          const saved = await saveMutation.mutateAsync({
+            ...record,
+            createdBy: editingRecord ? undefined : user?.uid,
+            updatedBy: user?.uid,
+          })
+          setSelectedRecordId(saved.id)
         }}
       />
 

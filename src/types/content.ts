@@ -28,7 +28,6 @@ export type VideoProviderId =
 export type StorageBackendMode =
   | "firebase_storage"
   | "external_cdn"
-  | "inline_spark"
   | "metadata_only"
 
 export type ContentAsset = {
@@ -71,4 +70,9 @@ export type ContentAsset = {
   uploadedBy?: string
   createdAt: string
   updatedAt: string
+  /**
+   * Set by listSubscriberContentLibrary for subscriber panel.
+   * When false, delivery fields (fileUrl / streamUrl / storagePath) are redacted.
+   */
+  accessAllowed?: boolean
 }

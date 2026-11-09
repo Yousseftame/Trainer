@@ -33,10 +33,14 @@ import { ConfirmActionDialog } from "@/components/dashboard/ConfirmActionDialog"
 import { LogMeasurementDialog } from "@/components/dashboard/LogMeasurementDialog"
 import { LogPerformanceDialog } from "@/components/dashboard/LogPerformanceDialog"
 import { PhotoComparisonDialog } from "@/components/dashboard/PhotoComparisonDialog"
+import { ProgressPhotoImage } from "@/components/dashboard/ProgressPhotoImage"
 import { FilterChip } from "@/components/dashboard/StatCard"
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
 import { APP_ROUTES } from "@/config/constants"
-import { adherenceFor, latestWeek, programsFor } from "@/features/progress/demo"
+import {
+  computeAdherenceWeeks,
+  latestAdherenceWeek,
+} from "@/features/progress/adherence"
 import {
   useDeleteMeasurementMutation,
   useDeletePerformanceMutation,
@@ -48,9 +52,11 @@ import {
   useSavePerformanceMutation,
   useSavePhotoMutation,
 } from "@/features/progress/hooks"
-import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
-import { useWorkoutProgramsQuery } from "@/features/workouts/hooks"
+import { useNutritionLogsQuery } from "@/features/nutrition/hooks"
 import { useNutritionProgramsQuery } from "@/features/nutrition/hooks"
+import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
+import { useWorkoutLogsQuery } from "@/features/workouts/hooks"
+import { useWorkoutProgramsQuery } from "@/features/workouts/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatChartDate, formatDate } from "@/lib/format"
@@ -114,18 +120,22 @@ export function ProgressPage() {
     subscriberId,
     enabled: Boolean(subscriberId),
   })
+  const { data: workoutLogs = [] } = useWorkoutLogsQuery({
+    subscriberId,
+    enabled: Boolean(subscriberId),
+  })
+  const { data: nutritionLogs = [] } = useNutritionLogsQuery({
+    subscriberId,
+    enabled: Boolean(subscriberId),
+  })
 
-  // Assigned programs (live database records filtered for subscriber, fallback to demo)
-  const assignedPrograms = useMemo(() => {
-    if (!subscriberId) return { workouts: [], nutrition: [] }
-    const liveWorkouts = allWorkoutPrograms
-    const liveNutrition = allNutritionPrograms
-    const demo = programsFor(subscriberId)
-    return {
-      workouts: liveWorkouts.length ? liveWorkouts : demo.workouts,
-      nutrition: liveNutrition.length ? liveNutrition : demo.nutrition,
-    }
-  }, [allWorkoutPrograms, allNutritionPrograms, subscriberId])
+  const assignedPrograms = useMemo(
+    () => ({
+      workouts: allWorkoutPrograms,
+      nutrition: allNutritionPrograms,
+    }),
+    [allWorkoutPrograms, allNutritionPrograms],
+  )
 
   // Mutations
   const saveMeasurementMutation = useSaveMeasurementMutation()
@@ -167,8 +177,17 @@ export function ProgressPage() {
       ? Math.round((currentWeight - startWeight) * 10) / 10
       : null
 
-  const weeks = useMemo(() => adherenceFor(subscriberId), [subscriberId])
-  const week = useMemo(() => latestWeek(subscriberId), [subscriberId])
+  const weeks = useMemo(
+    () =>
+      computeAdherenceWeeks({
+        workoutLogs,
+        nutritionLogs,
+        workoutPrograms: assignedPrograms.workouts,
+        nutritionPrograms: assignedPrograms.nutrition,
+      }),
+    [workoutLogs, nutritionLogs, assignedPrograms],
+  )
+  const week = useMemo(() => latestAdherenceWeek(weeks), [weeks])
   const workoutPct = week ? percent(week.workoutDone, week.workoutTotal) : null
   const nutritionPct = week
     ? percent(week.nutritionDone, week.nutritionTotal)
@@ -1012,18 +1031,10 @@ export function ProgressPage() {
                     className="group relative overflow-hidden rounded-[22px] bg-[var(--gym-ink,#111111)] text-white shadow-xs border border-black/6"
                   >
                     <div className="relative flex aspect-[3/4] items-center justify-center bg-black/40">
-                      {item.storagePath?.startsWith("data:") ||
-                      item.storagePath?.startsWith("http") ? (
-                        <img
-                          src={item.storagePath}
-                          alt="Progress"
-                          className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      ) : (
-                        <span className="font-heading text-[22px] font-extrabold text-white/80">
-                          {item.pose?.toUpperCase() || "•"}
-                        </span>
-                      )}
+                      <ProgressPhotoImage
+                        photo={item}
+                        imgClassName="group-hover:scale-105 transition-transform duration-300"
+                      />
 
                       {/* Pose badge */}
                       <span className="absolute bottom-2.5 start-2.5 rounded-lg bg-black/70 px-2 py-0.5 text-[10px] font-bold uppercase backdrop-blur-xs">

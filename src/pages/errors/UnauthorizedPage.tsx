@@ -2,9 +2,11 @@ import { useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { ArrowLeft, ArrowRight, Home, ShieldAlert, UserCheck } from "lucide-react"
+import { FullPageSpinner } from "@/components/feedback/FullPageSpinner"
 import { APP_ROUTES } from "@/config/constants"
 import { useAuth } from "@/features/auth/auth-context"
 import { useLocale } from "@/hooks/useLocale"
+import { resolveAdminLandingPath } from "@/lib/permissions/can"
 
 export function UnauthorizedPage() {
   const { t } = useTranslation()
@@ -16,7 +18,7 @@ export function UnauthorizedPage() {
   const destination = isSubscriber
     ? APP_ROUTES.subscriber.root
     : isAdmin
-      ? APP_ROUTES.admin.root
+      ? resolveAdminLandingPath(user)
       : APP_ROUTES.public.login
 
   const destinationLabel = isSubscriber
@@ -31,15 +33,22 @@ export function UnauthorizedPage() {
         ? "تسجيل الدخول"
         : "Sign In"
 
-  // Auto-redirect authenticated users to their home dashboard after brief notice
+  // Staff with a valid admin session should never linger here — send them to
+  // their first allowed module (or empty panel) without a shell flash loop.
   useEffect(() => {
-    if (status === "authenticated" && user) {
-      const timer = window.setTimeout(() => {
-        navigate(destination, { replace: true })
-      }, 1500)
-      return () => window.clearTimeout(timer)
+    if (status === "loading" || status === "idle") return
+    if (status === "authenticated" && (isAdmin || isSubscriber)) {
+      navigate(destination, { replace: true })
     }
-  }, [status, user, destination, navigate])
+  }, [status, isAdmin, isSubscriber, destination, navigate])
+
+  if (status === "loading" || status === "idle") {
+    return <FullPageSpinner />
+  }
+
+  if (status === "authenticated" && (isAdmin || isSubscriber)) {
+    return <FullPageSpinner />
+  }
 
   return (
     <section className="mx-auto flex min-h-dvh max-w-lg flex-col items-center justify-center gap-4 px-4 text-center">
@@ -48,26 +57,32 @@ export function UnauthorizedPage() {
       </div>
 
       <div className="space-y-1.5">
-        <h1 className="font-heading text-3xl font-extrabold text-[var(--gym-ink,#111111)]">403</h1>
+        <h1 className="font-heading text-3xl font-extrabold text-[var(--gym-ink,#111111)]">
+          403
+        </h1>
         <p className="text-[14px] font-medium text-[#6B7280]">
           {t("auth.unauthorized")}
         </p>
       </div>
 
-      <div className="mt-2 flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+      <div className="mt-2 flex w-full flex-col items-center gap-3 sm:w-auto sm:flex-row">
         <button
           type="button"
           onClick={() => navigate(destination, { replace: true })}
-          className="inline-flex h-11 w-full sm:w-auto items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-6 text-[13px] font-bold text-white transition hover:opacity-95 shadow-md"
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-6 text-[13px] font-bold text-white shadow-md transition hover:opacity-95 sm:w-auto"
         >
           <UserCheck className="size-4 text-[var(--gym-lime,#fb5001)]" />
           <span>{destinationLabel}</span>
-          {isRtl ? <ArrowLeft className="size-4" /> : <ArrowRight className="size-4" />}
+          {isRtl ? (
+            <ArrowLeft className="size-4" />
+          ) : (
+            <ArrowRight className="size-4" />
+          )}
         </button>
 
         <Link
           to={APP_ROUTES.public.home}
-          className="inline-flex h-11 w-full sm:w-auto items-center justify-center gap-2 rounded-full bg-[#F4F4F4] px-5 text-[13px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/10"
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#F4F4F4] px-5 text-[13px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/10 sm:w-auto"
         >
           <Home className="size-4 text-[#8c8c8c]" />
           <span>{t("nav.home")}</span>

@@ -2,25 +2,30 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   setDoc,
-  writeBatch,
 } from "firebase/firestore"
-import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage"
 import {
-  INITIAL_DEMO_CONTENT,
+  deleteObject,
+  getDownloadURL,
+  ref,
+  uploadBytesResumable,
+} from "firebase/storage"
+import {
   buildCanonicalStoragePath,
   buildContentSearchTokens,
+  CONTENT_UPLOAD_LIMITS,
   defaultEntitlementForCategory,
   defaultKindForCategory,
   formatBytesLabel,
-  getContentSnapshot,
-  setContentSnapshot,
-  type DemoContentAsset,
-} from "@/features/content/demo"
-import { tryGetDb } from "@/lib/firebase/firestore"
-import { tryGetFirebaseStorage } from "@/lib/firebase/storage"
+  isHttpUrl,
+} from "@/features/content/paths"
+import { callListSubscriberContentLibrary } from "@/lib/firebase/callables"
+import { getDb } from "@/lib/firebase/firestore"
+import { getFirebaseStorage } from "@/lib/firebase/storage"
 import type {
+  ContentAsset,
   ContentCategory,
   ContentVisibility,
   StorageBackendMode,
@@ -29,155 +34,173 @@ import type {
 import type { PackageEntitlementKey } from "@/types/subscription"
 
 const CONTENT_COLLECTION = "content_assets"
-const SEED_FLAG_KEY = "trainer_firestore_seeded_content_v2"
+const LEGACY_CONTENT_CACHE_KEY = "trainer_admin_content_v2"
 
-/** Session object URLs for large local files selected while on Firebase Spark (free) plan */
-const sessionObjectUrls = new Map<string, string>()
+try {
+  window.localStorage.removeItem(LEGACY_CONTENT_CACHE_KEY)
+} catch {
+  // ignore
+}
 
 function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
-  const out = {} as Record<string, unknown>
+  const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(obj)) {
-    if (v !== undefined) {
-      out[k] = v
-    }
+    if (v !== undefined) out[k] = v
   }
   return out as T
 }
 
-function slugifyId(prefix: string, raw: string): string {
-  const base = raw
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 28)
-  const suffix = Math.random().toString(36).slice(2, 6)
-  return `${prefix}-${base || "item"}-${suffix}`
-}
+function normalizeContentAsset(
+  id: string,
+  raw: Record<string, unknown>,
+): ContentAsset {
+  const category = (raw.category as ContentCategory) || "education"
+  const kind = (raw.kind as ContentAsset["kind"]) || defaultKindForCategory(category)
+  const titleRaw = (raw.title ?? {}) as Record<string, string>
+  const descRaw = (raw.description ?? {}) as Record<string, string>
 
-function prefixForCategory(category: ContentCategory): string {
-  switch (category) {
-    case "exerciseVideo":
-      return "vid"
-    case "workoutPdf":
-    case "nutritionPdf":
-      return "pdf"
-    case "education":
-      return "doc"
-    case "reference":
-    default:
-      return "ref"
-  }
-}
-
-async function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result || ""))
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
-}
-
-async function seedContentIfEmpty(): Promise<void> {
-  const db = tryGetDb()
-  if (!db) return
-
-  try {
-    const snap = await getDocs(collection(db, CONTENT_COLLECTION))
-    if (!snap.empty) return
-
-    const batch = writeBatch(db)
-    const initial = getContentSnapshot()
-    const itemsToSeed = initial.length > 0 ? initial : INITIAL_DEMO_CONTENT
-
-    for (const item of itemsToSeed) {
-      batch.set(
-        doc(db, CONTENT_COLLECTION, item.id),
-        stripUndefined({
-          ...item,
-          searchTokens: buildContentSearchTokens(item),
-        }),
-      )
-    }
-    await batch.commit()
-
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(SEED_FLAG_KEY, "1")
-    }
-  } catch (err) {
-    console.warn("[content/service] Firestore seed skipped:", err)
-  }
-}
-
-export async function fetchContentAssets(): Promise<DemoContentAsset[]> {
-  const db = tryGetDb()
-  if (!db) {
-    return getContentSnapshot()
-  }
-
-  try {
-    await seedContentIfEmpty()
-    const snap = await getDocs(collection(db, CONTENT_COLLECTION))
-    if (!snap.empty) {
-      const items = snap.docs
-        .map((d) => {
-          const data = d.data() as DemoContentAsset
-          const id = data.id || d.id
-          const sessionUrl = sessionObjectUrls.get(id)
-          const category = data.category ?? "education"
-          const normalized: DemoContentAsset = {
-            ...data,
+  const asset: ContentAsset = {
+    id,
+    category,
+    kind,
+    title: {
+      en: String(titleRaw.en ?? id),
+      ar: String(titleRaw.ar ?? titleRaw.en ?? id),
+    },
+    description: {
+      en: String(descRaw.en ?? ""),
+      ar: String(descRaw.ar ?? descRaw.en ?? ""),
+    },
+    fileName: typeof raw.fileName === "string" ? raw.fileName : undefined,
+    mimeType: typeof raw.mimeType === "string" ? raw.mimeType : undefined,
+    sizeBytes: typeof raw.sizeBytes === "number" ? raw.sizeBytes : undefined,
+    sizeLabel:
+      typeof raw.sizeLabel === "string"
+        ? raw.sizeLabel
+        : formatBytesLabel(
+            typeof raw.sizeBytes === "number" ? raw.sizeBytes : undefined,
+          ),
+    pageCount: typeof raw.pageCount === "number" ? raw.pageCount : undefined,
+    durationSeconds:
+      typeof raw.durationSeconds === "number" ? raw.durationSeconds : undefined,
+    storagePath:
+      typeof raw.storagePath === "string" && raw.storagePath
+        ? raw.storagePath
+        : buildCanonicalStoragePath({
             id,
             category,
-            kind: data.kind ?? defaultKindForCategory(category),
-            title: data.title ?? { en: id, ar: id },
-            description: data.description ?? { en: "", ar: "" },
-            tags: Array.isArray(data.tags) ? data.tags : [],
-            visibility: data.visibility ?? "library",
-            requiredEntitlement:
-              data.requiredEntitlement ?? defaultEntitlementForCategory(category),
-            packageIds: Array.isArray(data.packageIds) ? data.packageIds : [],
-            subscriberIds: Array.isArray(data.subscriberIds)
-              ? data.subscriberIds
-              : [],
-            programIds: Array.isArray(data.programIds) ? data.programIds : [],
-            exerciseNames: Array.isArray(data.exerciseNames)
-              ? data.exerciseNames
-              : [],
-            storagePath:
-              data.storagePath ||
-              buildCanonicalStoragePath({
-                id,
-                category,
-                fileName: data.fileName,
-                videoProvider: data.videoProvider,
-                videoAssetId: data.videoAssetId,
-                createdAt: data.createdAt,
-              }),
-            fileUrl: sessionUrl || data.fileUrl,
-            streamUrl: sessionUrl || data.streamUrl,
-          }
-          normalized.searchTokens =
-            data.searchTokens ?? buildContentSearchTokens(normalized)
-          return normalized
-        })
-        .sort(
-          (a, b) =>
-            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-        )
-
-      setContentSnapshot(items)
-      return items
-    }
-  } catch (err) {
-    console.warn(
-      "[content/service] Falling back to local content snapshot:",
-      err,
-    )
+            fileName: typeof raw.fileName === "string" ? raw.fileName : undefined,
+            videoProvider: raw.videoProvider as VideoProviderId | undefined,
+            videoAssetId:
+              typeof raw.videoAssetId === "string" ? raw.videoAssetId : undefined,
+            createdAt:
+              typeof raw.createdAt === "string" ? raw.createdAt : undefined,
+          }),
+    fileUrl: typeof raw.fileUrl === "string" ? raw.fileUrl : undefined,
+    storageMode: raw.storageMode as StorageBackendMode | undefined,
+    videoProvider:
+      kind === "video"
+        ? ((raw.videoProvider as VideoProviderId) ?? "bunny")
+        : undefined,
+    videoAssetId:
+      typeof raw.videoAssetId === "string" ? raw.videoAssetId : undefined,
+    streamUrl: typeof raw.streamUrl === "string" ? raw.streamUrl : undefined,
+    thumbnailUrl:
+      typeof raw.thumbnailUrl === "string" ? raw.thumbnailUrl : undefined,
+    tags: Array.isArray(raw.tags) ? raw.tags.map(String) : [],
+    visibility: (raw.visibility as ContentVisibility) || "package",
+    requiredEntitlement:
+      (raw.requiredEntitlement as PackageEntitlementKey) ||
+      defaultEntitlementForCategory(category),
+    packageIds: Array.isArray(raw.packageIds)
+      ? raw.packageIds.map(String)
+      : [],
+    subscriberIds: Array.isArray(raw.subscriberIds)
+      ? raw.subscriberIds.map(String)
+      : [],
+    programIds: Array.isArray(raw.programIds)
+      ? raw.programIds.map(String)
+      : [],
+    exerciseNames: Array.isArray(raw.exerciseNames)
+      ? raw.exerciseNames.map(String)
+      : [],
+    uploadedBy: typeof raw.uploadedBy === "string" ? raw.uploadedBy : undefined,
+    createdAt:
+      typeof raw.createdAt === "string"
+        ? raw.createdAt
+        : new Date().toISOString(),
+    updatedAt:
+      typeof raw.updatedAt === "string"
+        ? raw.updatedAt
+        : new Date().toISOString(),
+    accessAllowed:
+      typeof raw.accessAllowed === "boolean" ? raw.accessAllowed : undefined,
   }
+  asset.searchTokens =
+    Array.isArray(raw.searchTokens) && raw.searchTokens.length
+      ? raw.searchTokens.map(String)
+      : buildContentSearchTokens(asset)
+  return asset
+}
 
-  return getContentSnapshot()
+/** Staff SDK list — requires content:manage or subscribers:read in rules. */
+export async function fetchContentAssets(): Promise<ContentAsset[]> {
+  try {
+    const db = getDb()
+    const snap = await getDocs(collection(db, CONTENT_COLLECTION))
+    return snap.docs
+      .map((d) =>
+        normalizeContentAsset(d.id, d.data() as Record<string, unknown>),
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      )
+  } catch (err) {
+    console.warn("[content] Failed to load content_assets:", err)
+    throw err instanceof Error ? err : new Error("Failed to load content library")
+  }
+}
+
+/**
+ * Subscriber library — entitlement-gated via Cloud Function.
+ * Locked items come back without fileUrl / streamUrl / storagePath.
+ */
+export async function fetchSubscriberContentLibrary(): Promise<ContentAsset[]> {
+  try {
+    const result = await callListSubscriberContentLibrary()
+    return result.assets
+      .map((raw) =>
+        normalizeContentAsset(raw.id, raw as Record<string, unknown>),
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      )
+  } catch (err) {
+    console.warn("[content] Failed to load subscriber content library:", err)
+    throw err instanceof Error
+      ? err
+      : new Error("Failed to load content library")
+  }
+}
+
+export async function fetchContentAssetById(
+  assetId: string,
+): Promise<ContentAsset | null> {
+  if (!assetId) return null
+  try {
+    const db = getDb()
+    const snap = await getDoc(doc(db, CONTENT_COLLECTION, assetId))
+    if (!snap.exists()) return null
+    return normalizeContentAsset(
+      snap.id,
+      snap.data() as Record<string, unknown>,
+    )
+  } catch (err) {
+    console.warn("[content] Failed to read content asset:", err)
+    return null
+  }
 }
 
 export type SaveContentAssetInput = {
@@ -188,10 +211,8 @@ export type SaveContentAssetInput = {
   fileName?: string
   mimeType?: string
   sizeBytes?: number
-  sizeLabel?: string
   pageCount?: number | null
   durationSeconds?: number | null
-  storagePath?: string
   fileUrl?: string
   videoProvider?: VideoProviderId
   videoAssetId?: string
@@ -205,135 +226,165 @@ export type SaveContentAssetInput = {
   programIds: string[]
   exerciseNames?: string[]
   uploadedBy?: string
-  /** Optional local File chosen in the modal */
   file?: File | null
+  onUploadProgress?: (percent: number) => void
+}
+
+async function uploadToFirebaseStorage(
+  path: string,
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<string> {
+  const storage = getFirebaseStorage()
+  const storageRef = ref(storage, path)
+  const task = uploadBytesResumable(storageRef, file, {
+    contentType: file.type || undefined,
+    customMetadata: {
+      uploadedAt: new Date().toISOString(),
+    },
+  })
+
+  await new Promise<void>((resolve, reject) => {
+    task.on(
+      "state_changed",
+      (snap) => {
+        if (!onProgress || snap.totalBytes <= 0) return
+        onProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100))
+      },
+      reject,
+      () => resolve(),
+    )
+  })
+
+  return getDownloadURL(task.snapshot.ref)
+}
+
+async function deleteStoragePath(path?: string | null): Promise<void> {
+  if (!path || path.startsWith("http") || path.startsWith("data:")) return
+  try {
+    await deleteObject(ref(getFirebaseStorage(), path))
+  } catch {
+    // Object may already be gone
+  }
 }
 
 /**
- * Handles saving a content asset to Firestore and smartly handling its binary/URL:
- * - On Firebase Spark (free) plan where Firebase Storage is not enabled, it stores:
- *   1. External CDN / streaming URLs directly (`external_cdn`)
- *   2. Small PDFs/docs (< 650 KB) as inline data URLs in Firestore (`inline_spark`) so they work across reloads
- *   3. Larger local files via session Object URL + canonical `storagePath` metadata (`metadata_only`)
- * - If `VITE_FIREBASE_STORAGE_ENABLED=true` is set on a Blaze plan, it uploads to Firebase Storage at `storagePath`.
+ * Save content metadata to Firestore and binaries to the right backend:
+ * - PDF/docs → Firebase Storage (private, cost-efficient object storage)
+ * - Videos → external streaming CDN by default (Bunny/CF/Mux/YouTube/Vimeo)
+ *   optional small local upload to Storage with a hard size cap
  */
 export async function saveContentAsset(
   input: SaveContentAssetInput,
-): Promise<DemoContentAsset> {
-  const current = getContentSnapshot()
+): Promise<ContentAsset> {
   const now = new Date().toISOString()
+  const db = getDb()
   const existing = input.id
-    ? current.find((item) => item.id === input.id)
-    : undefined
+    ? await fetchContentAssetById(input.id)
+    : null
 
-  const prefix = prefixForCategory(input.category)
-  const id =
-    existing?.id ??
-    input.id ??
-    slugifyId(prefix, input.title.en || input.title.ar || input.fileName || "asset")
-
+  const id = existing?.id ?? doc(collection(db, CONTENT_COLLECTION)).id
   const kind = defaultKindForCategory(input.category)
+  const file = input.file ?? null
+
+  if (file) {
+    if (kind === "video" && file.size > CONTENT_UPLOAD_LIMITS.videoBytes) {
+      throw new Error(
+        `Video file exceeds ${formatBytesLabel(CONTENT_UPLOAD_LIMITS.videoBytes)}. Upload to Bunny/Cloudflare/Mux and paste the stream URL instead.`,
+      )
+    }
+    if (kind !== "video" && file.size > CONTENT_UPLOAD_LIMITS.pdfBytes) {
+      throw new Error(
+        `Document exceeds ${formatBytesLabel(CONTENT_UPLOAD_LIMITS.pdfBytes)} upload limit.`,
+      )
+    }
+  }
+
   const effectiveFileName =
-    input.file?.name ||
+    file?.name ||
     input.fileName?.trim() ||
     existing?.fileName ||
     (kind === "video" ? `${id}.mp4` : `${id}.pdf`)
 
-  const canonicalPath =
-    input.storagePath?.trim() ||
-    buildCanonicalStoragePath({
-      id,
-      category: input.category,
-      fileName: effectiveFileName,
-      videoProvider: input.videoProvider,
-      videoAssetId: input.videoAssetId,
-      createdAt: existing?.createdAt ?? now,
-    })
+  const videoProvider: VideoProviderId | undefined =
+    kind === "video"
+      ? input.videoProvider || existing?.videoProvider || "bunny"
+      : undefined
+
+  const canonicalPath = buildCanonicalStoragePath({
+    id,
+    category: input.category,
+    fileName: effectiveFileName,
+    videoProvider,
+    videoAssetId: input.videoAssetId?.trim() || existing?.videoAssetId,
+    createdAt: existing?.createdAt ?? now,
+  })
 
   let resolvedFileUrl = input.fileUrl?.trim() || existing?.fileUrl
   let resolvedStreamUrl = input.streamUrl?.trim() || existing?.streamUrl
   let storageMode: StorageBackendMode =
     existing?.storageMode ??
-    (resolvedFileUrl || resolvedStreamUrl || input.videoAssetId
-      ? "external_cdn"
-      : "metadata_only")
+    (resolvedStreamUrl || resolvedFileUrl ? "external_cdn" : "metadata_only")
+  let storagePath = existing?.storagePath || canonicalPath
+  let previousStoragePathToDelete: string | null = null
 
-  const file = input.file
-  const storageEnabled =
-    import.meta.env.VITE_FIREBASE_STORAGE_ENABLED === "true"
-
-  if (file) {
-    // Always register an instant session Object URL so preview works immediately
-    const objectUrl = URL.createObjectURL(file)
-    sessionObjectUrls.set(id, objectUrl)
-
-    if (storageEnabled) {
-      const storage = tryGetFirebaseStorage()
-      if (storage) {
-        try {
-          const storageRef = ref(storage, canonicalPath)
-          await uploadBytes(storageRef, file, {
-            contentType: file.type || undefined,
-          })
-          const downloadUrl = await getDownloadURL(storageRef)
-          resolvedFileUrl = downloadUrl
-          if (kind === "video") resolvedStreamUrl = downloadUrl
-          storageMode = "firebase_storage"
-        } catch (err) {
-          console.warn(
-            "[content/service] Firebase Storage upload failed, using Spark fallback:",
-            err,
-          )
-        }
+  // Validate delivery source for create
+  if (!existing) {
+    if (kind === "video") {
+      const hasExternal = isHttpUrl(resolvedStreamUrl) || isHttpUrl(resolvedFileUrl)
+      if (!file && !hasExternal) {
+        throw new Error(
+          "Videos require a streaming URL (recommended) or a local file under the upload limit.",
+        )
       }
-    }
-
-    // Spark Free Plan smart inline persistence for small PDFs/docs (< 650 KB)
-    if (storageMode !== "firebase_storage") {
-      if (kind !== "video" && file.size <= 650 * 1024) {
-        try {
-          resolvedFileUrl = await fileToDataUrl(file)
-          storageMode = "inline_spark"
-        } catch {
-          resolvedFileUrl = objectUrl
-          storageMode = "metadata_only"
-        }
-      } else {
-        if (!resolvedFileUrl) resolvedFileUrl = objectUrl
-        if (kind === "video" && !resolvedStreamUrl) resolvedStreamUrl = objectUrl
-        storageMode = "metadata_only"
-      }
-    }
-  } else if (resolvedFileUrl || resolvedStreamUrl) {
-    if (resolvedFileUrl?.startsWith("data:")) {
-      storageMode = "inline_spark"
-    } else if (storageMode !== "firebase_storage") {
-      storageMode = "external_cdn"
+    } else if (!file && !isHttpUrl(resolvedFileUrl)) {
+      throw new Error("Please upload a PDF/document or provide a valid https URL.")
     }
   }
 
-  const sizeBytes = file?.size ?? input.sizeBytes ?? existing?.sizeBytes
-  const sizeLabel =
-    input.sizeLabel?.trim() ||
-    (file ? formatBytesLabel(file.size) : existing?.sizeLabel) ||
-    (kind === "video" ? "120 MB" : "1.2 MB")
+  if (file) {
+    // Replace previous Storage object when path changes or file replaced
+    if (
+      existing?.storageMode === "firebase_storage" &&
+      existing.storagePath &&
+      existing.storagePath !== canonicalPath
+    ) {
+      previousStoragePathToDelete = existing.storagePath
+    }
 
+    const downloadUrl = await uploadToFirebaseStorage(
+      canonicalPath,
+      file,
+      input.onUploadProgress,
+    )
+    resolvedFileUrl = downloadUrl
+    if (kind === "video") resolvedStreamUrl = downloadUrl
+    storageMode = "firebase_storage"
+    storagePath = canonicalPath
+  } else if (kind === "video" && isHttpUrl(resolvedStreamUrl || resolvedFileUrl)) {
+    storageMode = "external_cdn"
+    // Keep a stable canonical path for organization/search even when CDN hosts bytes
+    storagePath = canonicalPath
+  } else if (kind !== "video" && isHttpUrl(resolvedFileUrl) && !file) {
+    storageMode = "external_cdn"
+    storagePath = canonicalPath
+  }
+
+  const sizeBytes = file?.size ?? input.sizeBytes ?? existing?.sizeBytes
   const cleanTitleEn = input.title.en.trim() || input.title.ar.trim()
   const cleanTitleAr = input.title.ar.trim() || input.title.en.trim()
-  const cleanDescEn = input.description.en.trim() || input.description.ar.trim()
-  const cleanDescAr = input.description.ar.trim() || input.description.en.trim()
+  if (!cleanTitleEn && !cleanTitleAr) {
+    throw new Error("Content title is required")
+  }
 
-  const nextAsset: DemoContentAsset = {
+  const nextAsset: ContentAsset = {
     id,
     category: input.category,
     kind,
-    title: {
-      en: cleanTitleEn,
-      ar: cleanTitleAr,
-    },
+    title: { en: cleanTitleEn, ar: cleanTitleAr },
     description: {
-      en: cleanDescEn,
-      ar: cleanDescAr,
+      en: input.description.en.trim() || input.description.ar.trim(),
+      ar: input.description.ar.trim() || input.description.en.trim(),
     },
     fileName: effectiveFileName,
     mimeType:
@@ -342,25 +393,23 @@ export async function saveContentAsset(
       existing?.mimeType ||
       (kind === "video" ? "video/mp4" : "application/pdf"),
     sizeBytes,
-    sizeLabel,
+    sizeLabel: formatBytesLabel(sizeBytes),
     pageCount:
       kind === "video"
         ? undefined
-        : (input.pageCount ?? existing?.pageCount ?? undefined),
+        : (input.pageCount ?? existing?.pageCount ?? undefined) || undefined,
     durationSeconds:
       kind === "video"
-        ? (input.durationSeconds ?? existing?.durationSeconds ?? 45)
+        ? (input.durationSeconds ?? existing?.durationSeconds ?? undefined) ||
+          undefined
         : undefined,
-    storagePath: canonicalPath,
+    storagePath,
     fileUrl: resolvedFileUrl,
     storageMode,
-    videoProvider:
-      kind === "video"
-        ? (input.videoProvider ?? existing?.videoProvider ?? "bunny")
-        : undefined,
+    videoProvider,
     videoAssetId:
       kind === "video"
-        ? (input.videoAssetId?.trim() || existing?.videoAssetId || id)
+        ? input.videoAssetId?.trim() || existing?.videoAssetId || undefined
         : undefined,
     streamUrl: kind === "video" ? resolvedStreamUrl : undefined,
     thumbnailUrl: input.thumbnailUrl?.trim() || existing?.thumbnailUrl,
@@ -387,36 +436,15 @@ export async function saveContentAsset(
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   }
-
   nextAsset.searchTokens = buildContentSearchTokens(nextAsset)
 
-  const updatedList = existing
-    ? current.map((item) => (item.id === id ? nextAsset : item))
-    : [nextAsset, ...current]
+  await setDoc(
+    doc(db, CONTENT_COLLECTION, id),
+    stripUndefined({ ...nextAsset }),
+  )
 
-  setContentSnapshot(updatedList)
-
-  const db = tryGetDb()
-  if (db) {
-    try {
-      // Do not persist transient blob: URLs to Firestore; persist data: or https: URLs
-      const firestorePayload: DemoContentAsset = {
-        ...nextAsset,
-        fileUrl: nextAsset.fileUrl?.startsWith("blob:")
-          ? undefined
-          : nextAsset.fileUrl,
-        streamUrl: nextAsset.streamUrl?.startsWith("blob:")
-          ? undefined
-          : nextAsset.streamUrl,
-      }
-      await setDoc(
-        doc(db, CONTENT_COLLECTION, id),
-        stripUndefined(firestorePayload),
-        { merge: true },
-      )
-    } catch (err) {
-      console.warn("[content/service] Firestore saveContentAsset error:", err)
-    }
+  if (previousStoragePathToDelete) {
+    await deleteStoragePath(previousStoragePathToDelete)
   }
 
   return nextAsset
@@ -434,15 +462,11 @@ export type UpdateContentAssociationsInput = {
 
 export async function updateContentAssociations(
   input: UpdateContentAssociationsInput,
-): Promise<DemoContentAsset> {
-  const current = getContentSnapshot()
-  const existing = current.find((item) => item.id === input.assetId)
-  if (!existing) {
-    throw new Error(`Content asset ${input.assetId} not found`)
-  }
+): Promise<ContentAsset> {
+  const existing = await fetchContentAssetById(input.assetId)
+  if (!existing) throw new Error("Content asset not found")
 
-  const now = new Date().toISOString()
-  const updated: DemoContentAsset = {
+  const updated: ContentAsset = {
     ...existing,
     visibility: input.visibility,
     requiredEntitlement: input.requiredEntitlement,
@@ -459,80 +483,44 @@ export async function updateContentAssociations(
             ),
           )
         : existing.exerciseNames,
-    updatedAt: now,
+    updatedAt: new Date().toISOString(),
   }
   updated.searchTokens = buildContentSearchTokens(updated)
 
-  const nextList = current.map((item) =>
-    item.id === updated.id ? updated : item,
+  const db = getDb()
+  await setDoc(
+    doc(db, CONTENT_COLLECTION, updated.id),
+    stripUndefined({
+      visibility: updated.visibility,
+      requiredEntitlement: updated.requiredEntitlement,
+      packageIds: updated.packageIds,
+      subscriberIds: updated.subscriberIds,
+      programIds: updated.programIds,
+      exerciseNames: updated.exerciseNames,
+      searchTokens: updated.searchTokens,
+      updatedAt: updated.updatedAt,
+    }),
+    { merge: true },
   )
-  setContentSnapshot(nextList)
-
-  const db = tryGetDb()
-  if (db) {
-    try {
-      await setDoc(
-        doc(db, CONTENT_COLLECTION, updated.id),
-        stripUndefined({
-          visibility: updated.visibility,
-          requiredEntitlement: updated.requiredEntitlement,
-          packageIds: updated.packageIds,
-          subscriberIds: updated.subscriberIds,
-          programIds: updated.programIds,
-          exerciseNames: updated.exerciseNames,
-          searchTokens: updated.searchTokens,
-          updatedAt: updated.updatedAt,
-        }),
-        { merge: true },
-      )
-    } catch (err) {
-      console.warn(
-        "[content/service] Firestore updateContentAssociations error:",
-        err,
-      )
-    }
-  }
 
   return updated
 }
 
 export async function deleteContentAsset(assetId: string): Promise<void> {
-  const current = getContentSnapshot()
-  const target = current.find((item) => item.id === assetId)
-  const nextList = current.filter((item) => item.id !== assetId)
-  setContentSnapshot(nextList)
+  const existing = await fetchContentAssetById(assetId)
+  const db = getDb()
+  await deleteDoc(doc(db, CONTENT_COLLECTION, assetId))
 
-  const blobUrl = sessionObjectUrls.get(assetId)
-  if (blobUrl) {
-    URL.revokeObjectURL(blobUrl)
-    sessionObjectUrls.delete(assetId)
-  }
+  const path = existing?.storagePath
+  const shouldDeleteObject =
+    existing?.storageMode === "firebase_storage" ||
+    (Boolean(path) &&
+      path!.startsWith("content/") &&
+      !path!.startsWith("http") &&
+      existing?.storageMode !== "external_cdn" &&
+      existing?.storageMode !== "metadata_only")
 
-  // If uploaded to Firebase Storage on Blaze plan, delete the storage object too
-  const storageEnabled =
-    import.meta.env.VITE_FIREBASE_STORAGE_ENABLED === "true"
-  if (
-    storageEnabled &&
-    target?.storageMode === "firebase_storage" &&
-    target.storagePath
-  ) {
-    const storage = tryGetFirebaseStorage()
-    if (storage) {
-      try {
-        await deleteObject(ref(storage, target.storagePath))
-      } catch {
-        // Ignore storage object not found
-      }
-    }
-  }
-
-  const db = tryGetDb()
-  if (db) {
-    try {
-      await deleteDoc(doc(db, CONTENT_COLLECTION, assetId))
-    } catch (err) {
-      console.warn("[content/service] Firestore deleteContentAsset error:", err)
-    }
+  if (shouldDeleteObject) {
+    await deleteStoragePath(path)
   }
 }
-

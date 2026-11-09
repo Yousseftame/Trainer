@@ -21,6 +21,7 @@ import type {
   SaveWorkoutProgramInput,
 } from "@/features/workouts/service"
 import { useLocale } from "@/hooks/useLocale"
+import { allocateFirestoreId } from "@/lib/firebase/ids"
 import { cn } from "@/lib/utils"
 import type { ContentAsset } from "@/types/content"
 import type {
@@ -51,7 +52,7 @@ const WEEKDAY_NAMES_AR = ["الاثنين", "الثلاثاء", "الأربعا�
 
 function emptyWeek(): WorkoutDay[] {
   return Array.from({ length: 7 }, (_, weekday) => ({
-    id: `day-${weekday}-${Date.now().toString(36)}`,
+    id: allocateFirestoreId("workout_days"),
     weekday,
     isRest: weekday === 2 || weekday === 6, // default wed/sun rest
     exercises: [],
@@ -205,7 +206,7 @@ export function WorkoutProgramFormDialog({
 
   function addExerciseToCurrentDay() {
     const newEx: WorkoutExercise = {
-      id: `ex-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+      id: allocateFirestoreId("workout_exercises"),
       name: { en: "New Exercise", ar: "تمرين جديد" },
       description: { en: "", ar: "" },
       sets: 3,

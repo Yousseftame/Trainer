@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { Eye, EyeOff } from "lucide-react"
 import { APP_ROUTES } from "@/config/constants"
+import { adminNav, flattenNavItems } from "@/config/navigation"
 import {
   authInputClass,
   authLabelClass,
@@ -14,8 +15,20 @@ import { useAuth } from "@/features/auth/auth-context"
 import { firebaseAuthErrorKey } from "@/features/auth/errors"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
+import { can, resolveAdminLandingPath } from "@/lib/permissions/can"
 import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
+
+function adminPathAllowed(user: Parameters<typeof can>[0], pathname: string) {
+  if (pathname === APP_ROUTES.admin.root) return true
+  const match = flattenNavItems(adminNav)
+    .sort((a, b) => b.to.length - a.to.length)
+    .find(
+      (item) => pathname === item.to || pathname.startsWith(`${item.to}/`),
+    )
+  if (!match) return false
+  return !match.permission || can(user, match.permission)
+}
 
 export function LoginPage() {
   const { t } = useTranslation()
@@ -49,8 +62,11 @@ export function LoginPage() {
       const target = from?.startsWith("/app") ? from : APP_ROUTES.subscriber.root
       navigate(target, { replace: true })
     } else {
-      const target = from?.startsWith("/admin") ? from : APP_ROUTES.admin.root
-      navigate(target, { replace: true })
+      const preferred =
+        from?.startsWith("/admin") && adminPathAllowed(user, from)
+          ? from
+          : resolveAdminLandingPath(user)
+      navigate(preferred, { replace: true })
     }
   }, [status, user, location.state, navigate, signOut, isAr])
 

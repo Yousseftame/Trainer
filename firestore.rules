@@ -10,12 +10,19 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.status != 'suspended';
     }
 
+    function isActiveAccount() {
+      return isNotSuspended() &&
+        request.auth.token.status != 'rejected' &&
+        request.auth.token.status != 'pending';
+    }
+
+    // Head coach still requires an active (non-suspended) token.
     function isHeadCoach() {
-      return isSignedIn() && request.auth.token.role == 'head_coach';
+      return isActiveAccount() && request.auth.token.role == 'head_coach';
     }
 
     function isStaff() {
-      return isSignedIn() && isNotSuspended() && (
+      return isActiveAccount() && (
         request.auth.token.role in [
           'head_coach',
           'assistant',
@@ -36,14 +43,36 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    function isActiveSelf(uid) {
+      return isSelf(uid) && isActiveAccount();
+    }
+
     // Lifecycle / identity fields must stay immutable from the client SDK.
     // Only Admin SDK (Cloud Functions) can create accounts, flip status, or delete.
-    function subscriberIdentityLocked() {
+    function subscriberIdentityLocked(sid) {
       return request.resource.data.id == resource.data.id &&
-        request.resource.data.id == subscriberId &&
+        request.resource.data.id == sid &&
         request.resource.data.email == resource.data.email &&
         request.resource.data.status == resource.data.status &&
         request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    // Subscribers may soft-edit profile fields only — never coachNotes / package prefs.
+    function subscriberSelfProfileKeysOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'displayName',
+        'name',
+        'phone',
+        'locale',
+        'sex',
+        'age',
+        'heightCm',
+        'startingWeightKg',
+        'targetWeightKg',
+        'goal',
+        'healthNotes',
+        'updatedAt'
+      ]);
     }
 
     // -------------------------------------------------------------
@@ -68,28 +97,30 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------
-    // Staff directory
+    // Staff directory — create / update / delete ONLY via Cloud Functions
+    // (Auth user + custom claims must stay in sync; DevTools cannot mint roles)
     // -------------------------------------------------------------
     match /staff/{staffId} {
       allow read: if isStaff() || isSelf(staffId);
-      allow create, update: if hasPermission('staff:manage');
-      allow delete: if hasPermission('staff:manage') &&
-        resource.data.role != 'head_coach';
+      allow create, update, delete: if false;
     }
 
     // -------------------------------------------------------------
     // Subscribers — create/status/delete ONLY via Cloud Functions
     // -------------------------------------------------------------
     match /subscribers/{subscriberId} {
-      allow read: if hasPermission('subscribers:read') || isSelf(subscriberId);
+      allow read: if hasPermission('subscribers:read') ||
+        hasPermission('reports:read') ||
+        isSelf(subscriberId);
 
       // Staff may edit profile/notes/metrics, never identity/status
       allow update: if hasPermission('subscribers:write') &&
-        subscriberIdentityLocked();
+        subscriberIdentityLocked(subscriberId);
 
-      // Subscriber may edit own soft profile fields only
-      allow update: if isSelf(subscriberId) &&
-        subscriberIdentityLocked();
+      // Subscriber may edit own soft profile fields only (not coachNotes)
+      allow update: if isActiveSelf(subscriberId) &&
+        subscriberIdentityLocked(subscriberId) &&
+        subscriberSelfProfileKeysOnly();
 
       allow create: if false;
       allow delete: if false;
@@ -110,7 +141,8 @@ service cloud.firestore {
         request.resource.data.source in ['contact', 'manual'];
 
       allow read: if hasPermission('subscribers:read') ||
-        hasPermission('subscribers:approve');
+        hasPermission('subscribers:approve') ||
+        hasPermission('reports:read');
 
       // DevTools cannot approve/reject — Functions use Admin SDK
       allow update: if false;
@@ -124,7 +156,7 @@ service cloud.firestore {
       allow read: if hasPermission('subscriptions:manage') ||
         hasPermission('subscribers:read') ||
         hasPermission('reports:read') ||
-        (isSignedIn() && resource.data.subscriberId == request.auth.uid);
+        (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
 
       allow create: if hasPermission('subscriptions:manage') &&
         request.resource.data.id == subscriptionId &&
@@ -157,7 +189,7 @@ service cloud.firestore {
       allow read: if hasPermission('workouts:manage') ||
         hasPermission('subscribers:read') ||
         hasPermission('reports:read') ||
-        (isSignedIn() &&
+        (isActiveAccount() &&
           resource.data.keys().hasAny(['subscriberId']) &&
           resource.data.subscriberId == request.auth.uid);
 
@@ -186,7 +218,7 @@ service cloud.firestore {
       allow read: if hasPermission('nutrition:manage') ||
         hasPermission('subscribers:read') ||
         hasPermission('reports:read') ||
-        (isSignedIn() &&
+        (isActiveAccount() &&
           resource.data.keys().hasAny(['subscriberId']) &&
           resource.data.subscriberId == request.auth.uid);
 
@@ -211,49 +243,131 @@ service cloud.firestore {
       allow delete: if hasPermission('nutrition:manage');
     }
 
-    match /physical_therapy/{recordId} {
+    // Injury / rehab case files — staff manage; subscribers read own records only.
+    match /physical_therapy/{id} {
       allow read: if hasPermission('physicalTherapy:read') ||
-        (isSignedIn() && resource.data.subscriberId == request.auth.uid);
-      allow write: if hasPermission('physicalTherapy:manage');
+        (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
+
+      allow create: if hasPermission('physicalTherapy:manage') &&
+        request.resource.data.id == id &&
+        request.resource.data.keys().hasAll([
+          'id', 'subscriberId', 'injuryTitle', 'affectedArea', 'severity',
+          'status', 'diagnosisDate', 'restrictions', 'rehabExercises',
+          'createdAt', 'updatedAt'
+        ]) &&
+        request.resource.data.status in ['active', 'recovering', 'cleared'] &&
+        request.resource.data.severity in ['mild', 'moderate', 'severe'] &&
+        request.resource.data.subscriberId is string;
+
+      allow update: if hasPermission('physicalTherapy:manage') &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.id == id &&
+        request.resource.data.subscriberId == resource.data.subscriberId &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.status in ['active', 'recovering', 'cleared'] &&
+        request.resource.data.severity in ['mild', 'moderate', 'severe'];
+
+      allow delete: if hasPermission('physicalTherapy:manage');
     }
 
+    // progress:read = inspect; progress:write = create/update/delete for others
     match /progress_measurements/{id} {
       allow read: if hasPermission('progress:read') ||
-        (isSignedIn() && resource.data.subscriberId == request.auth.uid);
-      allow create, update: if hasPermission('progress:read') ||
-        (isSignedIn() && request.resource.data.subscriberId == request.auth.uid);
-      allow delete: if hasPermission('progress:read');
+        hasPermission('reports:read') ||
+        (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
+      allow create: if hasPermission('progress:write') ||
+        (isActiveAccount() &&
+          request.resource.data.subscriberId == request.auth.uid &&
+          request.resource.data.id == id);
+      allow update: if (
+          hasPermission('progress:write') ||
+          (isActiveAccount() && resource.data.subscriberId == request.auth.uid)
+        ) &&
+        request.resource.data.id == id &&
+        request.resource.data.subscriberId == resource.data.subscriberId;
+      allow delete: if hasPermission('progress:write') ||
+        (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
     }
 
     match /progress_photos/{id} {
       allow read: if hasPermission('progress:read') ||
-        (isSignedIn() && resource.data.subscriberId == request.auth.uid);
-      allow create, update: if hasPermission('progress:read') ||
-        (isSignedIn() && request.resource.data.subscriberId == request.auth.uid);
-      allow delete: if hasPermission('progress:read');
-    }
-
-    match /content_assets/{id} {
-      allow read: if hasPermission('content:manage') ||
-        hasPermission('subscribers:read') ||
-        isSignedIn();
-      allow write: if hasPermission('content:manage');
+        hasPermission('reports:read') ||
+        (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
+      allow create: if hasPermission('progress:write') ||
+        (isActiveAccount() &&
+          request.resource.data.subscriberId == request.auth.uid &&
+          request.resource.data.id == id);
+      allow update: if (
+          hasPermission('progress:write') ||
+          (isActiveAccount() && resource.data.subscriberId == request.auth.uid)
+        ) &&
+        request.resource.data.id == id &&
+        request.resource.data.subscriberId == resource.data.subscriberId;
+      allow delete: if hasPermission('progress:write') ||
+        (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
     }
 
     match /progress_performance/{id} {
       allow read: if hasPermission('progress:read') ||
-        (isSignedIn() && resource.data.subscriberId == request.auth.uid);
-      allow create, update: if hasPermission('progress:read') ||
-        (isSignedIn() && request.resource.data.subscriberId == request.auth.uid);
-      allow delete: if hasPermission('progress:read');
+        hasPermission('reports:read') ||
+        (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
+      allow create: if hasPermission('progress:write') ||
+        (isActiveAccount() &&
+          request.resource.data.subscriberId == request.auth.uid &&
+          request.resource.data.id == id);
+      allow update: if (
+          hasPermission('progress:write') ||
+          (isActiveAccount() && resource.data.subscriberId == request.auth.uid)
+        ) &&
+        request.resource.data.id == id &&
+        request.resource.data.subscriberId == resource.data.subscriberId;
+      allow delete: if hasPermission('progress:write') ||
+        (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
+    }
+
+    // Content metadata holds fileUrl/streamUrl/storagePath — never open to all signed-in users.
+    // Staff manage/preview via client SDK; subscribers receive entitled payloads via Cloud Functions.
+    match /content_assets/{id} {
+      allow read: if hasPermission('content:manage') ||
+        hasPermission('subscribers:read') ||
+        hasPermission('reports:read');
+      allow create, update, delete: if hasPermission('content:manage');
+    }
+
+    // Ops notification inbox — created by Cloud Functions; staff may only clear unread.
+    match /notices/{id} {
+      allow read: if hasPermission('reports:read') ||
+        hasPermission('notifications:send');
+      allow create, delete: if false;
+      allow update: if (
+          hasPermission('reports:read') ||
+          hasPermission('notifications:send')
+        ) &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['unread', 'updatedAt']) &&
+        request.resource.data.unread == false;
+    }
+
+    // Trigger Email extension queue — Admin SDK only.
+    match /mail/{id} {
+      allow read, write: if false;
+    }
+
+    // Device push tokens — each user manages their own rows.
+    match /fcm_tokens/{tokenId} {
+      allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow create, update: if isActiveAccount() &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.token is string;
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }
 
     match /workout_logs/{id} {
       allow read: if hasPermission('workouts:manage') ||
         hasPermission('progress:read') ||
-        (isSignedIn() && resource.data.subscriberId == request.auth.uid);
+        hasPermission('reports:read') ||
+        (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
 
-      // Subscribers may log their own sessions; never rewrite another user's logs
       allow create: if
         request.resource.data.id == id &&
         request.resource.data.keys().hasAll([
@@ -261,7 +375,7 @@ service cloud.firestore {
         ]) &&
         (
           hasPermission('workouts:manage') ||
-          (isSignedIn() &&
+          (isActiveAccount() &&
             request.resource.data.subscriberId == request.auth.uid)
         );
 
@@ -276,7 +390,8 @@ service cloud.firestore {
     match /nutrition_logs/{id} {
       allow read: if hasPermission('nutrition:manage') ||
         hasPermission('progress:read') ||
-        (isSignedIn() && resource.data.subscriberId == request.auth.uid);
+        hasPermission('reports:read') ||
+        (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
 
       allow create: if
         request.resource.data.id == id &&
@@ -285,7 +400,7 @@ service cloud.firestore {
         ]) &&
         (
           hasPermission('nutrition:manage') ||
-          (isSignedIn() &&
+          (isActiveAccount() &&
             request.resource.data.subscriberId == request.auth.uid)
         );
 

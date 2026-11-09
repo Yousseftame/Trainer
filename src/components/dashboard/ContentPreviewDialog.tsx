@@ -16,22 +16,26 @@ import {
 import { useMemo, useState } from "react"
 import { APP_ROUTES } from "@/config/constants"
 import { useAuth } from "@/features/auth/auth-context"
+import { evaluateSubscriberContentAccess } from "@/features/content/access"
+import { useMySubscriberQuery } from "@/features/subscribers/hooks"
 import {
-  evaluateSubscriberContentAccess,
-  type DemoContentAsset,
-} from "@/features/content/demo"
+  currentSubscriptionFor,
+  getPackageById,
+} from "@/features/subscriptions/cache"
 import {
-  useMySubscriberQuery,
-  useSubscribersQuery,
-} from "@/features/subscribers/hooks"
+  usePackagesQuery,
+  useSubscriberSubscriptionsQuery,
+} from "@/features/subscriptions/hooks"
+import type { CatalogPackage } from "@/features/subscriptions/types"
 import { useLocale } from "@/hooks/useLocale"
+import type { ContentAsset } from "@/types/content"
 import { formatDuration } from "@/lib/format"
 import { appToast } from "@/lib/toast"
 
 type ContentPreviewDialogProps = {
-  asset: DemoContentAsset | null
+  asset: ContentAsset | null
   onClose: () => void
-  onEdit?: (asset: DemoContentAsset) => void
+  onEdit?: (asset: ContentAsset) => void
 }
 
 function toEmbedUrl(rawUrl: string): { type: "iframe" | "video"; url: string } {
@@ -78,16 +82,23 @@ export function ContentPreviewDialog({
   const isAr = locale === "ar"
   const [copied, setCopied] = useState(false)
   const { user, isAdmin, isSubscriber } = useAuth()
-  // Admin preview may list members; subscribers only read their own doc
-  const { data: subscribers = [] } = useSubscribersQuery({ enabled: isAdmin })
   const { data: mySubscriber } = useMySubscriberQuery(
     !isAdmin ? user?.uid : undefined,
   )
+  const { data: mySubs = [] } = useSubscriberSubscriptionsQuery(
+    !isAdmin ? mySubscriber?.id : undefined,
+  )
+  usePackagesQuery({ enabled: !isAdmin })
 
-  const currentSubscriber = useMemo(() => {
-    if (isAdmin) return subscribers[0] ?? null
-    return mySubscriber ?? null
-  }, [isAdmin, subscribers, mySubscriber])
+  const currentSubscriber = mySubscriber ?? null
+  const mySubscription = useMemo(() => {
+    if (!currentSubscriber) return null
+    return (
+      mySubs.find((s) => s.status === "active" || s.status === "suspended") ??
+      mySubs[0] ??
+      currentSubscriptionFor(currentSubscriber.id)
+    )
+  }, [currentSubscriber, mySubs])
 
   const access = useMemo(() => {
     if (isAdmin) {
@@ -114,17 +125,15 @@ export function ContentPreviewDialog({
         },
       }
     }
-    if (!currentSubscriber) {
-      return {
-        allowed: false,
-        reason: {
-          en: "Active subscriber account required",
-          ar: "يتطلب حساب مشترك نشط",
-        },
-      }
-    }
-    return evaluateSubscriberContentAccess(asset, currentSubscriber.id)
-  }, [isAdmin, asset, currentSubscriber])
+    return evaluateSubscriberContentAccess({
+      asset,
+      subscriber: currentSubscriber,
+      subscription: mySubscription,
+      pkg: getPackageById(mySubscription?.packageId) as
+        | CatalogPackage
+        | undefined,
+    })
+  }, [isAdmin, asset, currentSubscriber, mySubscription])
 
   if (!asset || typeof document === "undefined") return null
 

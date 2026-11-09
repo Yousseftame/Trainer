@@ -27,6 +27,7 @@ import { useSubscribersQuery } from "@/features/subscribers/hooks"
 import { currentSubscriptionFor } from "@/features/subscriptions/demo"
 import { useSubscriptionsQuery } from "@/features/subscriptions/hooks"
 import { useLocale } from "@/hooks/useLocale"
+import { allocateFirestoreId } from "@/lib/firebase/ids"
 import { cn } from "@/lib/utils"
 import type {
   BilingualText,
@@ -68,21 +69,21 @@ const MEAL_SLOT_LABELS: Record<MealSlotKey, { en: string; ar: string }> = {
 
 function emptyNutritionWeek(): NutritionDay[] {
   return Array.from({ length: 7 }, (_, weekday) => ({
-    id: `nday-${weekday}-${Date.now().toString(36)}`,
+    id: allocateFirestoreId("nutrition_days"),
     weekday,
     meals: [
       {
-        id: `slot-bf-${weekday}`,
+        id: allocateFirestoreId("nutrition_slots"),
         slot: "breakfast",
         items: [],
       },
       {
-        id: `slot-ln-${weekday}`,
+        id: allocateFirestoreId("nutrition_slots"),
         slot: "lunch",
         items: [],
       },
       {
-        id: `slot-dn-${weekday}`,
+        id: allocateFirestoreId("nutrition_slots"),
         slot: "dinner",
         items: [],
       },
@@ -256,7 +257,7 @@ export function NutritionProgramFormDialog({
 
   function addMealSlotToCurrentDay(slotKey: MealSlotKey) {
     const newSlot: MealSlot = {
-      id: `slot-${slotKey}-${Date.now().toString(36)}`,
+      id: allocateFirestoreId("nutrition_slots"),
       slot: slotKey,
       items: [],
     }
@@ -283,7 +284,7 @@ export function NutritionProgramFormDialog({
 
   function addMealItem(slotId: string) {
     const newItem: MealItem = {
-      id: `mitem-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+      id: allocateFirestoreId("nutrition_items"),
       name: { en: "Meal Item", ar: "عنصر غذائي" },
       quantity: { en: "1 portion", ar: "1 حصة" },
       calories: 250,
@@ -376,7 +377,7 @@ export function NutritionProgramFormDialog({
 
   function addFoodAlternative(slotId: string, itemId: string) {
     const newAlt: MealAlternative = {
-      id: `alt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+      id: allocateFirestoreId("nutrition_alts"),
       name: { en: "Substitute Food", ar: "بديل غذائي معتمد" },
       quantity: { en: "1 portion", ar: "1 حصة" },
       calories: 200,

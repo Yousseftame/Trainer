@@ -3,6 +3,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Dumbbell,
+  HeartPulse,
   TrendingUp,
   Users,
   UtensilsCrossed,
@@ -50,6 +51,12 @@ export function OverviewPage() {
       title: isAr ? "سجل القياسات" : "Body Metrics",
       to: APP_ROUTES.subscriber.progress,
       icon: TrendingUp,
+    },
+    {
+      id: "physicalTherapy",
+      title: isAr ? "العلاج الطبيعي" : "Physical Therapy",
+      to: APP_ROUTES.subscriber.physicalTherapy,
+      icon: HeartPulse,
     },
   ]
 

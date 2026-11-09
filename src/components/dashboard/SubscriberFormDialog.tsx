@@ -125,15 +125,15 @@ export function SubscriberFormDialog({
       const defaultPkg =
         packages.find((p) => p.isActive && p.featured) ??
         packages.find((p) => p.isActive) ??
-        packages[0] ?? { id: "pkg-transform", durationDays: 30 }
-      setAssignInitialPackage(true)
-      setInitialPackageId(defaultPkg.id)
+        packages[0]
+      setAssignInitialPackage(Boolean(defaultPkg))
+      setInitialPackageId(defaultPkg?.id ?? "")
       setInitialSubStatus("active")
       const todayIso = new Date().toISOString()
       setStartsDate(toDateInputValue(todayIso))
       setEndsDate(
         toDateInputValue(
-          computeEndsAtIso(todayIso, defaultPkg.durationDays ?? 30),
+          computeEndsAtIso(todayIso, defaultPkg?.durationDays ?? 30),
         ),
       )
     }

@@ -301,10 +301,8 @@ export async function savePackage(input: SavePackageInput): Promise<CatalogPacka
   }
 
   const current = await fetchPackages()
-  const id =
-    existing?.id ??
-    input.id ??
-    doc(collection(db, PACKAGES_COLLECTION)).id
+  // Always use Firestore auto-ids for creates (never client-prefixed ids like pkg-*)
+  const id = existing?.id ?? doc(collection(db, PACKAGES_COLLECTION)).id
 
   const sortOrder =
     input.sortOrder ??

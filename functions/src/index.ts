@@ -11,6 +11,11 @@ import "./config/firebase.js";
 
 export {
   bootstrapStaffClaims,
+  createStaffMember,
+  updateStaffMember,
+  setStaffAccountStatus,
+  deleteStaffMember,
+  purgeDemoStaffData,
   createSubscriberAccount,
   updateSubscriberAccount,
   setSubscriberAccountStatus,
@@ -19,3 +24,14 @@ export {
   approveRegistrationRequest,
   rejectRegistrationRequest,
 } from "./admin/index.js";
+
+export {listSubscriberContentLibrary} from "./subscriber/index.js";
+
+export {
+  dispatchNotice,
+  registerFcmToken,
+  unregisterFcmToken,
+  onRegistrationRequestCreated,
+  onSubscriptionWritten,
+  scanExpiringSubscriptions,
+} from "./notifications/index.js";

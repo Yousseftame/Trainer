@@ -1,19 +1,21 @@
 import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { Check, Link2, ShieldCheck, Users, X } from "lucide-react"
-import {
-  defaultEntitlementForCategory,
-  evaluateSubscriberContentAccess,
-  type DemoContentAsset,
-} from "@/features/content/demo"
+import { evaluateSubscriberContentAccess } from "@/features/content/access"
+import { defaultEntitlementForCategory } from "@/features/content/paths"
 import type { UpdateContentAssociationsInput } from "@/features/content/service"
 import { useNutritionProgramsQuery } from "@/features/nutrition/hooks"
 import {
   subscriberDisplayName,
-  type DemoSubscriber,
-} from "@/features/subscribers/demo"
+  type Subscriber,
+} from "@/features/subscribers/types"
+import {
+  currentSubscriptionFor,
+  getPackageById,
+} from "@/features/subscriptions/cache"
 import type { CatalogPackage } from "@/features/subscriptions/types"
 import { useWorkoutProgramsQuery } from "@/features/workouts/hooks"
+import type { ContentAsset } from "@/types/content"
 import { useLocale } from "@/hooks/useLocale"
 import { cn } from "@/lib/utils"
 import type { ContentVisibility } from "@/types/content"
@@ -21,10 +23,10 @@ import type { PackageEntitlementKey } from "@/types/subscription"
 
 type ContentAssociationDialogProps = {
   open: boolean
-  asset: DemoContentAsset | null
+  asset: ContentAsset | null
   initialTab?: "programs" | "subscribers" | "packages"
   packages: CatalogPackage[]
-  subscribers: DemoSubscriber[]
+  subscribers: Subscriber[]
   busy?: boolean
   onClose: () => void
   onSave: (input: UpdateContentAssociationsInput) => Promise<unknown>
@@ -113,8 +115,7 @@ export function ContentAssociationDialog({
     setter(list.includes(id) ? list.filter((x) => x !== id) : [...list, id])
   }
 
-  // Simulated draft asset to evaluate subscriber access in real time inside the modal
-  const draftAsset: DemoContentAsset = {
+  const draftAsset: ContentAsset = {
     ...asset,
     visibility,
     requiredEntitlement,
@@ -364,10 +365,15 @@ export function ContentAssociationDialog({
               <div className="grid gap-2">
                 {subscribers.map((sub) => {
                   const selected = subscriberIds.includes(sub.id)
-                  const access = evaluateSubscriberContentAccess(
-                    draftAsset,
-                    sub.id,
-                  )
+                  const subRec = currentSubscriptionFor(sub.id)
+                  const access = evaluateSubscriberContentAccess({
+                    asset: draftAsset,
+                    subscriber: sub,
+                    subscription: subRec,
+                    pkg: getPackageById(subRec?.packageId) as
+                      | CatalogPackage
+                      | undefined,
+                  })
                   return (
                     <div
                       key={sub.id}
