@@ -16,7 +16,7 @@ import {
   X,
 } from "lucide-react"
 import { useLocale } from "@/hooks/useLocale"
-import { resolveBilingualText } from "@/features/workouts/demo"
+import { resolveBilingualText } from "@/lib/program-text"
 import { cn } from "@/lib/utils"
 import type {
   CompletedExerciseRecord,
@@ -31,6 +31,8 @@ interface WorkoutLiveSessionModalProps {
   onClose: () => void
   day: WorkoutDay
   programTitle?: string
+  /** Resolve entitled stream / embed URL for an exercise (content library + videoUrl). */
+  resolveExerciseVideoUrl?: (exercise: WorkoutExercise) => string | undefined
   onCompleteWorkout: (results: {
     durationMinutes: number
     activeMinutes: number
@@ -52,6 +54,7 @@ export function WorkoutLiveSessionModal({
   onClose,
   day,
   programTitle: _programTitle,
+  resolveExerciseVideoUrl,
   onCompleteWorkout,
 }: WorkoutLiveSessionModalProps) {
   const { t: _t } = useTranslation()
@@ -67,6 +70,15 @@ export function WorkoutLiveSessionModal({
 
   const [currentIdx, setCurrentIdx] = useState(0)
   const currentExercise = exercisesList[currentIdx] ?? exercisesList[0]
+
+  const currentVideoUrl = useMemo(() => {
+    if (!currentExercise) return undefined
+    return (
+      resolveExerciseVideoUrl?.(currentExercise) ||
+      currentExercise.videoUrl ||
+      undefined
+    )
+  }, [currentExercise, resolveExerciseVideoUrl])
 
   // Overall workout elapsed time in seconds
   const [totalSeconds, setTotalSeconds] = useState(0)
@@ -357,10 +369,14 @@ export function WorkoutLiveSessionModal({
       {/* 3. Main Stage: Video / Visual Demonstration */}
       <div className="relative flex-1 flex flex-col justify-center items-center overflow-hidden bg-black/40">
         {/* Video Player or Fallback Poster */}
-        {currentExercise.videoUrl ? (
+        {currentVideoUrl ? (
           <div className="relative w-full h-full max-h-[50vh] sm:max-h-[58vh] flex items-center justify-center bg-black">
             <iframe
-              src={`${currentExercise.videoUrl}?autoplay=1&mute=1&controls=0&loop=1`}
+              src={
+                /[?&](autoplay|mute|controls|loop)=/.test(currentVideoUrl)
+                  ? currentVideoUrl
+                  : `${currentVideoUrl}${currentVideoUrl.includes("?") ? "&" : "?"}autoplay=1&mute=1&controls=0&loop=1`
+              }
               title={exerciseName}
               allow="autoplay; encrypted-media; picture-in-picture"
               className="w-full h-full object-cover border-0 pointer-events-none"

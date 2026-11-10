@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { AnimatePresence, motion } from "motion/react"
 import { Check, Headphones, Mail } from "lucide-react"
@@ -15,24 +15,56 @@ const PHONE_RE = /^\+?[\d\s()-]{8,20}$/
 const MESSAGE_MIN = 10
 const MESSAGE_MAX = 1000
 
+type FieldKey =
+  | "firstName"
+  | "lastName"
+  | "email"
+  | "phone"
+  | "plan"
+  | "message"
+
+type FieldErrors = Partial<Record<FieldKey, string>>
+
+const FIELD_ORDER: FieldKey[] = [
+  "firstName",
+  "lastName",
+  "email",
+  "phone",
+  "plan",
+  "message",
+]
+
 const baseFieldClass = cn(
-  "w-full rounded-2xl border border-[var(--gym-ink)]/8 bg-[#f7f7f7] px-5",
+  "w-full rounded-2xl border bg-[#f7f7f7] px-5",
   "font-heading text-[15px] font-medium text-[var(--gym-ink)] outline-none",
   "placeholder:font-normal placeholder:text-[var(--gym-muted)]/55",
   "transition-[background-color,box-shadow,border-color] duration-300 ease-out",
+  "sm:text-[15px]",
+)
+
+const fieldIdleClass = cn(
+  "border-[var(--gym-ink)]/8",
   "hover:border-[var(--gym-ink)]/14 hover:bg-[#f3f3f3]",
   "focus:border-[var(--gym-ink)]/20 focus:bg-white focus:shadow-[0_8px_28px_rgba(0,0,0,0.08)]",
-  "sm:text-[15px]"
+)
+
+const fieldErrorClass = cn(
+  "border-[#e5484d]/55 bg-[#fff7f7]",
+  "focus:border-[#e5484d]/70 focus:bg-white focus:shadow-[0_8px_28px_rgba(229,72,77,0.12)]",
 )
 
 const inputFieldClass = cn(baseFieldClass, "h-[54px] sm:h-[58px]")
 const textareaFieldClass = cn(
   baseFieldClass,
-  "min-h-[128px] resize-y py-4 leading-relaxed sm:min-h-[140px]"
+  "min-h-[128px] resize-y py-4 leading-relaxed sm:min-h-[140px]",
 )
 
 const labelClass =
   "mb-2.5 block font-heading text-[13px] font-semibold tracking-[0.02em] text-[var(--gym-ink)]/80 sm:text-[14px]"
+
+function fieldClassName(hasError: boolean, extra?: string) {
+  return cn(extra, hasError ? fieldErrorClass : fieldIdleClass)
+}
 
 export function ContactSection() {
   const { t } = useTranslation()
@@ -43,15 +75,18 @@ export function ContactSection() {
 
   const formRef = useRef<HTMLFormElement>(null)
   const slideWrapRef = useRef<HTMLDivElement>(null)
+  const fieldRefs = useRef<Partial<Record<FieldKey, HTMLElement | null>>>({})
   const [slideWidth, setSlideWidth] = useState(320)
   const [submitted, setSubmitted] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState("")
+  const [errors, setErrors] = useState<FieldErrors>({})
 
   useEffect(() => {
     function onSelectPackage(event: Event) {
       const detail = (event as CustomEvent<{ packageId?: string }>).detail
       if (detail?.packageId) {
         setSelectedPlan(detail.packageId)
+        clearFieldError("plan")
       }
     }
     window.addEventListener("derpyfit:select-package", onSelectPackage)
@@ -74,42 +109,93 @@ export function ContactSection() {
     return () => ro.disconnect()
   }, [submitted])
 
-  function isFormValid(): boolean {
+  function clearFieldError(field: FieldKey) {
+    setErrors((prev) => {
+      if (!prev[field]) return prev
+      const next = { ...prev }
+      delete next[field]
+      return next
+    })
+  }
+
+  function readFormValues() {
     const form = formRef.current
-    if (!form) return false
-
+    if (!form) {
+      return {
+        firstName: "",
+        lastName: "",
+        email: "",
+        phone: "",
+        plan: "",
+        message: "",
+      }
+    }
     const data = new FormData(form)
-    const firstName = String(data.get("firstName") ?? "").trim()
-    const lastName = String(data.get("lastName") ?? "").trim()
-    const email = String(data.get("email") ?? "").trim()
-    const phone = String(data.get("phone") ?? "").trim()
-    const plan = String(data.get("plan") ?? "").trim()
-    const message = String(data.get("message") ?? "").trim()
+    return {
+      firstName: String(data.get("firstName") ?? "").trim(),
+      lastName: String(data.get("lastName") ?? "").trim(),
+      email: String(data.get("email") ?? "").trim(),
+      phone: String(data.get("phone") ?? "").trim(),
+      plan: String(data.get("plan") ?? "").trim(),
+      message: String(data.get("message") ?? "").trim(),
+    }
+  }
 
-    if (firstName.length < 2 || lastName.length < 2) return false
-    if (!EMAIL_RE.test(email)) return false
-    if (!PHONE_RE.test(phone) || phone.replace(/\D/g, "").length < 8) return false
-    if (!plan) return false
-    if (message.length < MESSAGE_MIN || message.length > MESSAGE_MAX) return false
+  function validateForm(): FieldErrors {
+    const { firstName, lastName, email, phone, plan, message } = readFormValues()
+    const next: FieldErrors = {}
 
-    return true
+    if (!firstName) next.firstName = t("contact.errors.firstNameRequired")
+    else if (firstName.length < 2) next.firstName = t("contact.errors.firstNameShort")
+
+    if (!lastName) next.lastName = t("contact.errors.lastNameRequired")
+    else if (lastName.length < 2) next.lastName = t("contact.errors.lastNameShort")
+
+    if (!email) next.email = t("contact.errors.emailRequired")
+    else if (!EMAIL_RE.test(email)) next.email = t("contact.errors.emailInvalid")
+
+    if (!phone) next.phone = t("contact.errors.phoneRequired")
+    else if (!PHONE_RE.test(phone) || phone.replace(/\D/g, "").length < 8) {
+      next.phone = t("contact.errors.phoneInvalid")
+    }
+
+    if (!plan) next.plan = t("contact.errors.planRequired")
+
+    if (!message) next.message = t("contact.errors.messageRequired")
+    else if (message.length < MESSAGE_MIN) {
+      next.message = t("contact.errors.messageShort", { min: MESSAGE_MIN })
+    } else if (message.length > MESSAGE_MAX) {
+      next.message = t("contact.errors.messageLong", { max: MESSAGE_MAX })
+    }
+
+    return next
+  }
+
+  function focusFirstError(nextErrors: FieldErrors) {
+    const firstKey = FIELD_ORDER.find((key) => nextErrors[key])
+    if (!firstKey) return
+    const el = fieldRefs.current[firstKey]
+    if (!el) return
+    el.scrollIntoView({ behavior: "smooth", block: "center" })
+    if (typeof (el as HTMLInputElement).focus === "function") {
+      window.setTimeout(() => (el as HTMLInputElement).focus(), 180)
+    }
   }
 
   async function handleConfirm() {
-    if (!isFormValid()) {
-      appToast.error(t("contact.toast.invalid"))
+    const nextErrors = validateForm()
+    setErrors(nextErrors)
+
+    const firstKey = FIELD_ORDER.find((key) => nextErrors[key])
+    if (firstKey) {
+      appToast.error(nextErrors[firstKey] || t("contact.toast.invalid"))
+      focusFirstError(nextErrors)
       throw new Error("invalid")
     }
 
     const form = formRef.current
     if (!form) throw new Error("invalid")
-    const data = new FormData(form)
-    const firstName = String(data.get("firstName") ?? "").trim()
-    const lastName = String(data.get("lastName") ?? "").trim()
-    const email = String(data.get("email") ?? "").trim()
-    const phone = String(data.get("phone") ?? "").trim()
-    const plan = String(data.get("plan") ?? "").trim()
-    const message = String(data.get("message") ?? "").trim()
+    const { firstName, lastName, email, phone, plan, message } = readFormValues()
 
     try {
       const fullName = `${firstName} ${lastName}`.trim()
@@ -127,6 +213,13 @@ export function ContactSection() {
       appToast.error(t("contact.toast.failed"))
       throw new Error("failed")
     }
+  }
+
+  function resetForm() {
+    setSubmitted(false)
+    setErrors({})
+    setSelectedPlan("")
+    window.setTimeout(() => formRef.current?.reset(), 0)
   }
 
   return (
@@ -156,7 +249,7 @@ export function ContactSection() {
               </p>
               <button
                 type="button"
-                onClick={() => setSubmitted(false)}
+                onClick={resetForm}
                 className="mt-8 inline-flex h-[50px] items-center justify-center rounded-full border border-[var(--gym-ink)] bg-white px-7 font-heading text-[15px] font-bold text-[var(--gym-ink)] transition-colors duration-300 hover:bg-[var(--gym-ink)] hover:text-white sm:mt-10 sm:text-[16px]"
               >
                 {t("contact.newForm")}
@@ -230,59 +323,133 @@ export function ContactSection() {
                   onSubmit={(event) => event.preventDefault()}
                 >
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-5">
-                    <label className="block">
-                      <span className={labelClass}>{t("contact.fields.firstName")}</span>
+                    <Field
+                      label={t("contact.fields.firstName")}
+                      error={errors.firstName}
+                      errorId="contact-error-firstName"
+                    >
                       <input
+                        ref={(el) => {
+                          fieldRefs.current.firstName = el
+                        }}
                         name="firstName"
                         type="text"
                         autoComplete="given-name"
                         placeholder={t("contact.placeholders.firstName")}
-                        className={inputFieldClass}
+                        aria-invalid={Boolean(errors.firstName)}
+                        aria-describedby={
+                          errors.firstName ? "contact-error-firstName" : undefined
+                        }
+                        onInput={() => clearFieldError("firstName")}
+                        className={fieldClassName(
+                          Boolean(errors.firstName),
+                          inputFieldClass,
+                        )}
                       />
-                    </label>
-                    <label className="block">
-                      <span className={labelClass}>{t("contact.fields.lastName")}</span>
+                    </Field>
+                    <Field
+                      label={t("contact.fields.lastName")}
+                      error={errors.lastName}
+                      errorId="contact-error-lastName"
+                    >
                       <input
+                        ref={(el) => {
+                          fieldRefs.current.lastName = el
+                        }}
                         name="lastName"
                         type="text"
                         autoComplete="family-name"
                         placeholder={t("contact.placeholders.lastName")}
-                        className={inputFieldClass}
+                        aria-invalid={Boolean(errors.lastName)}
+                        aria-describedby={
+                          errors.lastName ? "contact-error-lastName" : undefined
+                        }
+                        onInput={() => clearFieldError("lastName")}
+                        className={fieldClassName(
+                          Boolean(errors.lastName),
+                          inputFieldClass,
+                        )}
                       />
-                    </label>
+                    </Field>
                   </div>
 
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-5">
-                    <label className="block">
-                      <span className={labelClass}>{t("contact.fields.email")}</span>
+                    <Field
+                      label={t("contact.fields.email")}
+                      error={errors.email}
+                      errorId="contact-error-email"
+                    >
                       <input
+                        ref={(el) => {
+                          fieldRefs.current.email = el
+                        }}
                         name="email"
                         type="email"
                         autoComplete="email"
+                        inputMode="email"
                         placeholder={t("contact.placeholders.email")}
-                        className={inputFieldClass}
+                        aria-invalid={Boolean(errors.email)}
+                        aria-describedby={
+                          errors.email ? "contact-error-email" : undefined
+                        }
+                        onInput={() => clearFieldError("email")}
+                        className={fieldClassName(
+                          Boolean(errors.email),
+                          inputFieldClass,
+                        )}
                       />
-                    </label>
-                    <label className="block">
-                      <span className={labelClass}>{t("contact.fields.phone")}</span>
+                    </Field>
+                    <Field
+                      label={t("contact.fields.phone")}
+                      error={errors.phone}
+                      errorId="contact-error-phone"
+                    >
                       <input
+                        ref={(el) => {
+                          fieldRefs.current.phone = el
+                        }}
                         name="phone"
                         type="tel"
                         autoComplete="tel"
+                        inputMode="tel"
                         placeholder={t("contact.placeholders.phone")}
-                        className={inputFieldClass}
+                        aria-invalid={Boolean(errors.phone)}
+                        aria-describedby={
+                          errors.phone ? "contact-error-phone" : undefined
+                        }
+                        onInput={() => clearFieldError("phone")}
+                        className={fieldClassName(
+                          Boolean(errors.phone),
+                          inputFieldClass,
+                        )}
                       />
-                    </label>
+                    </Field>
                   </div>
 
-                  <label className="block">
-                    <span className={labelClass}>{t("contact.fields.plan")}</span>
+                  <Field
+                    label={t("contact.fields.plan")}
+                    error={errors.plan}
+                    errorId="contact-error-plan"
+                  >
                     <div className="relative">
                       <select
+                        ref={(el) => {
+                          fieldRefs.current.plan = el
+                        }}
                         name="plan"
                         value={selectedPlan}
-                        onChange={(e) => setSelectedPlan(e.target.value)}
-                        className={cn(inputFieldClass, "appearance-none pe-12")}
+                        aria-invalid={Boolean(errors.plan)}
+                        aria-describedby={
+                          errors.plan ? "contact-error-plan" : undefined
+                        }
+                        onChange={(e) => {
+                          setSelectedPlan(e.target.value)
+                          clearFieldError("plan")
+                        }}
+                        className={fieldClassName(
+                          Boolean(errors.plan),
+                          cn(inputFieldClass, "appearance-none pe-12"),
+                        )}
                       >
                         <option value="" disabled>
                           {t("contact.placeholders.plan")}
@@ -297,7 +464,7 @@ export function ContactSection() {
                         aria-hidden
                         className={cn(
                           "pointer-events-none absolute top-1/2 inline-flex size-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/70 text-[var(--gym-ink)]",
-                          isRtl ? "left-3" : "right-3"
+                          isRtl ? "left-3" : "right-3",
                         )}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -311,18 +478,32 @@ export function ContactSection() {
                         </svg>
                       </span>
                     </div>
-                  </label>
+                  </Field>
 
-                  <label className="block">
-                    <span className={labelClass}>{t("contact.fields.message")}</span>
+                  <Field
+                    label={t("contact.fields.message")}
+                    error={errors.message}
+                    errorId="contact-error-message"
+                  >
                     <textarea
+                      ref={(el) => {
+                        fieldRefs.current.message = el
+                      }}
                       name="message"
                       rows={5}
                       maxLength={MESSAGE_MAX}
                       placeholder={t("contact.placeholders.message")}
-                      className={textareaFieldClass}
+                      aria-invalid={Boolean(errors.message)}
+                      aria-describedby={
+                        errors.message ? "contact-error-message" : undefined
+                      }
+                      onInput={() => clearFieldError("message")}
+                      className={fieldClassName(
+                        Boolean(errors.message),
+                        textareaFieldClass,
+                      )}
                     />
-                  </label>
+                  </Field>
 
                   <div ref={slideWrapRef} className="mt-2 w-full min-w-0 max-w-full overflow-hidden">
                     <p className="mb-3 flex items-center gap-2 font-heading text-[13px] font-medium text-[var(--gym-muted)] sm:text-[14px]">
@@ -365,5 +546,33 @@ export function ContactSection() {
         </AnimatePresence>
       </div>
     </section>
+  )
+}
+
+function Field({
+  label,
+  error,
+  errorId,
+  children,
+}: {
+  label: string
+  error?: string
+  errorId?: string
+  children: ReactNode
+}) {
+  return (
+    <label className="block">
+      <span className={labelClass}>{label}</span>
+      {children}
+      {error ? (
+        <span
+          id={errorId}
+          role="alert"
+          className="mt-2 block text-[12.5px] font-medium leading-snug text-[#c44536]"
+        >
+          {error}
+        </span>
+      ) : null}
+    </label>
   )
 }

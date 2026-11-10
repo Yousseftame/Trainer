@@ -11,7 +11,7 @@ import {
 } from "lucide-react"
 import { StatCard } from "@/components/dashboard/StatCard"
 import { WorkoutSummaryModal } from "@/components/subscriber/WorkoutSummaryModal"
-import { useAuth } from "@/features/auth/auth-context"
+import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
 import { useWorkoutLogsQuery } from "@/features/workouts/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
@@ -19,15 +19,26 @@ import { formatDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { WorkoutSessionLog } from "@/types/program"
 
-export function WorkoutLogPage({ subscriberId: explicitSubId }: { subscriberId?: string } = {}) {
+export function WorkoutLogPage({
+  subscriberId: explicitSubId,
+  embedded = false,
+}: { subscriberId?: string; embedded?: boolean } = {}) {
   const { t } = useTranslation()
   const { locale } = useLocale()
   const isAr = locale === "ar"
-  const { user } = useAuth()
-  useDocumentTitle(t("nav.workoutLog"))
+  const { subscriberId: panelSubscriberId } = usePanelSubscriber()
+  useDocumentTitle(embedded ? null : t("nav.workoutLog"))
 
-  const targetSubscriberId = explicitSubId || user?.uid
-  const { data: logs = [] } = useWorkoutLogsQuery(targetSubscriberId)
+  const targetSubscriberId = explicitSubId || panelSubscriberId
+  const {
+    data: logs = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useWorkoutLogsQuery({
+    subscriberId: targetSubscriberId,
+    enabled: Boolean(targetSubscriberId),
+  })
 
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
   const [selectedModalLog, setSelectedModalLog] = useState<WorkoutSessionLog | null>(null)
@@ -42,6 +53,34 @@ export function WorkoutLogPage({ subscriberId: explicitSubId }: { subscriberId?:
         : "—"
     return { totalSessions, totalMinutes, totalVolume, avgRpe }
   }, [logs])
+
+  if (!targetSubscriberId || isLoading) {
+    return (
+      <div className="flex min-h-60 flex-col items-center justify-center rounded-[28px] bg-white p-8 text-center shadow-xs">
+        <Dumbbell className="size-10 mb-3 animate-pulse text-[var(--gym-orange,#fb5001)] stroke-1" />
+        <p className="text-[13px] font-medium text-[#8c8c8c]">
+          {isAr ? "جاري تحميل سجل التمارين..." : "Loading workout history..."}
+        </p>
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="flex min-h-60 flex-col items-center justify-center gap-3 rounded-[28px] bg-white p-8 text-center shadow-xs">
+        <p className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
+          {isAr ? "تعذر تحميل سجل التمارين" : "Could not load workout history"}
+        </p>
+        <button
+          type="button"
+          onClick={() => void refetch()}
+          className="rounded-full bg-[var(--gym-ink,#111111)] px-4 py-2 text-[12px] font-bold text-white"
+        >
+          {isAr ? "إعادة المحاولة" : "Retry"}
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-5 pb-10">

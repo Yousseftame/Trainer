@@ -43,10 +43,6 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
-    function isActiveSelf(uid) {
-      return isSelf(uid) && isActiveAccount();
-    }
-
     // Lifecycle / identity fields must stay immutable from the client SDK.
     // Only Admin SDK (Cloud Functions) can create accounts, flip status, or delete.
     function subscriberIdentityLocked(sid) {
@@ -57,8 +53,8 @@ service cloud.firestore {
         request.resource.data.createdAt == resource.data.createdAt;
     }
 
-    // Subscribers may soft-edit profile fields only — never coachNotes / package prefs.
-    function subscriberSelfProfileKeysOnly() {
+    // Staff client updates are allowlisted (identity/status stay locked separately).
+    function staffSubscriberProfileKeysOnly() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'displayName',
         'name',
@@ -71,6 +67,8 @@ service cloud.firestore {
         'targetWeightKg',
         'goal',
         'healthNotes',
+        'coachNotes',
+        'preferredPackageId',
         'updatedAt'
       ]);
     }
@@ -113,14 +111,13 @@ service cloud.firestore {
         hasPermission('reports:read') ||
         isSelf(subscriberId);
 
-      // Staff may edit profile/notes/metrics, never identity/status
+      // Staff may edit allowed profile/notes/metrics, never identity/status
       allow update: if hasPermission('subscribers:write') &&
-        subscriberIdentityLocked(subscriberId);
-
-      // Subscriber may edit own soft profile fields only (not coachNotes)
-      allow update: if isActiveSelf(subscriberId) &&
         subscriberIdentityLocked(subscriberId) &&
-        subscriberSelfProfileKeysOnly();
+        staffSubscriberProfileKeysOnly();
+
+      // Subscriber self-edits go through updateMySubscriberProfile (Admin SDK)
+      allow update: if false;
 
       allow create: if false;
       allow delete: if false;
@@ -158,26 +155,18 @@ service cloud.firestore {
         hasPermission('reports:read') ||
         (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
 
-      allow create: if hasPermission('subscriptions:manage') &&
-        request.resource.data.id == subscriptionId &&
-        request.resource.data.keys().hasAll([
-          'id', 'subscriberId', 'packageId', 'status', 'createdAt', 'updatedAt'
-        ]) &&
-        request.resource.data.status in [
-          'active', 'pending', 'expired', 'suspended', 'cancelled'
-        ];
+      // Lifecycle writes go through Admin SDK callables only (DevTools-safe).
+      allow create, update, delete: if false;
+    }
 
-      // Subscriber identity + creation timestamp stay immutable from client
-      allow update: if hasPermission('subscriptions:manage') &&
-        request.resource.data.id == resource.data.id &&
-        request.resource.data.id == subscriptionId &&
-        request.resource.data.subscriberId == resource.data.subscriberId &&
-        request.resource.data.createdAt == resource.data.createdAt &&
-        request.resource.data.status in [
-          'active', 'pending', 'expired', 'suspended', 'cancelled'
-        ];
+    // Subscriber package change / upgrade requests (coach resolves manually).
+    match /subscription_change_requests/{requestId} {
+      allow read: if hasPermission('subscriptions:manage') ||
+        hasPermission('subscribers:read') ||
+        (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
 
-      allow delete: if hasPermission('subscriptions:manage');
+      // Creates go through requestSubscriptionChange callable (Admin SDK).
+      allow create, update, delete: if false;
     }
 
     // -------------------------------------------------------------
@@ -270,59 +259,52 @@ service cloud.firestore {
       allow delete: if hasPermission('physicalTherapy:manage');
     }
 
-    // progress:read = inspect; progress:write = create/update/delete for others
+    // Progress records — subscribers read own; writes go through Cloud Functions
+    // (entitlement-checked). Staff with progress:write may manage via client SDK.
     match /progress_measurements/{id} {
       allow read: if hasPermission('progress:read') ||
         hasPermission('reports:read') ||
         (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
-      allow create: if hasPermission('progress:write') ||
-        (isActiveAccount() &&
-          request.resource.data.subscriberId == request.auth.uid &&
-          request.resource.data.id == id);
-      allow update: if (
-          hasPermission('progress:write') ||
-          (isActiveAccount() && resource.data.subscriberId == request.auth.uid)
-        ) &&
+      allow create: if hasPermission('progress:write') &&
         request.resource.data.id == id &&
-        request.resource.data.subscriberId == resource.data.subscriberId;
-      allow delete: if hasPermission('progress:write') ||
-        (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
+        request.resource.data.keys().hasAll(['id', 'subscriberId', 'recordedAt']) &&
+        request.resource.data.subscriberId is string;
+      allow update: if hasPermission('progress:write') &&
+        request.resource.data.id == id &&
+        request.resource.data.subscriberId == resource.data.subscriberId &&
+        request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if hasPermission('progress:write');
     }
 
     match /progress_photos/{id} {
       allow read: if hasPermission('progress:read') ||
         hasPermission('reports:read') ||
         (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
-      allow create: if hasPermission('progress:write') ||
-        (isActiveAccount() &&
-          request.resource.data.subscriberId == request.auth.uid &&
-          request.resource.data.id == id);
-      allow update: if (
-          hasPermission('progress:write') ||
-          (isActiveAccount() && resource.data.subscriberId == request.auth.uid)
-        ) &&
+      allow create: if hasPermission('progress:write') &&
         request.resource.data.id == id &&
-        request.resource.data.subscriberId == resource.data.subscriberId;
-      allow delete: if hasPermission('progress:write') ||
-        (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
+        request.resource.data.keys().hasAll(['id', 'subscriberId', 'storagePath', 'takenAt', 'createdAt']) &&
+        request.resource.data.subscriberId is string &&
+        request.resource.data.storagePath is string;
+      allow update: if hasPermission('progress:write') &&
+        request.resource.data.id == id &&
+        request.resource.data.subscriberId == resource.data.subscriberId &&
+        request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if hasPermission('progress:write');
     }
 
     match /progress_performance/{id} {
       allow read: if hasPermission('progress:read') ||
         hasPermission('reports:read') ||
         (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
-      allow create: if hasPermission('progress:write') ||
-        (isActiveAccount() &&
-          request.resource.data.subscriberId == request.auth.uid &&
-          request.resource.data.id == id);
-      allow update: if (
-          hasPermission('progress:write') ||
-          (isActiveAccount() && resource.data.subscriberId == request.auth.uid)
-        ) &&
+      allow create: if hasPermission('progress:write') &&
         request.resource.data.id == id &&
-        request.resource.data.subscriberId == resource.data.subscriberId;
-      allow delete: if hasPermission('progress:write') ||
-        (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
+        request.resource.data.keys().hasAll(['id', 'subscriberId', 'recordedAt', 'name', 'value', 'unit']) &&
+        request.resource.data.subscriberId is string;
+      allow update: if hasPermission('progress:write') &&
+        request.resource.data.id == id &&
+        request.resource.data.subscriberId == resource.data.subscriberId &&
+        request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if hasPermission('progress:write');
     }
 
     // Content metadata holds fileUrl/streamUrl/storagePath — never open to all signed-in users.
@@ -362,22 +344,21 @@ service cloud.firestore {
       allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }
 
+    // Subscriber creates go through logWorkoutSession callable (Admin SDK).
+    // Client create is staff-only so DevTools cannot forge performance logs.
     match /workout_logs/{id} {
       allow read: if hasPermission('workouts:manage') ||
         hasPermission('progress:read') ||
         hasPermission('reports:read') ||
         (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
 
-      allow create: if
+      allow create: if hasPermission('workouts:manage') &&
         request.resource.data.id == id &&
         request.resource.data.keys().hasAll([
           'id', 'subscriberId', 'programId', 'completedAt'
         ]) &&
-        (
-          hasPermission('workouts:manage') ||
-          (isActiveAccount() &&
-            request.resource.data.subscriberId == request.auth.uid)
-        );
+        request.resource.data.subscriberId is string &&
+        request.resource.data.programId is string;
 
       allow update: if hasPermission('workouts:manage') &&
         request.resource.data.subscriberId == resource.data.subscriberId &&
@@ -387,27 +368,24 @@ service cloud.firestore {
       allow delete: if hasPermission('workouts:manage');
     }
 
+    // Subscriber creates/updates go through logNutritionAdherence callable.
     match /nutrition_logs/{id} {
       allow read: if hasPermission('nutrition:manage') ||
         hasPermission('progress:read') ||
         hasPermission('reports:read') ||
         (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
 
-      allow create: if
+      allow create: if hasPermission('nutrition:manage') &&
         request.resource.data.id == id &&
         request.resource.data.keys().hasAll([
           'id', 'subscriberId', 'programId', 'loggedAt'
         ]) &&
-        (
-          hasPermission('nutrition:manage') ||
-          (isActiveAccount() &&
-            request.resource.data.subscriberId == request.auth.uid)
-        );
+        request.resource.data.subscriberId is string &&
+        request.resource.data.programId is string;
 
       allow update: if hasPermission('nutrition:manage') &&
         request.resource.data.subscriberId == resource.data.subscriberId &&
-        request.resource.data.programId == resource.data.programId &&
-        request.resource.data.loggedAt == resource.data.loggedAt;
+        request.resource.data.programId == resource.data.programId;
 
       allow delete: if hasPermission('nutrition:manage');
     }

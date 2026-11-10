@@ -16,12 +16,19 @@ export {
   fetchSubscriberByEmail,
   fetchRegistrationRequests,
   saveSubscriber,
+  subscribePendingRegistrationRequestCount,
+  subscribeSubscriberById,
+  updateMySubscriberProfile,
   updateSubscriberAccountStatus,
   deleteSubscriberAccount,
   createRegistrationRequest,
   reviewRegistrationRequest,
   updateSubscriberCoachNotes,
   purgeDemoSubscriberData,
+} from "@/features/subscribers/service"
+export type {
+  SaveSubscriberInput,
+  UpdateMyProfileInput,
 } from "@/features/subscribers/service"
 
 /** @deprecated Use Subscriber */

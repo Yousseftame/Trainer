@@ -12,7 +12,6 @@ import {
   Package,
   ShieldCheck,
   Sparkles,
-  UserCheck,
 } from "lucide-react"
 import { DataTable } from "@/components/dashboard/DataTable"
 import { StatCard } from "@/components/dashboard/StatCard"
@@ -20,20 +19,18 @@ import {
   StatusBadge,
   subscriptionStatusTone,
 } from "@/components/dashboard/StatusBadge"
-import { useAuth } from "@/features/auth/auth-context"
-import {
-  useCreateRegistrationRequestMutation,
-  useRegistrationRequestsQuery,
-} from "@/features/subscribers/hooks"
 import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
 import {
+  canAccessPackageEntitlement,
   ENTITLEMENT_KEYS,
-  normalizeEntitlements,
+  pickCurrentSubscription,
+  resolveEffectiveSubscriptionStatus,
 } from "@/features/subscriptions/entitlements"
 import {
   usePackagesQuery,
+  useRequestSubscriptionChangeMutation,
+  useSubscriberChangeRequestsQuery,
   useSubscriberSubscriptionsQuery,
-  useSubscriptionsQuery,
 } from "@/features/subscriptions/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
@@ -81,31 +78,19 @@ const ENTITLEMENT_LABELS: Record<
 export function SubscriptionPage() {
   const { t } = useTranslation()
   const { locale, isRtl } = useLocale()
-  const { user } = useAuth()
   const isAr = locale === "ar"
   useDocumentTitle(t("nav.subscription"))
 
-  const {
-    staffCanPick,
-    directory: subscribers,
-    subscriber: currentSubscriber,
-    subscriberId: activeSubscriberId,
-    selectedSubscriberId,
-    setSelectedSubscriberId,
-  } = usePanelSubscriber({ allowStaffPicker: true })
+  const { subscriberId: activeSubscriberId } = usePanelSubscriber()
 
   const { data: allPackages = [] } = usePackagesQuery()
   const { data: scopedSubscriptions = [] } = useSubscriberSubscriptionsQuery(
-    staffCanPick ? undefined : activeSubscriberId,
+    activeSubscriberId,
   )
-  // Staff preview may browse another member from the full list
-  const { data: allSubscriptions = [] } = useSubscriptionsQuery({
-    enabled: staffCanPick,
-  })
-  const { data: registrationRequests = [] } = useRegistrationRequestsQuery({
-    enabled: staffCanPick,
-  })
-  const createRequestMutation = useCreateRegistrationRequestMutation()
+  const { data: changeRequests = [] } = useSubscriberChangeRequestsQuery(
+    activeSubscriberId,
+  )
+  const requestChangeMutation = useRequestSubscriptionChangeMutation()
 
   const packageMap = useMemo(
     () => new Map(allPackages.map((p) => [p.id, p])),
@@ -113,61 +98,33 @@ export function SubscriptionPage() {
   )
 
   const subscriberHistory = useMemo(() => {
-    const targetId = activeSubscriberId
-    const targetEmail = (currentSubscriber?.email || user?.email || "").toLowerCase()
-    const pool = staffCanPick ? allSubscriptions : scopedSubscriptions
-
-    const matched = pool.filter(
-      (item) =>
-        (targetId && item.subscriberId === targetId) ||
-        (targetEmail && item.subscriberEmail?.toLowerCase() === targetEmail),
+    return [...scopedSubscriptions].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     )
-    return [...matched].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    )
-  }, [
-    allSubscriptions,
-    scopedSubscriptions,
-    staffCanPick,
-    activeSubscriberId,
-    currentSubscriber,
-    user?.email,
-  ])
+  }, [scopedSubscriptions])
 
-  const current =
-    subscriberHistory.find(
-      (item) => item.status === "active" || item.status === "suspended",
-    ) ?? subscriberHistory[0]
-
+  const current = pickCurrentSubscription(subscriberHistory)
   const currentPackage = current ? packageMap.get(current.packageId) : undefined
-  const entitlements = normalizeEntitlements(
-    currentPackage?.entitlements ?? current?.entitlementsSnapshot,
-  )
+  const effectiveStatus = resolveEffectiveSubscriptionStatus(current)
   const remaining = daysUntil(current?.endsAt)
-  const isActive = current?.status === "active"
 
-  // Package Upgrade State
-  const [selectedTargetPackageId, setSelectedTargetPackageId] = useState<string>("")
+  const [selectedTargetPackageId, setSelectedTargetPackageId] = useState("")
   const [upgradeNote, setUpgradeNote] = useState("")
-  const [submittingRequest, setSubmittingRequest] = useState(false)
 
-  // Pending upgrade request for this subscriber if any
-  const pendingUpgradeRequest = useMemo(() => {
-    const subEmail = (currentSubscriber?.email || user?.email || "").toLowerCase()
-    return registrationRequests.find(
-      (r) =>
-        r.status === "pending" &&
-        (r.email.toLowerCase() === subEmail || (r.subscriberId && r.subscriberId === activeSubscriberId)),
-    )
-  }, [registrationRequests, currentSubscriber, user?.email, activeSubscriberId])
+  const pendingUpgradeRequest = useMemo(
+    () => changeRequests.find((r) => r.status === "pending"),
+    [changeRequests],
+  )
 
   const pendingPackage = pendingUpgradeRequest?.packageId
     ? packageMap.get(pendingUpgradeRequest.packageId)
     : undefined
 
-  const selectablePackages = useMemo(() => {
-    return allPackages.filter((p) => p.isActive)
-  }, [allPackages])
+  const selectablePackages = useMemo(
+    () => allPackages.filter((p) => p.isActive),
+    [allPackages],
+  )
 
   const selectedTargetPackage = selectedTargetPackageId
     ? packageMap.get(selectedTargetPackageId)
@@ -175,72 +132,35 @@ export function SubscriptionPage() {
 
   async function handleRequestUpgradeSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!selectedTargetPackage) return
-    setSubmittingRequest(true)
+    if (!selectedTargetPackage || pendingUpgradeRequest) return
     try {
-      const targetName = currentSubscriber?.displayName || user?.displayName || "Subscriber"
-      const targetEmail = currentSubscriber?.email || user?.email || "subscriber@trainer.app"
-      const targetPhone = currentSubscriber?.phone || user?.phone || "+20 100 000 0000"
-
-      await createRequestMutation.mutateAsync({
-        displayName: targetName,
-        email: targetEmail,
-        phone: targetPhone,
-        locale,
+      await requestChangeMutation.mutateAsync({
         packageId: selectedTargetPackage.id,
-        goal: upgradeNote.trim()
-          ? {
-              ar: upgradeNote.trim(),
-              en: upgradeNote.trim(),
-            }
-          : {
-              ar: `طلب ترقية أو تغيير إلى باقة ${selectedTargetPackage.name.ar}`,
-              en: `Requested upgrade to ${selectedTargetPackage.name.en}`,
-            },
-        source: "contact",
+        currentPackageId: current?.packageId,
+        note: upgradeNote.trim() || undefined,
+        noteAr: upgradeNote.trim() || undefined,
+        noteEn: upgradeNote.trim() || undefined,
       })
-
       appToast.success(
         isAr
-          ? "تم إرسال طلب الترقية بنجاح إلى المدرب لمراجعته واعتماده."
-          : "Upgrade request submitted successfully to your coach for review.",
+          ? "تم إرسال طلب تغيير الباقة إلى المدرب لمراجعته."
+          : "Package change request sent to your coach for review.",
       )
       setUpgradeNote("")
       setSelectedTargetPackageId("")
-    } catch {
-      appToast.error(
-        isAr ? "تعذر إرسال طلب الترقية، يرجى المحاولة لاحقاً." : "Could not submit request. Please try again.",
-      )
-    } finally {
-      setSubmittingRequest(false)
+    } catch (err) {
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : isAr
+            ? "تعذر إرسال الطلب، يرجى المحاولة لاحقاً."
+            : "Could not submit request. Please try again."
+      appToast.error(message)
     }
   }
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5 pb-12">
-      {/* Staff Member Switcher (Only visible to admin/staff) */}
-      {staffCanPick ? (
-        <div className="flex items-center justify-between rounded-[20px] bg-white p-3.5 sm:p-4 border border-black/5 shadow-2xs">
-          <div className="flex items-center gap-2">
-            <UserCheck className="size-4 text-[var(--gym-lime,#fb5001)]" />
-            <span className="text-[12px] font-bold text-[#8c8c8c]">
-              {isAr ? "معاينة اشتراك المشترك:" : "Preview Subscriber Subscription:"}
-            </span>
-          </div>
-          <select
-            value={selectedSubscriberId || activeSubscriberId}
-            onChange={(e) => setSelectedSubscriberId(e.target.value)}
-            className="rounded-lg bg-[#F4F4F4] px-3 py-1.5 text-[12px] font-bold text-[var(--gym-ink,#111111)] outline-none cursor-pointer"
-          >
-            {subscribers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.displayName || s.email}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : null}
-
       {/* 1. Stat Cards Row */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
         <StatCard
@@ -254,7 +174,9 @@ export function SubscriptionPage() {
         />
         <StatCard
           label={isAr ? "حالة الاشتراك" : "Status"}
-          value={current ? t(`admin.status.${current.status}`) : "—"}
+          value={
+            effectiveStatus ? t(`admin.status.${effectiveStatus}`) : "—"
+          }
           icon={<CreditCard className="size-4" strokeWidth={1.8} />}
         />
         <StatCard
@@ -292,10 +214,10 @@ export function SubscriptionPage() {
                     : "Subscription activation and renewals are managed by your coach.")}
               </p>
             </div>
-            {current ? (
+            {effectiveStatus ? (
               <StatusBadge
-                label={t(`admin.status.${current.status}`)}
-                tone={subscriptionStatusTone(current.status)}
+                label={t(`admin.status.${effectiveStatus}`)}
+                tone={subscriptionStatusTone(effectiveStatus)}
               />
             ) : null}
           </div>
@@ -350,12 +272,14 @@ export function SubscriptionPage() {
                   {formatDate(current.endsAt, locale)}
                 </dd>
               </div>
-              {current.notes ? (
+              {current.notesLocalized?.[locale] || current.notes ? (
                 <div className="flex flex-col gap-1 pt-1">
                   <dt className="text-[#6B7280]">
                     {t("admin.subscribers.notes")}
                   </dt>
-                  <dd className="font-medium text-[#111111]">{current.notes}</dd>
+                  <dd className="font-medium text-[#111111]">
+                    {current.notesLocalized?.[locale] || current.notes}
+                  </dd>
                 </div>
               ) : null}
             </dl>
@@ -390,8 +314,11 @@ export function SubscriptionPage() {
 
           <ul className="mt-5 flex flex-col gap-2.5">
             {ENTITLEMENT_KEYS.map((key) => {
-              const grantedByPkg = entitlements[key]
-              const allowed = Boolean(isActive && grantedByPkg)
+              const allowed = canAccessPackageEntitlement(
+                current,
+                currentPackage,
+                key,
+              )
               const meta = ENTITLEMENT_LABELS[key]
               return (
                 <li
@@ -717,12 +644,12 @@ export function SubscriptionPage() {
 
               <button
                 type="submit"
-                disabled={submittingRequest}
+                disabled={requestChangeMutation.isPending || Boolean(pendingUpgradeRequest)}
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[var(--gym-lime,#fb5001)] hover:bg-[#e04500] px-7 text-[13.5px] font-extrabold text-white transition-all shadow-md hover:scale-[1.02] active:scale-95 disabled:opacity-50 shrink-0"
               >
                 <ArrowUpRight className="size-4" />
                 <span>
-                  {submittingRequest
+                  {requestChangeMutation.isPending
                     ? isAr
                       ? "جارٍ إرسال الطلب..."
                       : "Submitting..."
@@ -758,12 +685,16 @@ export function SubscriptionPage() {
           {
             id: "status",
             header: t("admin.subscribers.columns.subscription"),
-            cell: (row) => (
-              <StatusBadge
-                label={t(`admin.status.${row.status}`)}
-                tone={subscriptionStatusTone(row.status)}
-              />
-            ),
+            cell: (row) => {
+              const status =
+                resolveEffectiveSubscriptionStatus(row) ?? row.status
+              return (
+                <StatusBadge
+                  label={t(`admin.status.${status}`)}
+                  tone={subscriptionStatusTone(status)}
+                />
+              )
+            },
           },
           {
             id: "start",
@@ -780,7 +711,8 @@ export function SubscriptionPage() {
           {
             id: "notes",
             header: t("admin.subscribers.notes"),
-            cell: (row) => row.notes ?? "—",
+            cell: (row) =>
+              row.notesLocalized?.[locale] || row.notes || "—",
             className: "text-[#6B7280]",
           },
         ]}

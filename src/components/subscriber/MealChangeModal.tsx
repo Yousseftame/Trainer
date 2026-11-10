@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Check, Flame, RefreshCw, Send, Sparkles, Utensils, X } from "lucide-react"
-import { resolveBilingualText } from "@/features/nutrition/demo"
+import { resolveBilingualText } from "@/lib/program-text"
 import { useLocale } from "@/hooks/useLocale"
 import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"

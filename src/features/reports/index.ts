@@ -58,3 +58,8 @@ export {
   countActionableNotices,
   markNoticesRead,
 } from "@/features/reports/service"
+
+export {
+  resolveNoticeActionUrl,
+  noticeActionIsReview,
+} from "@/features/reports/notice-action-url"

@@ -57,7 +57,7 @@ import { subscriberDisplayName } from "@/features/subscribers"
 import {
   useDeleteSubscriberMutation,
   useSaveSubscriberMutation,
-  useSubscribersQuery,
+  useSubscriberDetailQuery,
   useUpdateSubscriberCoachNotesMutation,
   useUpdateSubscriberStatusMutation,
 } from "@/features/subscribers/hooks"
@@ -103,9 +103,16 @@ export function SubscriberDetailPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const { subscriberId = "" } = useParams()
-  const { data: allSubscribers = [] } = useSubscribersQuery()
-  const subscriber = allSubscribers.find((item) => item.id === subscriberId)
-  useDocumentTitle(subscriber?.displayName ?? t("nav.subscribers"))
+  const {
+    data: subscriber,
+    isLoading: subscriberLoading,
+    isError: subscriberError,
+  } = useSubscriberDetailQuery(subscriberId || undefined)
+  useDocumentTitle(
+    subscriber
+      ? subscriberDisplayName(subscriber, locale)
+      : t("nav.subscribers"),
+  )
 
   const { data: allPackages = [] } = usePackagesQuery()
   const { data: allSubscriptions = [] } = useSubscriptionsQuery()
@@ -174,7 +181,15 @@ export function SubscriberDetailPage() {
     enabled: Boolean(subscriberId),
   })
 
-  if (!subscriber) {
+  if (subscriberLoading && !subscriber) {
+    return (
+      <section className="rounded-[24px] bg-white p-8 text-[14px] text-[#8c8c8c]">
+        {locale === "ar" ? "جارٍ تحميل ملف المشترك…" : "Loading subscriber profile…"}
+      </section>
+    )
+  }
+
+  if (!subscriber || subscriberError) {
     return (
       <section className="rounded-[24px] bg-white p-8">
         <p className="font-heading text-[20px] font-extrabold text-[var(--gym-ink,#111111)]">
@@ -487,9 +502,14 @@ export function SubscriberDetailPage() {
               {locale === "ar" ? "تعديل الملف" : "Edit"}
             </button>
           </div>
+          <p className="mt-2 text-[12px] leading-relaxed text-[#8c8c8c]">
+            {locale === "ar"
+              ? "الاسم والهاتف والمقاييس والهدف والملاحظات الصحية يمكن أن يحدّثها المشترك من صفحة الملف الشخصي — تظهر هنا مباشرة."
+              : "Name, phone, metrics, goal, and health notes can also be updated by the subscriber on Profile — changes appear here live."}
+          </p>
           <dl className="mt-5 space-y-4 text-[14px]">
             <DetailRow icon={<Mail className="size-4" />} label={t("admin.subscribers.columns.email")} value={subscriber.email} />
-            <DetailRow icon={<Phone className="size-4" />} label={t("admin.subscribers.columns.phone")} value={subscriber.phone} />
+            <DetailRow icon={<Phone className="size-4" />} label={t("admin.subscribers.columns.phone")} value={subscriber.phone || "—"} />
             <DetailRow
               icon={<Languages className="size-4" />}
               label={t("admin.subscribers.language")}
@@ -500,35 +520,45 @@ export function SubscriberDetailPage() {
               label={t("admin.subscribers.sex")}
               value={subscriber.sex ? t(`admin.subscribers.sexValue.${subscriber.sex}`) : "—"}
             />
-            {subscriber.age ? (
-              <DetailRow
-                label={locale === "ar" ? "العمر" : "Age"}
-                value={`${subscriber.age}`}
-              />
-            ) : null}
+            <DetailRow
+              label={locale === "ar" ? "العمر" : "Age"}
+              value={subscriber.age != null ? `${subscriber.age}` : "—"}
+            />
             <DetailRow
               icon={<Ruler className="size-4" />}
               label={t("admin.subscribers.height")}
               value={subscriber.heightCm ? t("admin.subscribers.heightValue", { value: subscriber.heightCm }) : "—"}
             />
-            {subscriber.startingWeightKg != null || subscriber.targetWeightKg != null ? (
-              <DetailRow
-                label={locale === "ar" ? "وزن البداية / المستهدف" : "Start / Target weight"}
-                value={`${subscriber.startingWeightKg != null ? formatKg(subscriber.startingWeightKg, locale) : "—"} → ${subscriber.targetWeightKg != null ? formatKg(subscriber.targetWeightKg, locale) : "—"}`}
-              />
-            ) : null}
+            <DetailRow
+              label={locale === "ar" ? "وزن البداية / المستهدف" : "Start / Target weight"}
+              value={`${subscriber.startingWeightKg != null ? formatKg(subscriber.startingWeightKg, locale) : "—"} → ${subscriber.targetWeightKg != null ? formatKg(subscriber.targetWeightKg, locale) : "—"}`}
+            />
             <DetailRow label={t("admin.subscribers.bmi")} value={bmi ?? "—"} />
             <DetailRow
               icon={<Target className="size-4" />}
               label={t("admin.subscribers.goal")}
-              value={subscriber.goal?.[locale] ?? "—"}
+              value={
+                subscriber.goal?.[locale] ||
+                subscriber.goal?.en ||
+                subscriber.goal?.ar ||
+                "—"
+              }
               stacked
             />
-            {subscriber.healthNotes ? (
+            <DetailRow
+              label={locale === "ar" ? "ملاحظات صحية / إصابات" : "Health & injury notes"}
+              value={
+                subscriber.healthNotes?.[locale] ||
+                subscriber.healthNotes?.en ||
+                subscriber.healthNotes?.ar ||
+                "—"
+              }
+              stacked
+            />
+            {subscriber.updatedAt ? (
               <DetailRow
-                label={locale === "ar" ? "ملاحظات صحية / إصابات" : "Health & injury notes"}
-                value={subscriber.healthNotes[locale]}
-                stacked
+                label={locale === "ar" ? "آخر تحديث للملف" : "Profile updated"}
+                value={formatDate(subscriber.updatedAt, locale)}
               />
             ) : null}
           </dl>
@@ -723,14 +753,28 @@ export function SubscriberDetailPage() {
           empty={t("admin.progress.noProgram")}
           href={APP_ROUTES.admin.workouts}
         >
-          {activeWorkout ? <WorkoutSummary program={activeWorkout} locale={locale} /> : null}
+          {activeWorkout ? (
+            <WorkoutSummary
+              program={activeWorkout}
+              locale={locale}
+              weekDone={week?.workoutDone}
+              weekTotal={week?.workoutTotal}
+            />
+          ) : null}
         </ProgramCard>
         <ProgramCard
           title={t("admin.subscribers.currentNutrition")}
           empty={t("admin.progress.noProgram")}
           href={APP_ROUTES.admin.nutrition}
         >
-          {activeNutrition ? <NutritionSummary program={activeNutrition} locale={locale} /> : null}
+          {activeNutrition ? (
+            <NutritionSummary
+              program={activeNutrition}
+              locale={locale}
+              weekDone={week?.nutritionDone}
+              weekTotal={week?.nutritionTotal}
+            />
+          ) : null}
         </ProgramCard>
       </div>
 
@@ -739,12 +783,20 @@ export function SubscriberDetailPage() {
           <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
             {locale === "ar" ? "العلاج الطبيعي والتأهيل" : "Physical therapy & rehab"}
           </h3>
-          <Link
-            to={APP_ROUTES.admin.physicalTherapy}
-            className="text-[13px] font-bold text-[var(--gym-ink,#111111)]"
-          >
-            {locale === "ar" ? "فتح الوحدة" : "Open module"}
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              to={`${APP_ROUTES.admin.physicalTherapy}?subscriber=${subscriber.id}&new=1`}
+              className="text-[13px] font-bold text-[var(--gym-lime,#fb5001)]"
+            >
+              {locale === "ar" ? "تقييم جديد" : "New assessment"}
+            </Link>
+            <Link
+              to={`${APP_ROUTES.admin.physicalTherapy}?subscriber=${subscriber.id}`}
+              className="text-[13px] font-bold text-[var(--gym-ink,#111111)]"
+            >
+              {locale === "ar" ? "فتح الوحدة" : "Open module"}
+            </Link>
+          </div>
         </div>
         {activePt ? (
           <div className="mt-4 rounded-[18px] bg-[#F4F4F4] p-4">
@@ -780,6 +832,11 @@ export function SubscriberDetailPage() {
               {locale === "ar" ? "موانع حركة" : "restrictions"} ·{" "}
               {activePt.rehabExercises.length}{" "}
               {locale === "ar" ? "تمارين تأهيل" : "rehab exercises"}
+              {activePt.rehabExercises.some((r) => r.videoContentId)
+                ? locale === "ar"
+                  ? " · فيديوهات مكتبة مرتبطة"
+                  : " · library videos linked"
+                : ""}
             </p>
           </div>
         ) : (
@@ -1106,7 +1163,17 @@ function ProgramCard({
   )
 }
 
-function WorkoutSummary({ program, locale }: { program: WorkoutProgram; locale: AppLocale }) {
+function WorkoutSummary({
+  program,
+  locale,
+  weekDone,
+  weekTotal,
+}: {
+  program: WorkoutProgram
+  locale: AppLocale
+  weekDone?: number
+  weekTotal?: number
+}) {
   const { t } = useTranslation()
   return (
     <div className="mt-5">
@@ -1124,9 +1191,15 @@ function WorkoutSummary({ program, locale }: { program: WorkoutProgram; locale: 
           label={t("admin.subscribers.trainingDays")}
           value={String(trainingDayCount(program))}
         />
-        {program.completion ? (
+        {weekDone != null && weekTotal != null ? (
           <DetailRow
             label={t("admin.workouts.thisWeek")}
+            value={`${weekDone}/${weekTotal || 0}`}
+          />
+        ) : null}
+        {program.completion ? (
+          <DetailRow
+            label={locale === "ar" ? "إجمالي الإنجاز" : "Lifetime completion"}
             value={`${program.completion.done}/${program.completion.total}`}
           />
         ) : null}
@@ -1137,8 +1210,26 @@ function WorkoutSummary({ program, locale }: { program: WorkoutProgram; locale: 
   )
 }
 
-function NutritionSummary({ program, locale }: { program: NutritionProgram; locale: AppLocale }) {
+function NutritionSummary({
+  program,
+  locale,
+  weekDone,
+  weekTotal,
+}: {
+  program: NutritionProgram
+  locale: AppLocale
+  weekDone?: number
+  weekTotal?: number
+}) {
   const { t } = useTranslation()
+  const macrosLabel = [
+    program.macros?.proteinGrams != null ? `P ${program.macros.proteinGrams}g` : null,
+    program.macros?.carbsGrams != null ? `C ${program.macros.carbsGrams}g` : null,
+    program.macros?.fatsGrams != null ? `F ${program.macros.fatsGrams}g` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ")
+
   return (
     <div className="mt-5">
       <p className="text-[15px] font-bold text-[var(--gym-ink,#111111)]">{program.title[locale]}</p>
@@ -1154,10 +1245,28 @@ function NutritionSummary({ program, locale }: { program: NutritionProgram; loca
         {program.targetCalories ? (
           <DetailRow label={t("admin.subscribers.calories")} value={String(program.targetCalories)} />
         ) : null}
+        {macrosLabel ? (
+          <DetailRow
+            label={locale === "ar" ? "الماكروز" : "Macros"}
+            value={macrosLabel}
+          />
+        ) : null}
+        {program.targetWaterLiters != null ? (
+          <DetailRow
+            label={locale === "ar" ? "الماء" : "Water"}
+            value={`${program.targetWaterLiters}L`}
+          />
+        ) : null}
         <DetailRow label={t("admin.subscribers.mealsWeek")} value={String(mealCount(program))} />
-        {program.adherence ? (
+        {weekDone != null && weekTotal != null ? (
           <DetailRow
             label={t("admin.nutrition.thisWeek")}
+            value={`${weekDone}/${weekTotal || 0}`}
+          />
+        ) : null}
+        {program.adherence ? (
+          <DetailRow
+            label={locale === "ar" ? "إجمالي الالتزام" : "Lifetime adherence"}
             value={`${program.adherence.done}/${program.adherence.total}`}
           />
         ) : null}

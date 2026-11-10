@@ -23,6 +23,13 @@ const NUTRITION_LOGS_COLLECTION = "nutrition_logs"
 const STORAGE_KEY_NUTRITION = "derpyfit_nutrition_programs_v1"
 const STORAGE_KEY_NUTRITION_LOGS = "derpyfit_nutrition_logs_v1"
 
+/** Weekly adherence target — matches computeAdherenceWeeks nutrition totals. */
+const NUTRITION_ADHERENCE_WEEK_TOTAL = 7
+
+function defaultNutritionAdherence() {
+  return { done: 0, total: NUTRITION_ADHERENCE_WEEK_TOTAL }
+}
+
 function clearLegacyLocalCaches() {
   try {
     window.localStorage.removeItem(STORAGE_KEY_NUTRITION)
@@ -143,8 +150,10 @@ function normalizeNutritionProgram(
       raw.adherence && typeof raw.adherence === "object"
         ? {
             done: Number((raw.adherence as Record<string, unknown>).done) || 0,
+            // Weekly cycle (matches admin/subscriber adherence week math)
             total:
-              Number((raw.adherence as Record<string, unknown>).total) || 28,
+              Number((raw.adherence as Record<string, unknown>).total) ||
+              NUTRITION_ADHERENCE_WEEK_TOTAL,
           }
         : undefined,
     createdAt:
@@ -170,6 +179,11 @@ function normalizeNutritionLog(
     subscriberId: String(raw.subscriberId ?? ""),
     programId: String(raw.programId ?? ""),
     date: String(raw.date ?? ""),
+    dayId: typeof raw.dayId === "string" ? raw.dayId : undefined,
+    weekday:
+      raw.weekday === undefined || raw.weekday === null
+        ? undefined
+        : Math.max(0, Math.min(6, Number(raw.weekday) || 0)),
     status:
       raw.status === "mostly" ||
       raw.status === "deviated" ||
@@ -323,7 +337,7 @@ export async function saveNutritionProgram(
       pdfName: input.pdfName,
       notes: input.notes,
       disclaimerAcknowledged: input.disclaimerAcknowledged ?? true,
-      adherence: { done: 0, total: 28 },
+      adherence: defaultNutritionAdherence(),
       createdAt: now,
       updatedAt: now,
     }
@@ -371,7 +385,7 @@ export async function saveNutritionProgram(
             : existing.archivedAt,
       adherence:
         input.status === "active"
-          ? existing.adherence ?? { done: 0, total: 28 }
+          ? existing.adherence ?? defaultNutritionAdherence()
           : existing.adherence,
     }
 
@@ -417,7 +431,7 @@ export async function saveNutritionProgram(
     notes: input.notes,
     disclaimerAcknowledged: input.disclaimerAcknowledged ?? true,
     adherence:
-      input.status === "active" ? { done: 0, total: 28 } : undefined,
+      input.status === "active" ? defaultNutritionAdherence() : undefined,
     createdAt: now,
     updatedAt: now,
   }
@@ -552,7 +566,7 @@ export async function assignNutritionProgram(
     pdfName,
     notes: input.notes,
     disclaimerAcknowledged: true,
-    adherence: { done: 0, total: 28 },
+    adherence: defaultNutritionAdherence(),
     createdAt: now,
     updatedAt: now,
   }
@@ -613,7 +627,7 @@ export async function restoreNutritionProgram(
     updatedAt: now,
     adherence:
       nextStatus === "active"
-        ? existing.adherence ?? { done: 0, total: 28 }
+        ? existing.adherence ?? defaultNutritionAdherence()
         : existing.adherence,
   }
 
@@ -625,6 +639,14 @@ export async function restoreNutritionProgram(
 }
 
 export async function deleteNutritionProgram(id: string): Promise<void> {
+  const existing = await fetchNutritionProgramById(id)
+  if (!existing) return
+  // Assigned / historical versions must stay for History — archive instead of purge.
+  if (existing.subscriberId) {
+    throw new Error(
+      "Assigned nutrition plans cannot be permanently deleted. Archive them to preserve subscriber history.",
+    )
+  }
   const db = getDb()
   await deleteDoc(doc(db, NUTRITION_PROGRAMS_COLLECTION, id))
 }
@@ -655,45 +677,27 @@ export async function listNutritionLogs(
   }
 }
 
+/**
+ * Subscriber nutrition adherence — secured Cloud Function.
+ * Forces auth uid ownership, validates active assigned plan, upserts same-day log,
+ * bumps adherence counters server-side.
+ */
 export async function logNutritionAdherence(
   input: Omit<NutritionAdherenceLog, "id" | "loggedAt">,
 ): Promise<NutritionAdherenceLog> {
-  const now = new Date().toISOString()
-  const db = getDb()
-  const id = doc(collection(db, NUTRITION_LOGS_COLLECTION)).id
+  const { callLogNutritionAdherence } = await import("@/lib/firebase/callables")
+  const result = await callLogNutritionAdherence({
+    programId: input.programId,
+    date: input.date,
+    dayId: input.dayId,
+    weekday: input.weekday,
+    status: input.status,
+    caloriesActual: input.caloriesActual,
+    waterLitersActual: input.waterLitersActual,
+    notes: input.notes,
+    // subscriberId intentionally omitted — server binds to auth.uid
+  })
 
-  const newLog: NutritionAdherenceLog = {
-    ...input,
-    id,
-    loggedAt: now,
-  }
-
-  await setDoc(
-    doc(db, NUTRITION_LOGS_COLLECTION, id),
-    stripUndefined({ ...newLog }),
-  )
-
-  if (
-    input.programId &&
-    (input.status === "adhered" || input.status === "mostly")
-  ) {
-    const program = await fetchNutritionProgramById(input.programId)
-    if (program?.adherence) {
-      const updated: NutritionProgram = {
-        ...program,
-        adherence: {
-          ...program.adherence,
-          done: Math.min(program.adherence.total, program.adherence.done + 1),
-        },
-        updatedAt: now,
-      }
-      await setDoc(
-        doc(db, NUTRITION_PROGRAMS_COLLECTION, program.id),
-        stripUndefined({ ...updated }),
-        { merge: true },
-      )
-    }
-  }
-
-  return newLog
+  const raw = result.log
+  return normalizeNutritionLog(raw.id, raw as Record<string, unknown>)
 }

@@ -10,67 +10,157 @@ import {
   Zap,
 } from "lucide-react"
 import { APP_ROUTES } from "@/config/constants"
-import { useNutritionProgramsQuery } from "@/features/nutrition/hooks"
-import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
-import { useWorkoutProgramsQuery } from "@/features/workouts/hooks"
+import { useSubscriberOverviewDashboard } from "@/features/subscriber-overview/use-overview-dashboard"
 import { useLocale } from "@/hooks/useLocale"
+import { trainingDayCount } from "@/lib/program-text"
 import { cn } from "@/lib/utils"
+
+/** Program weekdays are Mon=0 … Sun=6 */
+function programWeekdayToday(): number {
+  return (new Date().getDay() + 6) % 7
+}
+
+function startOfUtcWeekIso(now = new Date()): string {
+  const day = now.getUTCDay() || 7
+  const monday = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  )
+  monday.setUTCDate(monday.getUTCDate() - (day - 1))
+  return monday.toISOString().slice(0, 10)
+}
 
 export function SubscriberAssignedPrograms() {
   const { locale, isRtl } = useLocale()
   const isAr = locale === "ar"
-  const { subscriberId } = usePanelSubscriber()
+  const {
+    isLoading: loading,
+    canWorkout,
+    canNutrition,
+    activeWorkout,
+    activeNutrition,
+    workoutLogs,
+    nutritionLogs,
+    currentWeek,
+  } = useSubscriberOverviewDashboard(locale)
 
-  const { data: workoutPrograms = [] } = useWorkoutProgramsQuery({
-    subscriberId,
-    enabled: Boolean(subscriberId),
-  })
-  const { data: nutritionPrograms = [] } = useNutritionProgramsQuery({
-    subscriberId,
-    enabled: Boolean(subscriberId),
-  })
+  const workoutCard = useMemo(() => {
+    if (!activeWorkout) return null
 
-  // Resolve assigned workout program
-  const activeWorkout = useMemo(() => {
-    const prog =
-      workoutPrograms.find((p) => p.status === "active") ?? workoutPrograms[0]
+    const todayIdx = programWeekdayToday()
+    const todayDay =
+      activeWorkout.days.find((d) => d.weekday === todayIdx) ??
+      activeWorkout.days[todayIdx]
+    const focus =
+      (todayDay?.focus &&
+        (typeof todayDay.focus === "string"
+          ? todayDay.focus
+          : todayDay.focus[locale] || todayDay.focus.en)) ||
+      (todayDay?.label &&
+        (typeof todayDay.label === "string"
+          ? todayDay.label
+          : todayDay.label[locale] || todayDay.label.en)) ||
+      (todayDay?.isRest
+        ? isAr
+          ? "اليوم راحة واستشفاء"
+          : "Rest & recovery day"
+        : isAr
+          ? `يوم ${todayIdx + 1} — ${(todayDay?.exercises.length ?? 0)} تمارين`
+          : `Day ${todayIdx + 1} — ${todayDay?.exercises.length ?? 0} exercises`)
+
+    const weekStart = startOfUtcWeekIso()
+    const weekLogs = workoutLogs.filter(
+      (log) =>
+        log.programId === activeWorkout.id &&
+        (log.date || log.completedAt).slice(0, 10) >= weekStart,
+    )
+    const total = Math.max(
+      1,
+      activeWorkout.completion?.total ?? trainingDayCount(activeWorkout),
+    )
+    // Prefer shared weekly adherence counter so boxes match the chart.
+    const doneThisWeek = currentWeek?.workoutDone ?? weekLogs.length
+    const lifetimeDone = activeWorkout.completion?.done ?? weekLogs.length
+    const progress = Math.min(
+      100,
+      Math.round((Math.min(lifetimeDone, total) / total) * 100),
+    )
 
     return {
-      title: prog?.title?.[locale] ?? (isAr ? "برنامج تضخيم وبناء القوة" : "Strength & Hypertrophy Split"),
+      title: activeWorkout.title[locale] || activeWorkout.title.en,
       description:
-        prog?.description?.[locale] ??
-        (isAr ? "نظام تدريبي 4 أيام أسبوعياً مع تركيز على التمارين المركبة والتطور المستمر" : "Advanced 4-day split focusing on compound progressive overload"),
-      daysCount: prog?.days?.length ?? 4,
-      todayFocus: isAr ? "اليوم: الصدر والترايسبس (Push Day)" : "Today: Chest & Triceps (Push Day)",
-      duration: isAr ? "55 دقيقة" : "55 min",
-      progress: 68,
+        activeWorkout.description?.[locale] ||
+        activeWorkout.description?.en ||
+        (isAr
+          ? "البرنامج التدريبي المعيّن لك من المدرب"
+          : "Your coach-assigned workout program"),
+      daysCount: trainingDayCount(activeWorkout),
+      todayFocus: focus,
+      format: activeWorkout.format,
+      progress,
+      doneLabel: `${Math.min(lifetimeDone, total)}/${total}`,
+      weekSessions: doneThisWeek,
     }
-  }, [workoutPrograms, locale, isAr])
+  }, [activeWorkout, workoutLogs, currentWeek, locale, isAr])
 
-  // Resolve assigned nutrition program
-  const activeNutrition = useMemo(() => {
-    const prog =
-      nutritionPrograms.find((p) => p.status === "active") ?? nutritionPrograms[0]
-
+  const nutritionCard = useMemo(() => {
+    if (!activeNutrition) return null
+    const macros = activeNutrition.macros
+    const mealsCount = activeNutrition.days.reduce(
+      (sum, day) => sum + day.meals.length,
+      0,
+    )
+    const weekStart = startOfUtcWeekIso()
+    const weekLogs = nutritionLogs.filter(
+      (log) =>
+        log.programId === activeNutrition.id &&
+        (log.date || log.loggedAt).slice(0, 10) >= weekStart &&
+        (log.status === "adhered" || log.status === "mostly"),
+    )
+    const total = Math.max(
+      1,
+      activeNutrition.adherence?.total ?? 7,
+    )
+    const lifetimeDone = activeNutrition.adherence?.done ?? weekLogs.length
+    const progress = Math.min(
+      100,
+      Math.round((Math.min(lifetimeDone, total) / total) * 100),
+    )
     return {
-      title: prog?.title?.[locale] ?? (isAr ? "نظام التضخيم النظيف المتوازن" : "Clean Bulk Nutrition Plan"),
+      title: activeNutrition.title[locale] || activeNutrition.title.en,
       description:
-        prog?.description?.[locale] ??
-        (isAr ? "توزيع مثالي للسعرات والماكروز مع الوجبات الغذائية المحددة لتسريع البناء" : "Optimal calorie surplus with targeted macro distribution"),
-      calories: 2450,
-      protein: 165,
-      carbs: 260,
-      fats: 65,
-      water: isAr ? "3.5 لتر" : "3.5 L",
-      mealsCount: 4,
+        activeNutrition.description?.[locale] ||
+        activeNutrition.description?.en ||
+        (isAr
+          ? "الخطة الغذائية المعيّنة لك من المدرب"
+          : "Your coach-assigned nutrition plan"),
+      calories: activeNutrition.targetCalories ?? 0,
+      protein: macros?.proteinGrams ?? 0,
+      carbs: macros?.carbsGrams ?? 0,
+      fats: macros?.fatsGrams ?? 0,
+      water:
+        activeNutrition.targetWaterLiters != null
+          ? isAr
+            ? `${activeNutrition.targetWaterLiters} لتر`
+            : `${activeNutrition.targetWaterLiters} L`
+          : "—",
+      mealsCount,
+      format: activeNutrition.format,
+      progress,
+      doneLabel: `${Math.min(lifetimeDone, total)}/${total}`,
+      weekSessions: currentWeek?.nutritionDone ?? weekLogs.length,
     }
-  }, [nutritionPrograms, locale, isAr])
+  }, [activeNutrition, nutritionLogs, currentWeek, locale, isAr])
 
   const ArrowIcon = isRtl ? ArrowLeft : ArrowRight
+  const workoutHref = canWorkout
+    ? APP_ROUTES.subscriber.workout
+    : APP_ROUTES.subscriber.subscription
+  const nutritionHref = canNutrition
+    ? APP_ROUTES.subscriber.nutrition
+    : APP_ROUTES.subscriber.subscription
 
   return (
     <section dir={isRtl ? "rtl" : "ltr"} className="space-y-3.5 select-none">
-      {/* Section Header */}
       <div className="px-1">
         <h2
           className={cn(
@@ -92,216 +182,286 @@ export function SubscriberAssignedPrograms() {
         </p>
       </div>
 
-      {/* Two-Column Grid: Crisp White Luxury Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
-        {/* ======================================================== */}
-        {/* CARD 1: ACTIVE WORKOUT PROGRAM (Crisp White Card)        */}
-        {/* ======================================================== */}
-        <div className="group relative flex flex-col justify-between overflow-hidden rounded-[22px] sm:rounded-[26px] bg-white p-5 sm:p-6 lg:p-7 border border-black/[0.06] shadow-[0_4px_24px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_36px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300">
-          <div>
-            {/* Top Header Row: Icon + Title + Status */}
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3.5">
-                <span className="flex size-11 sm:size-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--gym-ink,#111111)] text-white shadow-sm transition-transform duration-300 group-hover:scale-105">
-                  <Dumbbell className="size-5 sm:size-5.5" strokeWidth={2.2} />
+      {loading ? (
+        <div className="rounded-[22px] bg-white p-8 text-center text-[13px] text-[#8c8c8c] border border-black/[0.06]">
+          {isAr ? "جاري تحميل البرامج المعيّنة..." : "Loading assigned programs..."}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
+          {/* Workout card */}
+          {workoutCard ? (
+            <div className="group relative flex flex-col justify-between overflow-hidden rounded-[22px] sm:rounded-[26px] bg-white p-5 sm:p-6 lg:p-7 border border-black/[0.06] shadow-[0_4px_24px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_36px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300">
+              <div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3.5">
+                    <span className="flex size-11 sm:size-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--gym-ink,#111111)] text-white shadow-sm transition-transform duration-300 group-hover:scale-105">
+                      <Dumbbell className="size-5 sm:size-5.5" strokeWidth={2.2} />
+                    </span>
+                    <div>
+                      <span
+                        className={cn(
+                          "text-[10.5px] font-bold uppercase tracking-wider text-[var(--gym-lime,#fb5001)] block",
+                          isAr ? "font-arabic" : "font-sans",
+                        )}
+                      >
+                        {isAr ? "خطة التمارين" : "Workout Plan"}
+                      </span>
+                      <h3
+                        className={cn(
+                          "text-[17px] sm:text-[18px] font-extrabold text-[var(--gym-ink,#111111)] tracking-tight leading-snug mt-0.5",
+                          isAr ? "font-arabic" : "font-heading",
+                        )}
+                      >
+                        {workoutCard.title}
+                      </h3>
+                    </div>
+                  </div>
+
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 border border-emerald-200/80 shrink-0">
+                    <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>{isAr ? "نشط" : "Active"}</span>
+                  </span>
+                </div>
+
+                <p
+                  className={cn(
+                    "mt-3 text-[12.5px] sm:text-[13px] font-medium leading-relaxed text-[#737373] line-clamp-2",
+                    isAr ? "font-arabic" : "font-sans",
+                  )}
+                >
+                  {workoutCard.description}
+                </p>
+
+                <div className="mt-4 rounded-2xl bg-[#fafafa] p-3.5 sm:p-4 border border-black/[0.04]">
+                  <div className="flex items-center justify-between text-[12.5px] font-bold text-[var(--gym-ink,#111111)]">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Zap className="size-4 shrink-0 text-[var(--gym-lime,#fb5001)]" />
+                      <span className={cn("truncate", isAr ? "font-arabic" : "font-sans")}>
+                        {workoutCard.todayFocus}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[#888] text-[11.5px] font-semibold shrink-0">
+                      <Timer className="size-3.5" />
+                      <span>
+                        {workoutCard.format === "pdf"
+                          ? "PDF"
+                          : `${workoutCard.weekSessions} ${isAr ? "هذا الأسبوع" : "this week"}`}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between text-[11px] font-semibold text-[#888] mb-1">
+                      <span>{isAr ? "إنجاز البرنامج" : "Program progress"}</span>
+                      <span className="font-extrabold text-[var(--gym-ink,#111111)]">
+                        {workoutCard.doneLabel} · {workoutCard.progress}%
+                      </span>
+                    </div>
+                    <div className="relative h-2 w-full overflow-hidden rounded-full bg-black/5">
+                      <div
+                        className="h-full rounded-full bg-[var(--gym-lime,#fb5001)] transition-all duration-500 shadow-[0_0_8px_rgba(251,80,1,0.4)]"
+                        style={{ width: `${workoutCard.progress}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 pt-4 border-t border-black/[0.05] flex items-center justify-between">
+                <span className="text-[12px] font-semibold text-[#888]">
+                  {isAr
+                    ? `${workoutCard.daysCount} أيام تمرين / أسبوع`
+                    : `${workoutCard.daysCount} training days / week`}
                 </span>
-                <div>
-                  <span
-                    className={cn(
-                      "text-[10.5px] font-bold uppercase tracking-wider text-[var(--gym-lime,#fb5001)] block",
-                      isAr ? "font-arabic" : "font-sans",
-                    )}
-                  >
-                    {isAr ? "خطة التمارين" : "Workout Plan"}
+
+                <Link
+                  to={workoutHref}
+                  className={cn(
+                    "group/btn inline-flex items-center gap-2 rounded-full bg-[var(--gym-lime,#fb5001)] hover:bg-[#e04500] text-white px-4 py-2 sm:px-5 sm:py-2.5 text-[12.5px] sm:text-[13px] font-extrabold shadow-[0_4px_16px_rgba(251,80,1,0.35)] transition-all duration-200 hover:scale-105 active:scale-95",
+                    isAr ? "font-arabic" : "font-heading",
+                  )}
+                >
+                  <span>
+                    {canWorkout
+                      ? isAr
+                        ? "متابعة التمارين"
+                        : "View Workouts"
+                      : isAr
+                        ? "راجع الاشتراك"
+                        : "Review subscription"}
                   </span>
-                  <h3
-                    className={cn(
-                      "text-[17px] sm:text-[18px] font-extrabold text-[var(--gym-ink,#111111)] tracking-tight leading-snug mt-0.5",
-                      isAr ? "font-arabic" : "font-heading",
-                    )}
-                  >
-                    {activeWorkout.title}
-                  </h3>
-                </div>
-              </div>
-
-              {/* Status Pill */}
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 border border-emerald-200/80 shrink-0">
-                <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>{isAr ? "نشط" : "Active"}</span>
-              </span>
-            </div>
-
-            {/* Description */}
-            <p
-              className={cn(
-                "mt-3 text-[12.5px] sm:text-[13px] font-medium leading-relaxed text-[#737373] line-clamp-2",
-                isAr ? "font-arabic" : "font-sans",
-              )}
-            >
-              {activeWorkout.description}
-            </p>
-
-            {/* Today's Training Highlight Bar */}
-            <div className="mt-4 rounded-2xl bg-[#fafafa] p-3.5 sm:p-4 border border-black/[0.04]">
-              <div className="flex items-center justify-between text-[12.5px] font-bold text-[var(--gym-ink,#111111)]">
-                <div className="flex items-center gap-2">
-                  <Zap className="size-4 text-[var(--gym-lime,#fb5001)]" />
-                  <span className={isAr ? "font-arabic" : "font-sans"}>
-                    {activeWorkout.todayFocus}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 text-[#888] text-[11.5px] font-semibold">
-                  <Timer className="size-3.5" />
-                  <span>{activeWorkout.duration}</span>
-                </div>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="mt-3">
-                <div className="flex items-center justify-between text-[11px] font-semibold text-[#888] mb-1">
-                  <span>{isAr ? "إنجاز الخطة الأسبوعية" : "Weekly Progress"}</span>
-                  <span className="font-extrabold text-[var(--gym-ink,#111111)]">{activeWorkout.progress}%</span>
-                </div>
-                <div className="relative h-2 w-full overflow-hidden rounded-full bg-black/5">
-                  <div
-                    className="h-full rounded-full bg-[var(--gym-lime,#fb5001)] transition-all duration-500 shadow-[0_0_8px_rgba(251,80,1,0.4)]"
-                    style={{ width: `${activeWorkout.progress}%` }}
+                  <ArrowIcon
+                    className="size-3.5 rtl:rotate-180 transition-transform group-hover/btn:translate-x-1 rtl:group-hover/btn:-translate-x-1"
+                    strokeWidth={2.5}
                   />
-                </div>
+                </Link>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center rounded-[22px] bg-white p-8 text-center border border-black/[0.06] min-h-[220px]">
+              <Dumbbell className="size-10 mb-3 text-[var(--gym-orange,#fb5001)] stroke-1" />
+              <p className="font-heading text-[15px] font-extrabold text-[var(--gym-ink,#111111)]">
+                {isAr ? "لا يوجد برنامج تمارين نشط" : "No active workout program"}
+              </p>
+              <p className="mt-1 text-[12.5px] text-[#8c8c8c] max-w-sm">
+                {isAr
+                  ? "سيظهر هنا بمجرد أن يعيّن المدرب برنامجك التدريبي."
+                  : "It will appear here once your coach assigns a workout."}
+              </p>
+              <Link
+                to={APP_ROUTES.subscriber.history}
+                className="mt-4 text-[12px] font-bold text-[var(--gym-orange,#fb5001)] hover:underline"
+              >
+                {isAr ? "عرض السجل السابق" : "View previous history"}
+              </Link>
+            </div>
+          )}
 
-          {/* Bottom Action Row */}
-          <div className="mt-5 pt-4 border-t border-black/[0.05] flex items-center justify-between">
-            <span className="text-[12px] font-semibold text-[#888]">
-              {isAr ? `${activeWorkout.daysCount} أيام تمرين / أسبوع` : `${activeWorkout.daysCount} training days / week`}
-            </span>
+          {/* Nutrition card */}
+          {nutritionCard ? (
+            <div className="group relative flex flex-col justify-between overflow-hidden rounded-[22px] sm:rounded-[26px] bg-white p-5 sm:p-6 lg:p-7 border border-black/[0.06] shadow-[0_4px_24px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_36px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300">
+              <div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3.5">
+                    <span className="flex size-11 sm:size-12 shrink-0 items-center justify-center rounded-2xl bg-[#24030c] text-white shadow-sm transition-transform duration-300 group-hover:scale-105">
+                      <Apple className="size-5 sm:size-5.5" strokeWidth={2.2} />
+                    </span>
+                    <div>
+                      <span
+                        className={cn(
+                          "text-[10.5px] font-bold uppercase tracking-wider text-[var(--gym-lime,#fb5001)] block",
+                          isAr ? "font-arabic" : "font-sans",
+                        )}
+                      >
+                        {isAr ? "الخطة الغذائية" : "Nutrition Plan"}
+                      </span>
+                      <h3
+                        className={cn(
+                          "text-[17px] sm:text-[18px] font-extrabold text-[var(--gym-ink,#111111)] tracking-tight leading-snug mt-0.5",
+                          isAr ? "font-arabic" : "font-heading",
+                        )}
+                      >
+                        {nutritionCard.title}
+                      </h3>
+                    </div>
+                  </div>
 
-            <Link
-              to={APP_ROUTES.subscriber.workout}
-              className={cn(
-                "group/btn inline-flex items-center gap-2 rounded-full bg-[var(--gym-lime,#fb5001)] hover:bg-[#e04500] text-white px-4 py-2 sm:px-5 sm:py-2.5 text-[12.5px] sm:text-[13px] font-extrabold shadow-[0_4px_16px_rgba(251,80,1,0.35)] transition-all duration-200 hover:scale-105 active:scale-95",
-                isAr ? "font-arabic" : "font-heading",
-              )}
-            >
-              <span>{isAr ? "متابعة التمارين" : "View Workouts"}</span>
-              <ArrowIcon className="size-3.5 rtl:rotate-180 transition-transform group-hover/btn:translate-x-1 rtl:group-hover/btn:-translate-x-1" strokeWidth={2.5} />
-            </Link>
-          </div>
-        </div>
+                  {nutritionCard.calories > 0 ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 px-2.5 py-1 text-[11px] font-bold text-[var(--gym-lime,#fb5001)] border border-orange-200/80 shrink-0">
+                      <Flame className="size-3.5" />
+                      <span>
+                        {nutritionCard.calories} {isAr ? "سعرة" : "kcal"}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 border border-emerald-200/80 shrink-0">
+                      <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>{isAr ? "نشط" : "Active"}</span>
+                    </span>
+                  )}
+                </div>
 
-        {/* ======================================================== */}
-        {/* CARD 2: ACTIVE NUTRITION PROGRAM (Crisp White Card)      */}
-        {/* ======================================================== */}
-        <div className="group relative flex flex-col justify-between overflow-hidden rounded-[22px] sm:rounded-[26px] bg-white p-5 sm:p-6 lg:p-7 border border-black/[0.06] shadow-[0_4px_24px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_36px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300">
-          <div>
-            {/* Top Header Row: Icon + Title + Calories Target */}
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3.5">
-                <span className="flex size-11 sm:size-12 shrink-0 items-center justify-center rounded-2xl bg-[#24030c] text-white shadow-sm transition-transform duration-300 group-hover:scale-105">
-                  <Apple className="size-5 sm:size-5.5" strokeWidth={2.2} />
+                <p
+                  className={cn(
+                    "mt-3 text-[12.5px] sm:text-[13px] font-medium leading-relaxed text-[#737373] line-clamp-2",
+                    isAr ? "font-arabic" : "font-sans",
+                  )}
+                >
+                  {nutritionCard.description}
+                </p>
+
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-[11px] font-semibold text-[#888] mb-1">
+                    <span>
+                      {isAr
+                        ? `التزام هذا الأسبوع: ${nutritionCard.weekSessions}`
+                        : `This week adherence: ${nutritionCard.weekSessions}`}
+                    </span>
+                    <span className="font-extrabold text-[var(--gym-ink,#111111)]">
+                      {nutritionCard.doneLabel} · {nutritionCard.progress}%
+                    </span>
+                  </div>
+                  <div className="relative h-2 w-full overflow-hidden rounded-full bg-black/5">
+                    <div
+                      className="h-full rounded-full bg-[var(--gym-lime,#fb5001)] transition-all duration-500"
+                      style={{ width: `${nutritionCard.progress}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-3 gap-2.5">
+                  <div className="rounded-2xl bg-[#fafafa] p-3 text-center border border-black/[0.04]">
+                    <span className="block text-[11px] font-semibold text-[#888]">
+                      {isAr ? "بروتين" : "Protein"}
+                    </span>
+                    <span className="mt-0.5 block text-[16px] sm:text-[17px] font-black text-[var(--gym-ink,#111111)]">
+                      {nutritionCard.protein > 0 ? `${nutritionCard.protein}g` : "—"}
+                    </span>
+                  </div>
+                  <div className="rounded-2xl bg-[#fafafa] p-3 text-center border border-black/[0.04]">
+                    <span className="block text-[11px] font-semibold text-[#888]">
+                      {isAr ? "كاربوهيدرات" : "Carbs"}
+                    </span>
+                    <span className="mt-0.5 block text-[16px] sm:text-[17px] font-black text-[var(--gym-ink,#111111)]">
+                      {nutritionCard.carbs > 0 ? `${nutritionCard.carbs}g` : "—"}
+                    </span>
+                  </div>
+                  <div className="rounded-2xl bg-[#fafafa] p-3 text-center border border-black/[0.04]">
+                    <span className="block text-[11px] font-semibold text-[#888]">
+                      {isAr ? "دهون صحية" : "Fats"}
+                    </span>
+                    <span className="mt-0.5 block text-[16px] sm:text-[17px] font-black text-[var(--gym-ink,#111111)]">
+                      {nutritionCard.fats > 0 ? `${nutritionCard.fats}g` : "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 pt-4 border-t border-black/[0.05] flex items-center justify-between">
+                <span className="text-[12px] font-semibold text-[#888]">
+                  {isAr
+                    ? `${nutritionCard.mealsCount} وجبات • ماء: ${nutritionCard.water}`
+                    : `${nutritionCard.mealsCount} meals • Water: ${nutritionCard.water}`}
                 </span>
-                <div>
-                  <span
-                    className={cn(
-                      "text-[10.5px] font-bold uppercase tracking-wider text-[var(--gym-lime,#fb5001)] block",
-                      isAr ? "font-arabic" : "font-sans",
-                    )}
-                  >
-                    {isAr ? "الخطة الغذائية" : "Nutrition Plan"}
+
+                <Link
+                  to={nutritionHref}
+                  className={cn(
+                    "group/btn inline-flex items-center gap-2 rounded-full bg-[var(--gym-lime,#fb5001)] hover:bg-[#e04500] text-white px-4 py-2 sm:px-5 sm:py-2.5 text-[12.5px] sm:text-[13px] font-extrabold shadow-[0_4px_16px_rgba(251,80,1,0.35)] transition-all duration-200 hover:scale-105 active:scale-95",
+                    isAr ? "font-arabic" : "font-heading",
+                  )}
+                >
+                  <span>
+                    {canNutrition
+                      ? isAr
+                        ? "عرض الوجبات"
+                        : "View Meals"
+                      : isAr
+                        ? "راجع الاشتراك"
+                        : "Review subscription"}
                   </span>
-                  <h3
-                    className={cn(
-                      "text-[17px] sm:text-[18px] font-extrabold text-[var(--gym-ink,#111111)] tracking-tight leading-snug mt-0.5",
-                      isAr ? "font-arabic" : "font-heading",
-                    )}
-                  >
-                    {activeNutrition.title}
-                  </h3>
-                </div>
-              </div>
-
-              {/* Calories Target Pill */}
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 px-2.5 py-1 text-[11px] font-bold text-[var(--gym-lime,#fb5001)] border border-orange-200/80 shrink-0">
-                <Flame className="size-3.5" />
-                <span>{activeNutrition.calories} {isAr ? "سعرة" : "kcal"}</span>
-              </span>
-            </div>
-
-            {/* Description */}
-            <p
-              className={cn(
-                "mt-3 text-[12.5px] sm:text-[13px] font-medium leading-relaxed text-[#737373] line-clamp-2",
-                isAr ? "font-arabic" : "font-sans",
-              )}
-            >
-              {activeNutrition.description}
-            </p>
-
-            {/* Target Macros Breakdown */}
-            <div className="mt-4 grid grid-cols-3 gap-2.5">
-              {/* Protein */}
-              <div className="rounded-2xl bg-[#fafafa] p-3 text-center border border-black/[0.04]">
-                <span className="block text-[11px] font-semibold text-[#888]">
-                  {isAr ? "بروتين" : "Protein"}
-                </span>
-                <span className="mt-0.5 block text-[16px] sm:text-[17px] font-black text-[var(--gym-ink,#111111)]">
-                  {activeNutrition.protein}g
-                </span>
-                <div className="mt-1.5 h-1 w-full rounded-full bg-black/5 overflow-hidden">
-                  <div className="h-full rounded-full bg-[var(--gym-lime,#fb5001)] w-full" />
-                </div>
-              </div>
-
-              {/* Carbs */}
-              <div className="rounded-2xl bg-[#fafafa] p-3 text-center border border-black/[0.04]">
-                <span className="block text-[11px] font-semibold text-[#888]">
-                  {isAr ? "كاربوهيدرات" : "Carbs"}
-                </span>
-                <span className="mt-0.5 block text-[16px] sm:text-[17px] font-black text-[var(--gym-ink,#111111)]">
-                  {activeNutrition.carbs}g
-                </span>
-                <div className="mt-1.5 h-1 w-full rounded-full bg-black/5 overflow-hidden">
-                  <div className="h-full rounded-full bg-amber-500 w-full" />
-                </div>
-              </div>
-
-              {/* Fats */}
-              <div className="rounded-2xl bg-[#fafafa] p-3 text-center border border-black/[0.04]">
-                <span className="block text-[11px] font-semibold text-[#888]">
-                  {isAr ? "دهون صحية" : "Fats"}
-                </span>
-                <span className="mt-0.5 block text-[16px] sm:text-[17px] font-black text-[var(--gym-ink,#111111)]">
-                  {activeNutrition.fats}g
-                </span>
-                <div className="mt-1.5 h-1 w-full rounded-full bg-black/5 overflow-hidden">
-                  <div className="h-full rounded-full bg-emerald-500 w-full" />
-                </div>
+                  <ArrowIcon
+                    className="size-3.5 rtl:rotate-180 transition-transform group-hover/btn:translate-x-1 rtl:group-hover/btn:-translate-x-1"
+                    strokeWidth={2.5}
+                  />
+                </Link>
               </div>
             </div>
-          </div>
-
-          {/* Bottom Action Row */}
-          <div className="mt-5 pt-4 border-t border-black/[0.05] flex items-center justify-between">
-            <span className="text-[12px] font-semibold text-[#888]">
-              {isAr ? `${activeNutrition.mealsCount} وجبات • ماء: ${activeNutrition.water}` : `${activeNutrition.mealsCount} meals • Water: ${activeNutrition.water}`}
-            </span>
-
-            <Link
-              to={APP_ROUTES.subscriber.nutrition}
-              className={cn(
-                "group/btn inline-flex items-center gap-2 rounded-full bg-[var(--gym-lime,#fb5001)] hover:bg-[#e04500] text-white px-4 py-2 sm:px-5 sm:py-2.5 text-[12.5px] sm:text-[13px] font-extrabold shadow-[0_4px_16px_rgba(251,80,1,0.35)] transition-all duration-200 hover:scale-105 active:scale-95",
-                isAr ? "font-arabic" : "font-heading",
-              )}
-            >
-              <span>{isAr ? "عرض الوجبات" : "View Meals"}</span>
-              <ArrowIcon className="size-3.5 rtl:rotate-180 transition-transform group-hover/btn:translate-x-1 rtl:group-hover/btn:-translate-x-1" strokeWidth={2.5} />
-            </Link>
-          </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center rounded-[22px] bg-white p-8 text-center border border-black/[0.06] min-h-[220px]">
+              <Apple className="size-10 mb-3 text-[var(--gym-orange,#fb5001)] stroke-1" />
+              <p className="font-heading text-[15px] font-extrabold text-[var(--gym-ink,#111111)]">
+                {isAr ? "لا توجد خطة تغذية نشطة" : "No active nutrition plan"}
+              </p>
+              <p className="mt-1 text-[12.5px] text-[#8c8c8c] max-w-sm">
+                {isAr
+                  ? "سيظهر هنا بمجرد أن يعيّن المدرب خطتك الغذائية."
+                  : "It will appear here once your coach assigns a nutrition plan."}
+              </p>
+            </div>
+          )}
         </div>
-      </div>
+      )}
     </section>
   )
 }

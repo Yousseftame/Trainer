@@ -220,12 +220,29 @@ export function NutritionPage() {
 
   function handleDelete(program: NutritionProgram) {
     if (actionsBusy) return
+    // Assigned versions are part of subscriber History — archive only.
+    if (program.subscriberId) {
+      setConfirmDialog({
+        open: true,
+        title: isAr ? "أرشفة الخطة" : "Archive Plan",
+        description: isAr
+          ? `"${program.title[locale]}" مُسندة لمشترك. لا يمكن حذفها نهائياً حتى تبقى في السجل التاريخي. هل تريد أرشفتها؟`
+          : `"${program.title[locale]}" is assigned to a subscriber and cannot be permanently deleted (History retention). Archive it instead?`,
+        confirmLabel: isAr ? "أرشفة" : "Archive",
+        tone: "warning",
+        onConfirm: async () => {
+          await archiveMutation.mutateAsync(program.id)
+          appToast.success(isAr ? "تمت الأرشفة" : "Plan archived")
+        },
+      })
+      return
+    }
     setConfirmDialog({
       open: true,
       title: isAr ? "حذف خطة التغذية" : "Delete Nutrition Plan",
       description: isAr
-        ? `حذف نهائي لـ "${program.title[locale]}"؟ لا يمكن التراجع. سجلات الالتزام تبقى إن وُجدت.`
-        : `Permanently delete "${program.title[locale]}"? This cannot be undone. Adherence logs remain.`,
+        ? `حذف نهائي للقالب "${program.title[locale]}"؟ لا يمكن التراجع.`
+        : `Permanently delete template "${program.title[locale]}"? This cannot be undone.`,
       confirmLabel: isAr ? "تأكيد الحذف" : "Delete Plan",
       tone: "danger",
       onConfirm: async () => {
@@ -245,9 +262,24 @@ export function NutritionPage() {
   }, [allPrograms, selected])
 
   const subscriberLogs = useMemo(() => {
-    if (!selected?.subscriberId) return []
-    return allLogs.filter((l) => l.subscriberId === selected.subscriberId)
+    if (!selected?.id) return []
+    return allLogs.filter((l) => l.programId === selected.id)
   }, [allLogs, selected])
+
+  const selectedWeekAdherenceCount = useMemo(() => {
+    const now = new Date()
+    const day = now.getUTCDay() || 7
+    const monday = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    )
+    monday.setUTCDate(monday.getUTCDate() - (day - 1))
+    const weekStart = monday.toISOString().slice(0, 10)
+    return subscriberLogs.filter(
+      (l) =>
+        (l.date || l.loggedAt).slice(0, 10) >= weekStart &&
+        (l.status === "adhered" || l.status === "mostly"),
+    ).length
+  }, [subscriberLogs])
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
@@ -459,7 +491,7 @@ export function NutritionPage() {
 
                 {/* Right controls */}
                 <div className="flex flex-wrap items-center gap-2">
-                  {selected.adherence ? (
+                  {selected.subscriberId ? (
                     <button
                       type="button"
                       onClick={() =>
@@ -470,14 +502,21 @@ export function NutritionPage() {
                         })
                       }
                       className="rounded-2xl bg-white px-3.5 py-2 text-start shadow-sm transition hover:bg-[#F9F9F9]"
-                      title={isAr ? "عرض سجل الالتزام" : "View adherence logs"}
+                      title={isAr ? "عرض سجل الالتزام لهذه الخطة" : "View adherence logs for this plan"}
                     >
                       <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#8c8c8c]">
                         {t("admin.nutrition.thisWeek")}
                       </p>
                       <p className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
-                        {selected.adherence.done}/{selected.adherence.total}
+                        {selectedWeekAdherenceCount}/7
                       </p>
+                      {selected.adherence ? (
+                        <p className="text-[10px] font-semibold text-[#8c8c8c]">
+                          {isAr
+                            ? `إجمالي: ${selected.adherence.done}/${selected.adherence.total}`
+                            : `Total: ${selected.adherence.done}/${selected.adherence.total}`}
+                        </p>
+                      ) : null}
                     </button>
                   ) : null}
 
@@ -898,6 +937,7 @@ export function NutritionPage() {
           title={isAr ? "سجل إصدارات الخطة الغذائية" : "Nutrition Plan Version History"}
           subscriberName={selectedSubscriber?.displayName}
           programs={relatedVersions}
+          initialProgramId={historyModal.program.id}
           type="nutrition"
           onClose={() => setHistoryModal({ open: false, program: null })}
         />
@@ -907,7 +947,15 @@ export function NutritionPage() {
       {logsModal.open ? (
         <ProgramLogsDialog
           open={logsModal.open}
-          title={isAr ? "سجل الالتزام الغذائي" : "Nutrition Adherence Log"}
+          title={
+            selected
+              ? isAr
+                ? `سجل الالتزام: ${selected.title.ar || selected.title.en}`
+                : `Adherence log: ${selected.title.en || selected.title.ar}`
+              : isAr
+                ? "سجل الالتزام الغذائي"
+                : "Nutrition Adherence Log"
+          }
           subscriberName={logsModal.subscriberName}
           nutritionLogs={subscriberLogs}
           type="nutrition"

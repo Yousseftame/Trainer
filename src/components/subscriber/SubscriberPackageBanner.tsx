@@ -6,9 +6,13 @@ import { BRAND_LOGO_ON_LIGHT } from "@/components/shared/BrandLogo"
 import { APP_ROUTES } from "@/config/constants"
 import { useAuth } from "@/features/auth/auth-context"
 import {
-  currentSubscriptionFor,
-  getPackageById,
-} from "@/features/subscriptions/demo"
+  pickCurrentSubscription,
+  resolveEffectiveSubscriptionStatus,
+} from "@/features/subscriptions/entitlements"
+import {
+  usePackageByIdQuery,
+  useSubscriberSubscriptionsQuery,
+} from "@/features/subscriptions/hooks"
 import { useLocale } from "@/hooks/useLocale"
 import { cn } from "@/lib/utils"
 
@@ -16,69 +20,100 @@ export function SubscriberPackageBanner() {
   const { locale, isRtl } = useLocale()
   const isAr = locale === "ar"
   const { user } = useAuth()
+  const subscriberId = user?.uid
 
-  // Get current subscription and corresponding package
-  const sub = useMemo(
-    () => (user?.uid ? currentSubscriptionFor(user.uid) : null),
-    [user?.uid],
+  const { data: subscriptions = [] } = useSubscriberSubscriptionsQuery(
+    subscriberId,
   )
-  const pkg = useMemo(() => getPackageById(sub?.packageId), [sub?.packageId])
+  const sub = useMemo(
+    () => pickCurrentSubscription(subscriptions),
+    [subscriptions],
+  )
+  const { data: pkg } = usePackageByIdQuery(sub?.packageId)
+  const effectiveStatus = resolveEffectiveSubscriptionStatus(sub)
 
-  // Calculation for dates and progress
-  const { packageName, formattedStart, daysRemainingLabel, progressPercent } = useMemo(() => {
-    const name =
-      pkg?.name[locale] ??
-      sub?.packageName?.[locale] ??
-      (isAr ? "باقة تحوّل" : "Transform Plan")
+  const { packageName, formattedStart, daysRemainingLabel, progressPercent, statusTone } =
+    useMemo(() => {
+      const name =
+        pkg?.name[locale] ??
+        sub?.packageName?.[locale] ??
+        (isAr ? "لا توجد باقة نشطة" : "No active package")
 
-    const startVal = sub?.startsAt ?? "2026-08-12T00:00:00.000Z"
-    const endVal = sub?.endsAt ?? "2026-11-10T00:00:00.000Z"
+      if (!sub?.startsAt || !sub?.endsAt) {
+        return {
+          packageName: name,
+          formattedStart: "—",
+          daysRemainingLabel: isAr ? "غير محدد" : "Not set",
+          progressPercent: 4,
+          statusTone: "muted" as const,
+        }
+      }
 
-    const startDate = new Date(startVal)
-    const endDate = new Date(endVal)
-    const now = new Date()
+      const startDate = new Date(sub.startsAt)
+      const endDate = new Date(sub.endsAt)
+      const now = new Date()
 
-    // Compact date format DD-MM-YYYY
-    const day = String(startDate.getDate()).padStart(2, "0")
-    const month = String(startDate.getMonth() + 1).padStart(2, "0")
-    const year = startDate.getFullYear()
-    const formatted = `${day}-${month}-${year}`
+      const day = String(startDate.getDate()).padStart(2, "0")
+      const month = String(startDate.getMonth() + 1).padStart(2, "0")
+      const year = startDate.getFullYear()
+      const formatted = `${day}-${month}-${year}`
 
-    const startMs = startDate.getTime()
-    const endMs = endDate.getTime()
-    const nowMs = now.getTime()
+      const startMs = startDate.getTime()
+      const endMs = endDate.getTime()
+      const nowMs = now.getTime()
+      const totalDuration = Math.max(1, endMs - startMs)
+      const elapsed = Math.min(Math.max(0, nowMs - startMs), totalDuration)
+      const pct = Math.min(
+        100,
+        Math.max(4, Math.round((elapsed / totalDuration) * 100)),
+      )
 
-    const totalDuration = Math.max(1, endMs - startMs)
-    const elapsed = Math.min(Math.max(0, nowMs - startMs), totalDuration)
-    const pct = Math.min(100, Math.max(4, Math.round((elapsed / totalDuration) * 100)))
+      const remainingDays = Math.ceil((endMs - nowMs) / (1000 * 60 * 60 * 24))
+      let remainingLabel: string
+      let tone: "active" | "warning" | "muted" = "active"
 
-    const remainingDays = Math.max(0, Math.ceil((endMs - nowMs) / (1000 * 60 * 60 * 24)))
+      if (effectiveStatus === "suspended") {
+        remainingLabel = isAr ? "موقوف" : "Suspended"
+        tone = "warning"
+      } else if (effectiveStatus === "expired" || remainingDays < 0) {
+        remainingLabel = isAr ? "منتهٍ" : "Expired"
+        tone = "muted"
+      } else if (effectiveStatus !== "active") {
+        remainingLabel = effectiveStatus
+          ? String(effectiveStatus)
+          : isAr
+            ? "غير نشط"
+            : "Inactive"
+        tone = "muted"
+      } else {
+        if (isAr) {
+          if (remainingDays === 1) remainingLabel = "يوم واحد متبقي"
+          else if (remainingDays === 2) remainingLabel = "يومان متبقيان"
+          else if (remainingDays >= 3 && remainingDays <= 10)
+            remainingLabel = `${remainingDays} أيام متبقية`
+          else remainingLabel = `${remainingDays} يوماً متبقياً`
+        } else {
+          remainingLabel = `${remainingDays} days remaining`
+        }
+        if (remainingDays <= 7) tone = "warning"
+      }
 
-    // Accurate human-friendly phrasing
-    let remainingLabel = `${remainingDays} days remaining`
-    if (isAr) {
-      if (remainingDays === 1) remainingLabel = "يوم واحد متبقي"
-      else if (remainingDays === 2) remainingLabel = "يومان متبقيان"
-      else if (remainingDays >= 3 && remainingDays <= 10) remainingLabel = `${remainingDays} أيام متبقية`
-      else remainingLabel = `${remainingDays} يوماً متبقياً`
-    }
-
-    return {
-      packageName: name,
-      formattedStart: formatted,
-      daysRemainingLabel: remainingLabel,
-      progressPercent: pct,
-    }
-  }, [sub, pkg, locale, isAr])
+      return {
+        packageName: name,
+        formattedStart: formatted,
+        daysRemainingLabel: remainingLabel,
+        progressPercent: pct,
+        statusTone: tone,
+      }
+    }, [sub, pkg, locale, isAr, effectiveStatus])
 
   return (
     <Link
       to={APP_ROUTES.subscriber.subscription}
       dir={isRtl ? "rtl" : "ltr"}
       aria-label={packageName}
-      className="group relative block w-full overflow-hidden rounded-[22px] sm:rounded-[26px] bg-gradient-to-r from-[#24030c] via-[#2c0410] to-[#190208] p-4 sm:p-5 text-white shadow-[0_12px_32px_rgba(36,3,12,0.22)] border border-white/10 hover:border-white/20 hover:shadow-[0_16px_40px_rgba(36,3,12,0.32)] active:scale-[0.995] transition-all duration-300 select-none cursor-pointer"
+      className="group relative block w-full cursor-pointer select-none overflow-hidden rounded-[22px] border border-white/10 bg-gradient-to-r from-[#24030c] via-[#2c0410] to-[#190208] p-4 text-white shadow-[0_12px_32px_rgba(36,3,12,0.22)] transition-all duration-300 hover:border-white/20 hover:shadow-[0_16px_40px_rgba(36,3,12,0.32)] active:scale-[0.995] sm:rounded-[26px] sm:p-5"
     >
-      {/* Website Hero Pattern subtle texture */}
       <img
         src={heroPattern}
         alt=""
@@ -87,24 +122,19 @@ export function SubscriberPackageBanner() {
         className="pointer-events-none absolute inset-0 size-full object-cover opacity-15 mix-blend-screen transition-opacity duration-300 group-hover:opacity-25"
       />
 
-      {/* Ambient Backlight Glow behind Logo */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -top-10 -start-10 size-32 rounded-full bg-[var(--gym-lime,#fb5001)]/15 blur-2xl"
+        className="pointer-events-none absolute -start-10 -top-10 size-32 rounded-full bg-[var(--gym-lime,#fb5001)]/15 blur-2xl"
       />
 
-      {/* Subtle top specular border line */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/25 to-transparent"
       />
 
-      {/* Content Container */}
       <div className="relative z-10 flex flex-col justify-between">
-        {/* Top Row: Logo Badge + Package Info */}
         <div className="flex items-center gap-3.5 sm:gap-4">
-          {/* White Circular DerpyFit Logo Badge with specular rim */}
-          <div className="flex size-11 sm:size-12 shrink-0 items-center justify-center rounded-full bg-white shadow-md p-2 group-hover:scale-105 transition-transform duration-300">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white p-2 shadow-md transition-transform duration-300 group-hover:scale-105 sm:size-12">
             <img
               src={BRAND_LOGO_ON_LIGHT}
               alt="DerpyFit"
@@ -112,48 +142,56 @@ export function SubscriberPackageBanner() {
             />
           </div>
 
-          {/* Details */}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h2
                 className={cn(
-                  "truncate text-[16px] sm:text-[18px] font-extrabold text-white tracking-tight leading-snug",
+                  "truncate text-[16px] font-extrabold leading-snug tracking-tight text-white sm:text-[18px]",
                   isAr ? "font-arabic" : "font-heading",
                 )}
               >
                 {packageName}
               </h2>
 
-              {/* Subtle Live Active Ping (Default Green Online Pulse) */}
-              <span className="relative flex size-2 sm:size-2.5 shrink-0" title={isAr ? "نشط" : "Active"}>
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex size-2 sm:size-2.5 rounded-full bg-emerald-500" />
-              </span>
+              {statusTone === "active" ? (
+                <span
+                  className="relative flex size-2 shrink-0 sm:size-2.5"
+                  title={isAr ? "نشط" : "Active"}
+                >
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex size-2 rounded-full bg-emerald-500 sm:size-2.5" />
+                </span>
+              ) : (
+                <span
+                  className={cn(
+                    "size-2 shrink-0 rounded-full sm:size-2.5",
+                    statusTone === "warning" ? "bg-amber-400" : "bg-white/40",
+                  )}
+                  title={daysRemainingLabel}
+                />
+              )}
             </div>
 
-            {/* Dates & Remaining Days (Clean spacing, no grey dot) */}
-            <div className="mt-0.5 flex flex-wrap items-center justify-between sm:justify-start gap-x-4 sm:gap-x-6 gap-y-0.5 text-[12px] sm:text-[13px] font-semibold text-white/80">
+            <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-0.5 text-[12px] font-semibold text-white/80 sm:justify-start sm:gap-x-6 sm:text-[13px]">
               <span>
                 {isAr ? `منضم ${formattedStart}` : `Joined ${formattedStart}`}
               </span>
-              <span className="text-[var(--gym-lime,#fb5001)] font-bold">
+              <span className="font-bold text-[var(--gym-lime,#fb5001)]">
                 {daysRemainingLabel}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Bottom Row: Slim Rounded Progress Line with Indicator Pill */}
         <div className="mt-3.5 sm:mt-4">
-          <div className="relative h-2 sm:h-2.5 w-full overflow-hidden rounded-full bg-black/40 border border-white/10 p-[1px] shadow-inner">
+          <div className="relative h-2 w-full overflow-hidden rounded-full border border-white/10 bg-black/40 p-[1px] shadow-inner sm:h-2.5">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${progressPercent}%` }}
               transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-              className="relative h-full rounded-full bg-[var(--gym-lime,#fb5001)] shadow-[0_0_10px_rgba(251,80,1,0.7)] flex items-center justify-end"
+              className="relative flex h-full items-center justify-end rounded-full bg-[var(--gym-lime,#fb5001)] shadow-[0_0_10px_rgba(251,80,1,0.7)]"
             >
-              {/* White capsule pill indicator at the tip of the progress bar */}
-              <span className="size-1.5 sm:size-2 rounded-full bg-white shadow-sm me-0.5" />
+              <span className="me-0.5 size-1.5 rounded-full bg-white shadow-sm sm:size-2" />
             </motion.div>
           </div>
         </div>

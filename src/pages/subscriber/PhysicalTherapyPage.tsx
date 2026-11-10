@@ -1,24 +1,31 @@
-import { useMemo, useState } from "react"
-import { Link } from "react-router-dom"
+import { useEffect, useMemo, useState } from "react"
+import { Link, useSearchParams } from "react-router-dom"
 import {
   Activity,
   ArrowRight,
   ArrowLeft,
   Calendar,
   CheckCircle2,
+  Clapperboard,
   Dumbbell,
   HeartPulse,
   Info,
+  Play,
+  RefreshCw,
   ShieldAlert,
   Sparkles,
   UserCheck,
 } from "lucide-react"
+import { ContentPreviewDialog } from "@/components/dashboard/ContentPreviewDialog"
 import { APP_ROUTES } from "@/config/constants"
+import { useContentAssetsQuery } from "@/features/content/hooks"
 import { useSubscriberPTRecordsQuery } from "@/features/physicalTherapy/hooks"
 import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
+import type { ContentAsset } from "@/types/content"
 import { formatDate } from "@/lib/format"
+import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 import type { PTAffectedArea, PhysicalTherapyRecord } from "@/types/physicalTherapy"
 
@@ -47,11 +54,39 @@ export function PhysicalTherapyPage() {
     setSelectedSubscriberId,
   } = usePanelSubscriber({ allowStaffPicker: true })
 
-  // Fetch PT records for this subscriber only
-  const { data: records = [], isLoading } = useSubscriberPTRecordsQuery(activeSubscriberId)
+  const {
+    data: records = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useSubscriberPTRecordsQuery(activeSubscriberId)
 
-  // Currently selected record ID (defaults to active/recovering record first, then latest)
-  const [activeRecordId, setActiveRecordId] = useState<string>("")
+  const { data: contentAssets = [] } = useContentAssetsQuery({
+    audience: "subscriber",
+    enabled: Boolean(activeSubscriberId),
+  })
+
+  const contentById = useMemo(() => {
+    const map = new Map<string, ContentAsset>()
+    for (const asset of contentAssets) map.set(asset.id, asset)
+    return map
+  }, [contentAssets])
+
+  const [searchParams] = useSearchParams()
+  const recordFromUrl = searchParams.get("record") || ""
+
+  const [activeRecordId, setActiveRecordId] = useState<string>(recordFromUrl)
+  const [previewAsset, setPreviewAsset] = useState<ContentAsset | null>(null)
+
+  // Reset selected case when staff switches the previewed member.
+  useEffect(() => {
+    setActiveRecordId(recordFromUrl)
+    setPreviewAsset(null)
+  }, [activeSubscriberId, recordFromUrl])
+
+  useEffect(() => {
+    if (recordFromUrl) setActiveRecordId(recordFromUrl)
+  }, [recordFromUrl])
 
   const activeRecord: PhysicalTherapyRecord | null = useMemo(() => {
     if (!records.length) return null
@@ -59,8 +94,10 @@ export function PhysicalTherapyPage() {
       const match = records.find((r) => r.id === activeRecordId)
       if (match) return match
     }
-    // Prefer active or recovering record, otherwise first available
-    return records.find((r) => r.status === "active" || r.status === "recovering") || records[0]
+    return (
+      records.find((r) => r.status === "active" || r.status === "recovering") ||
+      records[0]
+    )
   }, [records, activeRecordId])
 
   const areaLabel = activeRecord
@@ -68,6 +105,60 @@ export function PhysicalTherapyPage() {
       ? AREA_LABELS[activeRecord.affectedArea]?.ar
       : AREA_LABELS[activeRecord.affectedArea]?.en
     : ""
+
+  function openRehabVideo(reh: PhysicalTherapyRecord["rehabExercises"][number]) {
+    if (reh.videoContentId) {
+      const asset = contentById.get(reh.videoContentId)
+      if (!asset || asset.accessAllowed === false) {
+        appToast.error(
+          isAr
+            ? "الفيديو غير متاح في صلاحيات باقتك الحالية."
+            : "This rehab video is locked for your current package.",
+        )
+        return
+      }
+      const url = asset.streamUrl || asset.fileUrl
+      if (!url) {
+        appToast.error(
+          isAr
+            ? "رابط التشغيل غير متاح. أعد فتح الصفحة أو تواصل مع المدرب."
+            : "Stream URL unavailable. Refresh or contact your coach.",
+        )
+        return
+      }
+      setPreviewAsset(asset)
+      return
+    }
+    if (reh.videoUrl) {
+      // Legacy external URL — open in a synthetic preview shell
+      setPreviewAsset({
+        id: reh.id,
+        category: "exerciseVideo",
+        kind: "video",
+        title: reh.name,
+        description: reh.notes ?? { en: "", ar: "" },
+        tags: [],
+        visibility: "assigned",
+        requiredEntitlement: "exerciseVideos",
+        packageIds: [],
+        subscriberIds: [],
+        programIds: [],
+        streamUrl: reh.videoUrl,
+        fileUrl: reh.videoUrl,
+        storagePath: "",
+        sizeLabel: "",
+        createdAt: "",
+        updatedAt: "",
+        accessAllowed: true,
+      })
+      return
+    }
+    appToast.error(
+      isAr
+        ? "لا يوجد فيديو مرتبط بهذا التمرين التأهيلي."
+        : "No instructional video is linked to this rehab drill.",
+    )
+  }
 
   return (
     <div className="flex flex-col gap-5 pb-14">
@@ -320,8 +411,33 @@ export function PhysicalTherapyPage() {
       {/* 2. Loading State / Empty State / Main Content            */}
       {/* ======================================================== */}
       {isLoading ? (
-        <div className="flex min-h-60 items-center justify-center rounded-[24px] bg-white p-8 text-sm text-[#8c8c8c] border border-black/6">
-          {isAr ? "جارٍ تحميل بروتوكول التأهيل..." : "Loading rehab protocol..."}
+        <div className="flex min-h-60 flex-col items-center justify-center gap-2 rounded-[24px] bg-white p-8 text-sm text-[#8c8c8c] border border-black/6">
+          <HeartPulse className="size-8 animate-pulse text-[var(--gym-lime,#fb5001)]" />
+          <p>
+            {isAr
+              ? "جارٍ تحميل بروتوكول التأهيل..."
+              : "Loading rehab protocol..."}
+          </p>
+        </div>
+      ) : isError ? (
+        <div className="flex min-h-60 flex-col items-center justify-center gap-3 rounded-[28px] bg-white p-8 text-center shadow-xs border border-black/6">
+          <ShieldAlert className="size-10 text-rose-500 stroke-1" />
+          <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#111111)]">
+            {isAr ? "تعذر تحميل ملف التأهيل" : "Could not load rehab protocol"}
+          </h2>
+          <p className="max-w-md text-[13px] text-[#8c8c8c]">
+            {isAr
+              ? "سجلات العلاج الطبيعي محمية بصلاحيات الحساب. أعد المحاولة أو تواصل مع المدرب."
+              : "Physical therapy records are account-protected. Retry or contact your coach."}
+          </p>
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            className="inline-flex items-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-4 py-2 text-[12px] font-bold text-white"
+          >
+            <RefreshCw className="size-3.5" />
+            {isAr ? "إعادة المحاولة" : "Retry"}
+          </button>
         </div>
       ) : !activeRecord ? (
         /* Empty State: Subscriber has no injury records */
@@ -345,12 +461,16 @@ export function PhysicalTherapyPage() {
               <Dumbbell className="size-4 text-[var(--gym-orange,#fb5001)]" />
               <span>{isAr ? "الانتقال إلى جدول التمارين" : "View Workout Plan"}</span>
             </Link>
-            {staffCanPick ? (
+            {staffCanPick && activeSubscriberId ? (
               <Link
-                to="/admin/physical-therapy"
+                to={`${APP_ROUTES.admin.physicalTherapy}?subscriber=${activeSubscriberId}&new=1`}
                 className="inline-flex items-center gap-2 rounded-full bg-[#F4F4F4] px-4 py-2.5 text-[13px] font-bold text-[var(--gym-ink,#111111)] hover:bg-[#e9e9e9]"
               >
-                <span>{isAr ? "إضافة سجل تأهيل جديد للمتدرب" : "Add PT Record in Admin"}</span>
+                <span>
+                  {isAr
+                    ? "إضافة سجل تأهيل جديد للمتدرب"
+                    : "Add PT Record in Admin"}
+                </span>
               </Link>
             ) : null}
           </div>
@@ -506,14 +626,37 @@ export function PhysicalTherapyPage() {
                       </div>
                     </div>
 
-                    {/* Form cues / Notes */}
                     {reh.notes ? (
                       <div className="rounded-xl bg-[#F8F9FA] p-3 text-[12px] text-[#555] leading-relaxed border border-black/5 mt-1">
                         <span className="font-bold text-[var(--gym-ink,#111111)] block text-[10.5px] uppercase tracking-wider mb-0.5">
-                          💡 {isAr ? "توجيهات الأداء الصحيح:" : "Form Cue:"}
+                          {isAr ? "توجيهات الأداء الصحيح:" : "Form Cue:"}
                         </span>
                         {reh.notes[locale] || reh.notes.en}
                       </div>
+                    ) : null}
+
+                    {reh.videoContentId || reh.videoUrl ? (
+                      <button
+                        type="button"
+                        onClick={() => openRehabVideo(reh)}
+                        className="mt-1 inline-flex h-9 w-full items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-3 text-[12px] font-extrabold text-white transition hover:bg-[var(--gym-lime,#fb5001)]"
+                      >
+                        {reh.videoContentId ? (
+                          <Clapperboard className="size-3.5 text-[var(--gym-lime,#fb5001)]" />
+                        ) : (
+                          <Play className="size-3.5 fill-current" />
+                        )}
+                        <span className="truncate">
+                          {reh.videoContentId &&
+                          contentById.get(reh.videoContentId)
+                            ? isAr
+                              ? `مشاهدة: ${contentById.get(reh.videoContentId)!.title[locale]}`
+                              : `Watch: ${contentById.get(reh.videoContentId)!.title[locale]}`
+                            : isAr
+                              ? "مشاهدة فيديو التأهيل"
+                              : "Watch rehab video"}
+                        </span>
+                      </button>
                     ) : null}
                   </div>
                 ))}
@@ -554,16 +697,36 @@ export function PhysicalTherapyPage() {
               </div>
             </div>
 
-            <Link
-              to={APP_ROUTES.subscriber.workout}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--gym-orange,#fb5001)] hover:bg-[#e04500] text-white px-5 py-2.5 text-[12.5px] font-bold transition shadow-xs shrink-0"
-            >
-              <span>{isAr ? "الانتقال إلى جدول التمارين" : "Go to Workout Plan"}</span>
-              {isRtl ? <ArrowLeft className="size-4" /> : <ArrowRight className="size-4" />}
-            </Link>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <Link
+                to={APP_ROUTES.subscriber.library}
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-white/10 hover:bg-white/15 text-white px-4 py-2.5 text-[12.5px] font-bold transition"
+              >
+                <Clapperboard className="size-3.5 text-[var(--gym-lime,#fb5001)]" />
+                <span>{isAr ? "مكتبة الملفات" : "Media Library"}</span>
+              </Link>
+              <Link
+                to={APP_ROUTES.subscriber.workout}
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--gym-orange,#fb5001)] hover:bg-[#e04500] text-white px-5 py-2.5 text-[12.5px] font-bold transition shadow-xs"
+              >
+                <span>
+                  {isAr ? "الانتقال إلى جدول التمارين" : "Go to Workout Plan"}
+                </span>
+                {isRtl ? (
+                  <ArrowLeft className="size-4" />
+                ) : (
+                  <ArrowRight className="size-4" />
+                )}
+              </Link>
+            </div>
           </div>
         </div>
       )}
+
+      <ContentPreviewDialog
+        asset={previewAsset}
+        onClose={() => setPreviewAsset(null)}
+      />
     </div>
   )
 }

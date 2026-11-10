@@ -2,3 +2,4 @@
 export * from "./staff/index.js";
 export * from "./subscribers/index.js";
 export * from "./registration/index.js";
+export * from "./subscriptions/index.js";

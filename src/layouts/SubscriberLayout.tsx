@@ -38,6 +38,10 @@ export function SubscriberLayout() {
   const navigate = useNavigate()
   const { signOut } = useAuth()
 
+  // Fetch-on-need: do NOT warm packages/programs/progress here.
+  // AuthProvider already loads the subscriber's own subscriptions for gates;
+  // each route lazy-loads and queries only what that page needs.
+
   const [collapsed, setCollapsed] = useState(false)
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)

@@ -198,6 +198,9 @@ export type NutritionAdherenceLog = {
   subscriberId: string
   programId: string
   date: string
+  /** Optional day reference on the assigned nutrition program */
+  dayId?: string
+  weekday?: number
   status: "adhered" | "mostly" | "deviated" | "skipped"
   caloriesActual?: number
   waterLitersActual?: number

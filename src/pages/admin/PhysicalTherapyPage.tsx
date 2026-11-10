@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react"
-import { Link } from "react-router-dom"
+import { useEffect, useMemo, useState } from "react"
+import { Link, useSearchParams } from "react-router-dom"
 import {
   Activity,
   AlertTriangle,
   CheckCircle2,
   ChevronDown,
+  Clapperboard,
   HeartPulse,
   Pencil,
   Plus,
@@ -18,6 +19,7 @@ import { FilterChip, StatCard } from "@/components/dashboard/StatCard"
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
 import { APP_ROUTES } from "@/config/constants"
 import { useAuth } from "@/features/auth/auth-context"
+import { useContentAssetsQuery } from "@/features/content/hooks"
 import {
   useDeletePTRecordMutation,
   usePTRecordsQuery,
@@ -60,8 +62,14 @@ export function PhysicalTherapyPage() {
   const [areaFilter, setAreaFilter] = useState<PTAffectedArea | "all">("all")
   const [selectedRecordId, setSelectedRecordId] = useState<string>("")
 
+  const [searchParams, setSearchParams] = useSearchParams()
+  const prefillSubscriberId = searchParams.get("subscriber") || undefined
+
   const [formOpen, setFormOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState<PhysicalTherapyRecord | null>(null)
+  const [defaultSubscriberId, setDefaultSubscriberId] = useState<string | undefined>(
+    prefillSubscriberId,
+  )
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean
     title: string
@@ -73,10 +81,31 @@ export function PhysicalTherapyPage() {
 
   const { data: records = [], isError, isLoading } = usePTRecordsQuery()
   const { data: subscribers = [] } = useSubscribersQuery()
+  const { data: contentAssets = [] } = useContentAssetsQuery()
+  const contentTitleById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const asset of contentAssets) {
+      map.set(asset.id, asset.title[locale] || asset.title.en)
+    }
+    return map
+  }, [contentAssets, locale])
   const subscriberMap = useMemo(
     () => new Map(subscribers.map((s) => [s.id, s])),
     [subscribers],
   )
+
+  // Deep-link from subscriber detail: /admin/physical-therapy?subscriber=<id>&new=1
+  useEffect(() => {
+    if (!prefillSubscriberId) return
+    setDefaultSubscriberId(prefillSubscriberId)
+    if (searchParams.get("new") === "1") {
+      setEditingRecord(null)
+      setFormOpen(true)
+      const next = new URLSearchParams(searchParams)
+      next.delete("new")
+      setSearchParams(next, { replace: true })
+    }
+  }, [prefillSubscriberId, searchParams, setSearchParams])
 
   const saveMutation = useSavePTRecordMutation()
   const deleteMutation = useDeletePTRecordMutation()
@@ -100,6 +129,14 @@ export function PhysicalTherapyPage() {
   const filteredRecords = useMemo(() => {
     const q = query.trim().toLowerCase()
     return records.filter((item) => {
+      if (
+        prefillSubscriberId &&
+        item.subscriberId !== prefillSubscriberId &&
+        !q
+      ) {
+        // When opened from subscriber detail without a search query, scope the list.
+        return false
+      }
       if (statusFilter !== "all" && item.status !== statusFilter) return false
       if (areaFilter !== "all" && item.affectedArea !== areaFilter) return false
       if (!q) return true
@@ -115,13 +152,30 @@ export function PhysicalTherapyPage() {
         subName.includes(q) ||
         titleEn.includes(q) ||
         titleAr.includes(q) ||
-        item.affectedArea.toLowerCase().includes(q)
+        item.affectedArea.toLowerCase().includes(q) ||
+        item.subscriberId === q
       )
     })
-  }, [records, statusFilter, areaFilter, query, subscriberMap, locale])
+  }, [
+    records,
+    statusFilter,
+    areaFilter,
+    query,
+    subscriberMap,
+    locale,
+    prefillSubscriberId,
+  ])
 
   const selectedRecord =
     filteredRecords.find((r) => r.id === selectedRecordId) ?? filteredRecords[0]
+
+  // Keep detail pane aligned with the filtered list (deep-link / search changes).
+  useEffect(() => {
+    if (!filteredRecords.length) return
+    if (!filteredRecords.some((r) => r.id === selectedRecordId)) {
+      setSelectedRecordId(filteredRecords[0].id)
+    }
+  }, [filteredRecords, selectedRecordId])
 
   async function handleToggleCleared(record: PhysicalTherapyRecord) {
     if (!canManage || saveMutation.isPending) return
@@ -165,7 +219,10 @@ export function PhysicalTherapyPage() {
       confirmLabel: isAr ? "تأكيد الحذف" : "Delete Record",
       tone: "danger",
       onConfirm: async () => {
-        await deleteMutation.mutateAsync(record.id)
+        await deleteMutation.mutateAsync({
+          id: record.id,
+          subscriberId: record.subscriberId,
+        })
         if (selectedRecordId === record.id) setSelectedRecordId("")
         appToast.success(isAr ? "تم حذف السجل بنجاح" : "Record deleted successfully")
       },
@@ -235,6 +292,7 @@ export function PhysicalTherapyPage() {
                   type="button"
                   onClick={() => {
                     setEditingRecord(null)
+                    setDefaultSubscriberId(prefillSubscriberId)
                     setFormOpen(true)
                   }}
                   className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
@@ -248,6 +306,21 @@ export function PhysicalTherapyPage() {
 
           {/* Bottom row: Status Filter Chips */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {prefillSubscriberId ? (
+              <FilterChip
+                active
+                onClick={() => {
+                  const next = new URLSearchParams(searchParams)
+                  next.delete("subscriber")
+                  next.delete("new")
+                  setSearchParams(next, { replace: true })
+                  setDefaultSubscriberId(undefined)
+                }}
+              >
+                {isAr ? "مسح فلتر المشترك" : "Clear member filter"} ·{" "}
+                {resolveSubscriberName(prefillSubscriberId)}
+              </FilterChip>
+            ) : null}
             <FilterChip active={statusFilter === "all"} onClick={() => setStatusFilter("all")}>
               {isAr ? "الكل" : "All"} ({records.length})
             </FilterChip>
@@ -436,51 +509,68 @@ export function PhysicalTherapyPage() {
                     </div>
                   </div>
 
-                  {canManage ? (
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        disabled={saveMutation.isPending}
-                        onClick={() => handleToggleCleared(selectedRecord)}
-                        className={cn(
-                          "inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[12px] font-bold transition shadow-xs disabled:opacity-50",
-                          selectedRecord.status === "cleared"
-                            ? "bg-amber-50 text-amber-800 hover:bg-amber-100"
-                            : "bg-[var(--gym-ink,#111111)] text-white hover:opacity-90",
-                        )}
-                      >
-                        <CheckCircle2 className="size-3.5" />
-                        {selectedRecord.status === "cleared"
-                          ? isAr
-                            ? "إعادة فتح"
-                            : "Reopen"
-                          : isAr
-                            ? "اعتماد التعافي"
-                            : "Mark Cleared"}
-                      </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link
+                      to={APP_ROUTES.admin.subscriberDetail(
+                        selectedRecord.subscriberId,
+                      )}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-full bg-white px-3.5 text-[12px] font-bold text-[var(--gym-ink,#111111)] shadow-xs hover:bg-black/5"
+                      title={
+                        isAr
+                          ? "فتح ملف المشترك"
+                          : "Open subscriber profile"
+                      }
+                    >
+                      <HeartPulse className="size-3.5 text-[var(--gym-lime,#fb5001)]" />
+                      {isAr ? "ملف المشترك" : "Member profile"}
+                    </Link>
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingRecord(selectedRecord)
-                          setFormOpen(true)
-                        }}
-                        className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-xs hover:bg-black/5"
-                        title={isAr ? "تعديل الملف" : "Edit record"}
-                      >
-                        <Pencil className="size-4" />
-                      </button>
+                    {canManage ? (
+                      <>
+                        <button
+                          type="button"
+                          disabled={saveMutation.isPending}
+                          onClick={() => handleToggleCleared(selectedRecord)}
+                          className={cn(
+                            "inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[12px] font-bold transition shadow-xs disabled:opacity-50",
+                            selectedRecord.status === "cleared"
+                              ? "bg-amber-50 text-amber-800 hover:bg-amber-100"
+                              : "bg-[var(--gym-ink,#111111)] text-white hover:opacity-90",
+                          )}
+                        >
+                          <CheckCircle2 className="size-3.5" />
+                          {selectedRecord.status === "cleared"
+                            ? isAr
+                              ? "إعادة فتح"
+                              : "Reopen"
+                            : isAr
+                              ? "اعتماد التعافي"
+                              : "Mark Cleared"}
+                        </button>
 
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(selectedRecord)}
-                        className="flex size-9 items-center justify-center rounded-full bg-white text-red-500 shadow-xs hover:bg-red-50"
-                        title={isAr ? "حذف السجل" : "Delete"}
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
-                    </div>
-                  ) : null}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingRecord(selectedRecord)
+                            setFormOpen(true)
+                          }}
+                          className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-xs hover:bg-black/5"
+                          title={isAr ? "تعديل الملف" : "Edit record"}
+                        >
+                          <Pencil className="size-4" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(selectedRecord)}
+                          className="flex size-9 items-center justify-center rounded-full bg-white text-red-500 shadow-xs hover:bg-red-50"
+                          title={isAr ? "حذف السجل" : "Delete"}
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
                 </div>
 
                 {/* Contraindications & Exercise Alternatives */}
@@ -583,6 +673,20 @@ export function PhysicalTherapyPage() {
                               {reh.notes[locale] || reh.notes.en}
                             </p>
                           ) : null}
+
+                          {reh.videoContentId || reh.videoUrl ? (
+                            <span className="inline-flex max-w-full items-center gap-1 self-start rounded-full bg-[var(--gym-ink,#111111)]/90 px-2 py-0.5 text-[10px] font-bold text-white">
+                              <Clapperboard className="size-3 shrink-0 text-[var(--gym-lime,#fb5001)]" />
+                              <span className="truncate">
+                                {reh.videoContentId
+                                  ? contentTitleById.get(reh.videoContentId) ||
+                                    (isAr ? "فيديو من المكتبة" : "Library video")
+                                  : isAr
+                                    ? "رابط فيديو"
+                                    : "External video"}
+                              </span>
+                            </span>
+                          ) : null}
                         </div>
                       ))}
                     </div>
@@ -614,6 +718,7 @@ export function PhysicalTherapyPage() {
           setEditingRecord(null)
         }}
         initialRecord={editingRecord}
+        defaultSubscriberId={defaultSubscriberId}
         onSave={async (record) => {
           const saved = await saveMutation.mutateAsync({
             ...record,

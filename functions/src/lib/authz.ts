@@ -46,7 +46,11 @@ export function assertStaffCaller(
   return {uid: authContext.uid, claims};
 }
 
-/** Future subscriber-panel callables. */
+/**
+ * Subscriber-panel callables.
+ * Requires an explicit subscriber role claim — missing/forged roles are denied
+ * so DevTools cannot invoke these as a bare Auth user or as staff.
+ */
 export function assertSubscriberCaller(
   authContext: AuthContext | undefined,
 ): {uid: string; claims: CallerClaims} {
@@ -60,7 +64,7 @@ export function assertSubscriberCaller(
     throw new HttpsError("permission-denied", "Account is suspended.");
   }
 
-  if (claims.role && claims.role !== "subscriber") {
+  if (claims.role !== "subscriber") {
     throw new HttpsError("permission-denied", "Subscriber access required.");
   }
 

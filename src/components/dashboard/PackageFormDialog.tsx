@@ -118,7 +118,14 @@ export function PackageFormDialog({
       setTone("light")
       setFeatured(false)
       setIsActive(true)
-      setEntitlements(normalizeEntitlements(null))
+      // New packages opt-in explicitly (normalize defaults are deny-by-default).
+      setEntitlements({
+        workoutProgram: true,
+        nutritionProgram: true,
+        exerciseVideos: true,
+        pdfDocuments: true,
+        progressTracking: true,
+      })
       setFeaturesAr(["خطة تمارين وتغذية مخصصة", "متابعة أسبوعية للنتائج"])
       setFeaturesEn([
         "Customized workout & nutrition plan",

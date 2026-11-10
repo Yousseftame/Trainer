@@ -91,8 +91,8 @@ export function ProgramLogsDialog({
                 <Clock className="size-8 mb-2 stroke-1 text-[#8c8c8c]" />
                 <p className="text-[13px] font-medium">
                   {isAr
-                    ? "لا توجد جلسات تدريب مسجلة بعد لهذا المشترك."
-                    : "No workout sessions logged yet for this subscriber."}
+                    ? "لا توجد جلسات مسجلة بعد لهذا البرنامج. الجلسات تُحفظ مع معرّف البرنامج وتبقى بعد إعادة التعيين."
+                    : "No sessions logged for this program yet. Logs keep the program id and stay after reassignment."}
                 </p>
               </div>
             ) : (
@@ -192,8 +192,8 @@ export function ProgramLogsDialog({
               <Flame className="size-8 mb-2 stroke-1 text-[#8c8c8c]" />
               <p className="text-[13px] font-medium">
                 {isAr
-                  ? "لا توجد سجلات التزام غذائي مسجلة بعد."
-                  : "No nutrition adherence entries logged yet."}
+                  ? "لا توجد سجلات التزام لهذه الخطة بعد. السجلات تُحفظ مع معرّف الخطة وتبقى بعد إعادة التعيين."
+                  : "No adherence entries for this plan yet. Logs keep the plan id and stay after reassignment."}
               </p>
             </div>
           ) : (

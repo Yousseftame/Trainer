@@ -3,7 +3,7 @@ import { createPortal } from "react-dom"
 import { Check, Eye, EyeOff, UserPlus, UserRoundPen, X } from "lucide-react"
 import type { Subscriber } from "@/features/subscribers"
 import type { SaveSubscriberInput } from "@/features/subscribers/service"
-import type { DemoPackage } from "@/features/subscriptions/demo"
+import type { CatalogPackage } from "@/features/subscriptions/types"
 import { computeEndsAtIso } from "@/features/subscriptions/entitlements"
 import { useLocale } from "@/hooks/useLocale"
 import { cn } from "@/lib/utils"
@@ -12,7 +12,7 @@ import type { UserStatus } from "@/types/user"
 type SubscriberFormDialogProps = {
   open: boolean
   subscriber?: Subscriber | null
-  packages?: DemoPackage[]
+  packages?: CatalogPackage[]
   busy?: boolean
   adminName?: string
   onClose: () => void
@@ -418,13 +418,7 @@ export function SubscriberFormDialog({
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={busy}
-                  placeholder={
-                    isEditing
-                      ? isAr
-                        ? "••••••••"
-                        : "••••••••"
-                      : "Member@123456"
-                  }
+                  placeholder="••••••••"
                   autoComplete="new-password"
                   className="h-11 w-full rounded-2xl bg-[#F4F4F4] py-0 pl-4 pr-11 text-[14px] font-medium text-[var(--gym-ink,#111111)] outline-none focus:ring-2 focus:ring-[var(--gym-lime,#fb5001)] disabled:opacity-70"
                 />

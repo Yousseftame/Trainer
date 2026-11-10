@@ -21,6 +21,25 @@ export const PT_QUERY_KEYS = {
 /** @deprecated Prefer PT_QUERY_KEYS.all */
 export const PT_QUERY_KEY = PT_QUERY_KEYS.all
 
+function invalidateRelatedCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  subscriberId?: string,
+) {
+  void queryClient.invalidateQueries({ queryKey: PT_QUERY_KEYS.all })
+  if (subscriberId) {
+    void queryClient.invalidateQueries({
+      queryKey: PT_QUERY_KEYS.list(subscriberId),
+    })
+    void queryClient.invalidateQueries({
+      queryKey: PT_QUERY_KEYS.primary(subscriberId),
+    })
+  }
+  // Rehab videoContentId links unlock library items server-side.
+  void queryClient.invalidateQueries({
+    queryKey: ["content_assets", "subscriber_library"],
+  })
+}
+
 export function usePTRecordsQuery(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: PT_QUERY_KEYS.list(),
@@ -55,13 +74,7 @@ export function useSavePTRecordMutation() {
   return useMutation({
     mutationFn: (input: SavePTRecordInput) => savePhysicalTherapyRecord(input),
     onSuccess: (saved) => {
-      void queryClient.invalidateQueries({ queryKey: PT_QUERY_KEYS.all })
-      void queryClient.invalidateQueries({
-        queryKey: PT_QUERY_KEYS.list(saved.subscriberId),
-      })
-      void queryClient.invalidateQueries({
-        queryKey: PT_QUERY_KEYS.primary(saved.subscriberId),
-      })
+      invalidateRelatedCaches(queryClient, saved.subscriberId)
     },
   })
 }
@@ -69,9 +82,15 @@ export function useSavePTRecordMutation() {
 export function useDeletePTRecordMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => deletePhysicalTherapyRecord(id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: PT_QUERY_KEYS.all })
+    mutationFn: async (input: string | { id: string; subscriberId?: string }) => {
+      const id = typeof input === "string" ? input : input.id
+      const subscriberId =
+        typeof input === "string" ? undefined : input.subscriberId
+      await deletePhysicalTherapyRecord(id)
+      return { subscriberId }
+    },
+    onSuccess: (result) => {
+      invalidateRelatedCaches(queryClient, result.subscriberId)
     },
   })
 }

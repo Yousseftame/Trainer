@@ -16,9 +16,11 @@ import { useAuth } from "@/features/auth/auth-context"
 import {
   daysFromToday,
   exportReport,
+  noticeActionIsReview,
   noticePerson,
   REPORT_TABS,
   deriveReportsDesk,
+  resolveNoticeActionUrl,
   useDispatchNoticeMutation,
   useMarkNoticeReadWhenOpened,
   useOpsNoticesQuery,
@@ -340,8 +342,8 @@ function InboxPane({
   const person = open
     ? noticePerson(open, subscribers, requests)
     : undefined
-  const href = open?.subscriberId
-    ? APP_ROUTES.admin.subscriberDetail(open.subscriberId)
+  const href = open
+    ? resolveNoticeActionUrl(open)
     : APP_ROUTES.admin.registrationRequests
 
   return (
@@ -895,9 +897,15 @@ function NoticeDetail({
         ) : null}
         <Link
           to={href}
-          className="inline-flex h-10 items-center px-2 text-[13px] font-semibold text-[var(--gym-ink,#111111)]"
+          className={
+            noticeActionIsReview(notice)
+              ? "inline-flex h-10 items-center rounded-full bg-[var(--gym-ink,#111111)] px-4 text-[13px] font-bold text-white"
+              : "inline-flex h-10 items-center px-2 text-[13px] font-semibold text-[var(--gym-ink,#111111)]"
+          }
         >
-          {t("admin.common.view")}
+          {noticeActionIsReview(notice)
+            ? t("admin.reports.reviewRequest")
+            : t("admin.common.view")}
         </Link>
       </div>
     </article>

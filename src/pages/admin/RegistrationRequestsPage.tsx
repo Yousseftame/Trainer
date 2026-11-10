@@ -1,5 +1,5 @@
-﻿import { useMemo, useState } from "react"
-import { Link } from "react-router-dom"
+﻿import { useEffect, useMemo, useRef, useState } from "react"
+import { Link, useSearchParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import {
   CircleCheck,
@@ -51,6 +51,9 @@ export function RegistrationRequestsPage() {
   const { t } = useTranslation()
   const { locale } = useLocale()
   const { user } = useAuth()
+  const [searchParams] = useSearchParams()
+  const focusRequestId = searchParams.get("request") || ""
+  const focusedOnceRef = useRef<string | null>(null)
   useDocumentTitle(t("nav.registrationRequests"))
 
   const { data: rows = [] } = useRegistrationRequestsQuery()
@@ -65,6 +68,18 @@ export function RegistrationRequestsPage() {
   )
   const [dialogState, setDialogState] =
     useState<RegistrationDialogState | null>(null)
+
+  useEffect(() => {
+    if (!focusRequestId || !rows.length) return
+    if (focusedOnceRef.current === focusRequestId) return
+    const row = rows.find((item) => item.id === focusRequestId)
+    if (!row) return
+    focusedOnceRef.current = focusRequestId
+    setStatus(row.status === "pending" ? "pending" : "all")
+    if (row.status === "pending") {
+      setDialogState({ mode: "approve", request: row })
+    }
+  }, [focusRequestId, rows])
 
   const packageMap = useMemo(
     () => new Map(packages.map((p) => [p.id, p])),

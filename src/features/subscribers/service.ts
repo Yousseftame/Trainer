@@ -1,13 +1,16 @@
 import {
   collection,
+  deleteField,
   doc,
   getDoc,
   getDocs,
   limit,
+  onSnapshot,
   query,
   setDoc,
   updateDoc,
   where,
+  type Unsubscribe,
 } from "firebase/firestore"
 import { getDb } from "@/lib/firebase/firestore"
 import {
@@ -17,6 +20,7 @@ import {
   callPurgeDemoSubscriberData,
   callRejectRegistrationRequest,
   callSetSubscriberAccountStatus,
+  callUpdateMySubscriberProfile,
   callUpdateSubscriberAccount,
 } from "@/lib/firebase/callables"
 import {
@@ -187,6 +191,37 @@ export async function fetchSubscriberById(
   return normalizeSubscriberDoc(snap.id, snap.data() as Record<string, unknown>)
 }
 
+/** Live single-doc listener — keeps admin detail + subscriber Profile in sync. */
+export function subscribeSubscriberById(
+  id: string,
+  onNext: (subscriber: Subscriber | null) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  if (!id) {
+    onNext(null)
+    return () => undefined
+  }
+  const db = getDb()
+  return onSnapshot(
+    doc(db, SUBSCRIBERS_COLLECTION, id),
+    (snap) => {
+      if (!snap.exists()) {
+        onNext(null)
+        return
+      }
+      onNext(
+        normalizeSubscriberDoc(
+          snap.id,
+          snap.data() as Record<string, unknown>,
+        ),
+      )
+    },
+    (err) => {
+      onError?.(err)
+    },
+  )
+}
+
 export async function fetchSubscriberByEmail(
   email: string,
 ): Promise<Subscriber | null> {
@@ -216,6 +251,22 @@ export async function fetchRegistrationRequests(): Promise<
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     )
+}
+
+/** Live pending count for admin sidebar badge (status == pending only). */
+export function subscribePendingRegistrationRequestCount(
+  onNext: (count: number) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  const q = query(
+    collection(getDb(), REGISTRATION_REQUESTS_COLLECTION),
+    where("status", "==", "pending"),
+  )
+  return onSnapshot(
+    q,
+    (snap) => onNext(snap.size),
+    (err) => onError?.(err),
+  )
 }
 
 export type SaveSubscriberInput = {
@@ -289,6 +340,10 @@ export async function saveSubscriber(
   const resolvedDisplayName =
     input.displayName.trim() || nameObj.en || nameObj.ar
 
+  const goal = normalizeBilingual(input.goal)
+  const healthNotes = normalizeBilingual(input.healthNotes)
+  const coachNotes = normalizeBilingual(input.coachNotes)
+
   const patch = stripUndefined({
     displayName: resolvedDisplayName,
     name: {
@@ -297,30 +352,30 @@ export async function saveSubscriber(
     },
     phone: input.phone.trim(),
     locale: input.locale,
-    sex: input.sex,
+    sex: input.sex || deleteField(),
     age:
       input.age && Number.isFinite(input.age) && input.age > 0
         ? Math.round(input.age)
-        : undefined,
+        : deleteField(),
     heightCm:
       input.heightCm && Number.isFinite(input.heightCm) && input.heightCm > 0
         ? Math.round(input.heightCm)
-        : undefined,
+        : deleteField(),
     startingWeightKg:
       input.startingWeightKg &&
       Number.isFinite(input.startingWeightKg) &&
       input.startingWeightKg > 0
         ? Number(input.startingWeightKg)
-        : undefined,
+        : deleteField(),
     targetWeightKg:
       input.targetWeightKg &&
       Number.isFinite(input.targetWeightKg) &&
       input.targetWeightKg > 0
         ? Number(input.targetWeightKg)
-        : undefined,
-    goal: normalizeBilingual(input.goal),
-    healthNotes: normalizeBilingual(input.healthNotes),
-    coachNotes: normalizeBilingual(input.coachNotes),
+        : deleteField(),
+    goal: goal ?? deleteField(),
+    healthNotes: healthNotes ?? deleteField(),
+    coachNotes: coachNotes ?? deleteField(),
     preferredPackageId:
       input.preferredPackageId ?? existing.preferredPackageId,
     updatedAt: now,
@@ -497,6 +552,47 @@ export async function reviewRegistrationRequest(
       result.request as unknown as Record<string, unknown>,
     ),
   }
+}
+
+/** Subscriber self-service profile patch (Cloud Function — allowlisted fields only). */
+export type UpdateMyProfileInput = {
+  displayName?: string
+  phone?: string
+  locale?: "en" | "ar"
+  sex?: "male" | "female" | null
+  age?: number | null
+  heightCm?: number | null
+  startingWeightKg?: number | null
+  targetWeightKg?: number | null
+  goalText?: string
+  healthNotesText?: string
+}
+
+export async function updateMySubscriberProfile(
+  input: UpdateMyProfileInput,
+): Promise<Subscriber> {
+  const result = await callUpdateMySubscriberProfile(
+    stripUndefined({
+      displayName: input.displayName?.trim(),
+      phone: input.phone,
+      locale: input.locale,
+      sex: input.sex === undefined ? undefined : input.sex,
+      age: input.age === undefined ? undefined : input.age,
+      heightCm: input.heightCm === undefined ? undefined : input.heightCm,
+      startingWeightKg:
+        input.startingWeightKg === undefined
+          ? undefined
+          : input.startingWeightKg,
+      targetWeightKg:
+        input.targetWeightKg === undefined ? undefined : input.targetWeightKg,
+      goalText: input.goalText,
+      healthNotesText: input.healthNotesText,
+    }),
+  )
+  return normalizeSubscriberDoc(
+    result.subscriber.id,
+    result.subscriber as unknown as Record<string, unknown>,
+  )
 }
 
 export async function updateSubscriberCoachNotes(

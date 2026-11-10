@@ -90,22 +90,26 @@ service firebase.storage {
     }
 
     // Progress photos — private per subscriber.
+    // Meta writes still go through entitlement-checked Cloud Functions.
     // progress:read = view; progress:write = staff upload/delete for any subscriber.
     match /progress/photos/{subscriberId}/{allPaths=**} {
       allow read: if isActiveAccount() && (
         hasPermission('progress:read') ||
-        request.auth.uid == subscriberId
+        (request.auth.uid == subscriberId &&
+          request.auth.token.role == 'subscriber')
       );
       allow create, update: if isActiveAccount()
         && underLimit(8 * 1024 * 1024)
         && request.resource.contentType.matches('image/.*')
         && (
           hasPermission('progress:write') ||
-          request.auth.uid == subscriberId
+          (request.auth.uid == subscriberId &&
+            request.auth.token.role == 'subscriber')
         );
       allow delete: if isActiveAccount() && (
         hasPermission('progress:write') ||
-        request.auth.uid == subscriberId
+        (request.auth.uid == subscriberId &&
+          request.auth.token.role == 'subscriber')
       );
     }
   }

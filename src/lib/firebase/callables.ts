@@ -119,6 +119,92 @@ export async function callListSubscriberContentLibrary() {
   }
 }
 
+export async function callLogWorkoutSession(
+  input: Record<string, unknown>,
+) {
+  const fn = httpsCallable(getFirebaseFunctions(), "logWorkoutSession")
+  const result = await fn(input)
+  return result.data as {
+    ok: boolean
+    log: Record<string, unknown> & {
+      id: string
+      subscriberId: string
+      programId: string
+      dayId: string
+      completedAt: string
+    }
+  }
+}
+
+export async function callLogNutritionAdherence(
+  input: Record<string, unknown>,
+) {
+  const fn = httpsCallable(getFirebaseFunctions(), "logNutritionAdherence")
+  const result = await fn(input)
+  return result.data as {
+    ok: boolean
+    log: Record<string, unknown> & {
+      id: string
+      subscriberId: string
+      programId: string
+      date: string
+      status: string
+      loggedAt: string
+    }
+  }
+}
+
+export async function callLogProgressMeasurement(
+  input: Record<string, unknown>,
+) {
+  const fn = httpsCallable(getFirebaseFunctions(), "logProgressMeasurement")
+  const result = await fn(input)
+  return result.data as {
+    ok: boolean
+    measurement: Record<string, unknown> & { id: string; subscriberId: string }
+  }
+}
+
+export async function callDeleteProgressMeasurement(id: string) {
+  const fn = httpsCallable(getFirebaseFunctions(), "deleteProgressMeasurement")
+  const result = await fn({ id })
+  return result.data as { ok: boolean; deletedId: string }
+}
+
+export async function callLogProgressPerformance(
+  input: Record<string, unknown>,
+) {
+  const fn = httpsCallable(getFirebaseFunctions(), "logProgressPerformance")
+  const result = await fn(input)
+  return result.data as {
+    ok: boolean
+    performance: Record<string, unknown> & { id: string; subscriberId: string }
+  }
+}
+
+export async function callDeleteProgressPerformance(id: string) {
+  const fn = httpsCallable(getFirebaseFunctions(), "deleteProgressPerformance")
+  const result = await fn({ id })
+  return result.data as { ok: boolean; deletedId: string }
+}
+
+export async function callSaveProgressPhotoMeta(
+  input: Record<string, unknown>,
+) {
+  const fn = httpsCallable(getFirebaseFunctions(), "saveProgressPhotoMeta")
+  const result = await fn(input)
+  return result.data as {
+    ok: boolean
+    photo: Record<string, unknown> & { id: string; subscriberId: string }
+  }
+}
+
+export async function callDeleteProgressPhoto(id: string) {
+  const fn = httpsCallable(getFirebaseFunctions(), "deleteProgressPhoto")
+  const result = await fn({ id })
+  return result.data as { ok: boolean; deletedId: string }
+}
+
 export async function callDispatchNotice(noticeId: string) {
   const fn = httpsCallable(getFirebaseFunctions(), "dispatchNotice")
   const result = await fn({ noticeId })
@@ -138,4 +224,61 @@ export async function callUnregisterFcmToken(input: { token: string }) {
   const fn = httpsCallable(getFirebaseFunctions(), "unregisterFcmToken")
   const result = await fn(input)
   return result.data as { ok: boolean }
+}
+
+export async function callAssignSubscription(input: Record<string, unknown>) {
+  const fn = httpsCallable(getFirebaseFunctions(), "assignSubscription")
+  const result = await fn(input)
+  return result.data as {
+    ok: boolean
+    subscription: Record<string, unknown> & { id: string; subscriberId: string }
+  }
+}
+
+export async function callUpdateSubscriptionLifecycle(
+  input: Record<string, unknown>,
+) {
+  const fn = httpsCallable(getFirebaseFunctions(), "updateSubscriptionLifecycle")
+  const result = await fn(input)
+  return result.data as {
+    ok: boolean
+    subscription: Record<string, unknown> & { id: string; subscriberId: string }
+  }
+}
+
+export async function callRequestSubscriptionChange(
+  input: Record<string, unknown>,
+) {
+  const fn = httpsCallable(getFirebaseFunctions(), "requestSubscriptionChange")
+  const result = await fn(input)
+  return result.data as {
+    ok: boolean
+    request: Record<string, unknown> & { id: string; subscriberId: string }
+  }
+}
+
+export async function callUpdateMySubscriberProfile(
+  input: Record<string, unknown>,
+) {
+  const fn = httpsCallable(getFirebaseFunctions(), "updateMySubscriberProfile")
+  const result = await fn(input)
+  return result.data as {
+    ok: boolean
+    subscriber: Record<string, unknown> & { id: string }
+  }
+}
+
+export async function callResolveSubscriptionChangeRequest(
+  input: Record<string, unknown>,
+) {
+  const fn = httpsCallable(
+    getFirebaseFunctions(),
+    "resolveSubscriptionChangeRequest",
+  )
+  const result = await fn(input)
+  return result.data as {
+    ok: boolean
+    request: Record<string, unknown> & { id: string }
+    subscription?: Record<string, unknown> & { id: string }
+  }
 }

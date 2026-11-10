@@ -83,6 +83,14 @@ export function useNutritionLogsQuery(
   })
 }
 
+function invalidateSubscriberContentLibrary(
+  queryClient: ReturnType<typeof useQueryClient>,
+) {
+  void queryClient.invalidateQueries({
+    queryKey: ["content_assets", "subscriber_library"],
+  })
+}
+
 export function useSaveNutritionProgramMutation() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -90,6 +98,7 @@ export function useSaveNutritionProgramMutation() {
       saveNutritionProgram(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: nutritionKeys.all })
+      invalidateSubscriberContentLibrary(queryClient)
     },
   })
 }
@@ -100,6 +109,7 @@ export function useAssignNutritionMutation() {
     mutationFn: (input: AssignNutritionInput) => assignNutritionProgram(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: nutritionKeys.all })
+      invalidateSubscriberContentLibrary(queryClient)
     },
   })
 }
@@ -141,6 +151,8 @@ export function useLogNutritionAdherenceMutation() {
       logNutritionAdherence(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: nutritionKeys.all })
+      void queryClient.invalidateQueries({ queryKey: ["subscribers"] })
+      void queryClient.invalidateQueries({ queryKey: ["overview"] })
     },
   })
 }

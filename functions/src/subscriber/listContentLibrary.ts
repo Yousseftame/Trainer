@@ -162,6 +162,69 @@ export const listSubscriberContentLibrary = onCall(async (request) => {
     }
   }
 
+  // Unlock instructional media linked from assigned programs + PT rehab drills.
+  const workoutProgramsSnap = await db
+    .collection(COLLECTIONS.workoutPrograms)
+    .where("subscriberId", "==", uid)
+    .get();
+  const nutritionProgramsSnap = await db
+    .collection(COLLECTIONS.nutritionPrograms)
+    .where("subscriberId", "==", uid)
+    .get();
+  const physicalTherapySnap = await db
+    .collection(COLLECTIONS.physicalTherapy)
+    .where("subscriberId", "==", uid)
+    .get();
+
+  const assignedProgramIds = new Set<string>();
+  const linkedAssetIds = new Set<string>();
+
+  for (const docSnap of workoutProgramsSnap.docs) {
+    assignedProgramIds.add(docSnap.id);
+    const raw = docSnap.data() as Record<string, unknown>;
+    if (typeof raw.pdfContentId === "string" && raw.pdfContentId) {
+      linkedAssetIds.add(raw.pdfContentId);
+    }
+    const days = Array.isArray(raw.days) ? raw.days : [];
+    for (const day of days) {
+      if (!day || typeof day !== "object") continue;
+      const exercises = Array.isArray((day as {exercises?: unknown}).exercises)
+        ? ((day as {exercises: unknown[]}).exercises)
+        : [];
+      for (const exercise of exercises) {
+        if (!exercise || typeof exercise !== "object") continue;
+        const videoId = (exercise as {videoContentId?: unknown}).videoContentId;
+        if (typeof videoId === "string" && videoId) linkedAssetIds.add(videoId);
+        const alts = Array.isArray((exercise as {alternatives?: unknown}).alternatives)
+          ? ((exercise as {alternatives: unknown[]}).alternatives)
+          : [];
+        for (const alt of alts) {
+          if (!alt || typeof alt !== "object") continue;
+          const altVideo = (alt as {videoContentId?: unknown}).videoContentId;
+          if (typeof altVideo === "string" && altVideo) linkedAssetIds.add(altVideo);
+        }
+      }
+    }
+  }
+
+  for (const docSnap of nutritionProgramsSnap.docs) {
+    assignedProgramIds.add(docSnap.id);
+    const raw = docSnap.data() as Record<string, unknown>;
+    if (typeof raw.pdfContentId === "string" && raw.pdfContentId) {
+      linkedAssetIds.add(raw.pdfContentId);
+    }
+  }
+
+  for (const docSnap of physicalTherapySnap.docs) {
+    const raw = docSnap.data() as Record<string, unknown>;
+    const rehab = Array.isArray(raw.rehabExercises) ? raw.rehabExercises : [];
+    for (const exercise of rehab) {
+      if (!exercise || typeof exercise !== "object") continue;
+      const videoId = (exercise as {videoContentId?: unknown}).videoContentId;
+      if (typeof videoId === "string" && videoId) linkedAssetIds.add(videoId);
+    }
+  }
+
   const assetsSnap = await db.collection(COLLECTIONS.contentAssets).get();
   const assets: Record<string, unknown>[] = [];
 
@@ -180,12 +243,16 @@ export const listSubscriberContentLibrary = onCall(async (request) => {
             : undefined,
         packageIds: asStringArray(raw.packageIds),
         subscriberIds: asStringArray(raw.subscriberIds),
+        programIds: asStringArray(raw.programIds),
       },
       subscriberId: uid,
       subscriberStatus,
       subscriptionStatus: effectiveStatus,
       packageId,
       entitlements,
+      linkedAssetIds,
+      assignedProgramIds,
+      assetId: docSnap.id,
     });
 
     if (access.allowed) {

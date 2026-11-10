@@ -10,13 +10,12 @@ import {
 } from "firebase/firestore"
 import { getDb } from "@/lib/firebase/firestore"
 import {
+  getSubscriptionsCache,
   setPackagesCache,
   setSubscriptionsCache,
 } from "@/features/subscriptions/cache"
 import type { CatalogPackage } from "@/features/subscriptions/types"
-import { callSetSubscriberAccountStatus } from "@/lib/firebase/callables"
 import {
-  computeEndsAtIso,
   normalizeEntitlements,
   resolveEffectiveSubscriptionStatus,
 } from "@/features/subscriptions/entitlements"
@@ -51,22 +50,6 @@ function syncSubscriptionsCache(
 ): SubscriberSubscription[] {
   clearLegacyLocalCaches()
   return setSubscriptionsCache(next)
-}
-
-async function ensureSubscriberAccountActive(subscriberId: string): Promise<void> {
-  try {
-    await callSetSubscriberAccountStatus({
-      subscriberId,
-      status: "active",
-      syncSubscription: false,
-      notes: "Activated with subscription assignment",
-    })
-  } catch (err) {
-    console.warn(
-      "[Subscriptions] Could not activate subscriber account via Functions:",
-      err,
-    )
-  }
 }
 
 // Clear stale local caches so admin packages/subscriptions stay Firestore-sourced
@@ -236,7 +219,7 @@ export async function fetchSubscriptionsForSubscriber(
         where("subscriberId", "==", subscriberId),
       ),
     )
-    return snap.docs
+    const list = snap.docs
       .map((d) =>
         normalizeSubscriptionDoc(d.id, d.data() as Record<string, unknown>),
       )
@@ -244,6 +227,13 @@ export async function fetchSubscriptionsForSubscriber(
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       )
+
+    // Merge into in-memory cache so topbar / legacy helpers see live data.
+    const others = getSubscriptionsCache().filter(
+      (item) => item.subscriberId !== subscriberId,
+    )
+    syncSubscriptionsCache([...list, ...others])
+    return list
   } catch (err) {
     console.warn("[Firestore] Failed to read subscriptions for subscriber:", err)
     throw err instanceof Error
@@ -418,90 +408,31 @@ export type AssignSubscriptionInput = {
 export async function assignSubscription(
   input: AssignSubscriptionInput,
 ): Promise<SubscriberSubscription> {
-  const now = new Date().toISOString()
-  const db = getDb()
-  const pkg = await fetchPackageById(input.packageId)
-  if (!pkg) {
-    throw new Error("Package not found")
-  }
-
-  const isActivating = input.status === "active"
-  const startsAtIso = isActivating
-    ? input.startsAt || now
-    : input.startsAt || null
-  const endsAtIso = isActivating
-    ? input.endsAt || computeEndsAtIso(startsAtIso ?? now, pkg.durationDays)
-    : input.endsAt || null
-
-  const cleanAr = input.notesLocalized?.ar?.trim() || input.notes?.trim() || ""
-  const cleanEn = input.notesLocalized?.en?.trim() || input.notes?.trim() || ""
-  const notesLocalized =
-    cleanAr || cleanEn
-      ? { ar: cleanAr || cleanEn, en: cleanEn || cleanAr }
-      : undefined
-
-  const newSub: SubscriberSubscription = {
-    id: doc(collection(db, SUBSCRIPTIONS_COLLECTION)).id,
+  const { callAssignSubscription } = await import("@/lib/firebase/callables")
+  const result = await callAssignSubscription({
     subscriberId: input.subscriberId,
     subscriberName: input.subscriberName,
     subscriberEmail: input.subscriberEmail,
-    packageId: pkg.id,
-    packageName: { ...pkg.name },
-    entitlementsSnapshot: normalizeEntitlements(pkg.entitlements),
+    packageId: input.packageId,
     status: input.status,
-    startsAt: startsAtIso,
-    endsAt: endsAtIso,
-    activatedBy: isActivating ? input.activatedBy || "Head Coach" : undefined,
-    notes: notesLocalized?.en ?? (input.notes?.trim() ? input.notes.trim() : undefined),
-    notesLocalized,
+    startsAt: input.startsAt,
+    endsAt: input.endsAt,
+    activatedBy: input.activatedBy,
+    notes: input.notes,
+    notesLocalized: input.notesLocalized,
     renewedFromId: input.renewedFromId,
-    createdAt: now,
-    updatedAt: now,
-  }
-
-  const current = await fetchSubscriptions()
-  // Expire any previous active/suspended/pending seat so history is preserved
-  const updatedPrevious: SubscriberSubscription[] = []
-  const nextList = current.map((item) => {
-    if (
-      isActivating &&
-      item.subscriberId === input.subscriberId &&
-      (item.status === "active" ||
-        item.status === "suspended" ||
-        item.status === "pending")
-    ) {
-      const closed: SubscriberSubscription = {
-        ...item,
-        status: "expired",
-        endsAt: item.endsAt ?? now,
-        updatedAt: now,
-      }
-      updatedPrevious.push(closed)
-      return closed
-    }
-    return item
   })
-
-  const batch = writeBatch(db)
-  for (const prev of updatedPrevious) {
-    batch.set(
-      doc(db, SUBSCRIPTIONS_COLLECTION, prev.id),
-      stripUndefined({ ...prev }),
-    )
-  }
-  batch.set(
-    doc(db, SUBSCRIPTIONS_COLLECTION, newSub.id),
-    stripUndefined({ ...newSub }),
+  const saved = normalizeSubscriptionDoc(
+    String(result.subscription.id),
+    result.subscription as Record<string, unknown>,
   )
-  await batch.commit()
-
-  syncSubscriptionsCache([newSub, ...nextList])
-
-  if (isActivating) {
-    await ensureSubscriberAccountActive(input.subscriberId)
-  }
-
-  return newSub
+  const current = await fetchSubscriptions()
+  const nextList = [
+    saved,
+    ...current.filter((item) => item.id !== saved.id),
+  ]
+  syncSubscriptionsCache(nextList)
+  return saved
 }
 
 export type UpdateSubscriptionLifecycleInput = {
@@ -519,136 +450,30 @@ export type UpdateSubscriptionLifecycleInput = {
 export async function updateSubscriptionLifecycle(
   input: UpdateSubscriptionLifecycleInput,
 ): Promise<SubscriberSubscription> {
-  const now = new Date().toISOString()
-  const current = await fetchSubscriptions()
-  const existing = current.find((item) => item.id === input.subscriptionId)
-  if (!existing) {
-    throw new Error("Subscription not found")
-  }
-
-  const targetPackageId = input.packageId ?? existing.packageId
-  const pkg = await fetchPackageById(targetPackageId)
-  if (!pkg) {
-    throw new Error("Package not found")
-  }
-
-  // "renew" creates a brand new active cycle and keeps the previous record in history as "expired"
-  if (input.action === "renew") {
-    const startsAtIso = input.startsAt || now
-    const endsAtIso =
-      input.endsAt || computeEndsAtIso(startsAtIso, pkg.durationDays)
-
-    return assignSubscription({
-      subscriberId: existing.subscriberId,
-      subscriberName: existing.subscriberName,
-      subscriberEmail: existing.subscriberEmail,
-      packageId: pkg.id,
-      status: "active",
-      startsAt: startsAtIso,
-      endsAt: endsAtIso,
-      activatedBy: input.activatedBy || "Head Coach",
-      notes: input.notes,
-      notesLocalized: input.notesLocalized,
-      renewedFromId: existing.id,
-    })
-  }
-
-  let nextStatus: SubscriptionStatus = existing.status
-  let nextStartsAt = existing.startsAt
-  let nextEndsAt = existing.endsAt
-  let nextActivatedBy = existing.activatedBy
-
-  if (input.action === "activate") {
-    nextStatus = "active"
-    nextStartsAt = input.startsAt || existing.startsAt || now
-    nextEndsAt =
-      input.endsAt || computeEndsAtIso(nextStartsAt, pkg.durationDays)
-    nextActivatedBy = input.activatedBy || existing.activatedBy || "Head Coach"
-  } else if (input.action === "suspend") {
-    nextStatus = "suspended"
-    if (input.startsAt !== undefined) nextStartsAt = input.startsAt
-    if (input.endsAt !== undefined) nextEndsAt = input.endsAt
-  } else if (input.action === "terminate") {
-    nextStatus = "cancelled"
-    nextEndsAt = input.endsAt || now
-  } else if (input.action === "edit") {
-    nextStatus = input.status ?? existing.status
-    if (input.startsAt !== undefined) nextStartsAt = input.startsAt
-    if (input.endsAt !== undefined) nextEndsAt = input.endsAt
-    if (nextStatus === "active" && !nextStartsAt) {
-      nextStartsAt = now
-    }
-    if (nextStatus === "active" && !nextEndsAt) {
-      nextEndsAt = computeEndsAtIso(nextStartsAt ?? now, pkg.durationDays)
-    }
-  }
-
-  const cleanAr =
-    input.notesLocalized?.ar?.trim() ??
-    (input.notes !== undefined ? input.notes.trim() : existing.notesLocalized?.ar ?? existing.notes ?? "")
-  const cleanEn =
-    input.notesLocalized?.en?.trim() ??
-    (input.notes !== undefined ? input.notes.trim() : existing.notesLocalized?.en ?? existing.notes ?? "")
-  const nextNotesLocalized =
-    cleanAr || cleanEn
-      ? { ar: cleanAr || cleanEn, en: cleanEn || cleanAr }
-      : undefined
-
-  const updated: SubscriberSubscription = {
-    ...existing,
-    packageId: pkg.id,
-    packageName: { ...pkg.name },
-    entitlementsSnapshot: normalizeEntitlements(pkg.entitlements),
-    status: nextStatus,
-    startsAt: nextStartsAt,
-    endsAt: nextEndsAt,
-    activatedBy: nextActivatedBy,
-    notes: nextNotesLocalized?.en,
-    notesLocalized: nextNotesLocalized,
-    updatedAt: now,
-  }
-
-  const closedOthers: SubscriberSubscription[] = []
-  const nextList = current.map((item) => {
-    if (item.id === updated.id) return updated
-    // Ensure only one active subscription per subscriber
-    if (
-      updated.status === "active" &&
-      item.subscriberId === updated.subscriberId &&
-      item.status === "active"
-    ) {
-      const closed: SubscriberSubscription = {
-        ...item,
-        status: "expired",
-        endsAt: item.endsAt ?? now,
-        updatedAt: now,
-      }
-      closedOthers.push(closed)
-      return closed
-    }
-    return item
-  })
-
-  const db = getDb()
-  const batch = writeBatch(db)
-  for (const other of closedOthers) {
-    batch.set(
-      doc(db, SUBSCRIPTIONS_COLLECTION, other.id),
-      stripUndefined({ ...other }),
-    )
-  }
-  batch.set(
-    doc(db, SUBSCRIPTIONS_COLLECTION, updated.id),
-    stripUndefined({ ...updated }),
+  const { callUpdateSubscriptionLifecycle } = await import(
+    "@/lib/firebase/callables"
   )
-  await batch.commit()
-
+  const result = await callUpdateSubscriptionLifecycle({
+    subscriptionId: input.subscriptionId,
+    action: input.action,
+    packageId: input.packageId,
+    status: input.status,
+    startsAt: input.startsAt,
+    endsAt: input.endsAt,
+    activatedBy: input.activatedBy,
+    notes: input.notes,
+    notesLocalized: input.notesLocalized,
+  })
+  const saved = normalizeSubscriptionDoc(
+    String(result.subscription.id),
+    result.subscription as Record<string, unknown>,
+  )
+  const current = await fetchSubscriptions()
+  const nextList = [
+    saved,
+    ...current.filter((item) => item.id !== saved.id),
+  ]
   syncSubscriptionsCache(nextList)
-
-  if (updated.status === "active") {
-    await ensureSubscriberAccountActive(updated.subscriberId)
-  }
-
-  return updated
+  return saved
 }
 

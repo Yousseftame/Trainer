@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import { createPortal } from "react-dom"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
@@ -20,7 +20,11 @@ import {
 } from "lucide-react"
 import { APP_ROUTES } from "@/config/constants"
 import { useAuth } from "@/features/auth/auth-context"
-import { currentSubscriptionFor, getPackageById } from "@/features/subscriptions/demo"
+import { pickCurrentSubscription } from "@/features/subscriptions/entitlements"
+import {
+  usePackageByIdQuery,
+  useSubscriberSubscriptionsQuery,
+} from "@/features/subscriptions/hooks"
 import { useLocale } from "@/hooks/useLocale"
 import { initials } from "@/lib/format"
 import { cn } from "@/lib/utils"
@@ -43,8 +47,12 @@ export function SubscriberMobileMenuDrawer({
   const navigate = useNavigate()
   const { user } = useAuth()
 
-  const sub = user?.uid ? currentSubscriptionFor(user.uid) : null
-  const pkg = getPackageById(sub?.packageId)
+  const { data: subscriptions = [] } = useSubscriberSubscriptionsQuery(user?.uid)
+  const sub = useMemo(
+    () => pickCurrentSubscription(subscriptions),
+    [subscriptions],
+  )
+  const { data: pkg } = usePackageByIdQuery(sub?.packageId)
 
   // Close only on genuine route change
   const lastPathRef = useRef(location.pathname)

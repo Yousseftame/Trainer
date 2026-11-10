@@ -54,7 +54,7 @@ export const deleteSubscriberAccount = onCall(async (request) => {
     const st = String(docSnap.data().status ?? "");
     if (st === "active" || st === "pending" || st === "suspended") {
       batch.update(docSnap.ref, {
-        status: "terminated",
+        status: "cancelled",
         updatedAt: now,
         notes: "Subscriber account deleted",
       });

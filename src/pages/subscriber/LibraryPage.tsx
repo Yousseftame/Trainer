@@ -9,7 +9,9 @@ import {
   FileText,
   Lock,
   Play,
+  RefreshCw,
   Search,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   UserCheck,
@@ -22,21 +24,18 @@ import { APP_ROUTES } from "@/config/constants"
 import { evaluateSubscriberContentAccess } from "@/features/content/access"
 import { useContentAssetsQuery } from "@/features/content/hooks"
 import { useNutritionProgramsQuery } from "@/features/nutrition/hooks"
+import { useSubscriberPTRecordsQuery } from "@/features/physicalTherapy/hooks"
 import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
 import {
-  currentSubscriptionFor,
-  getPackageById,
-} from "@/features/subscriptions/cache"
-import {
-  usePackagesQuery,
+  usePackageByIdQuery,
   useSubscriberSubscriptionsQuery,
 } from "@/features/subscriptions/hooks"
 import { useWorkoutProgramsQuery } from "@/features/workouts/hooks"
-import type { CatalogPackage } from "@/features/subscriptions/types"
 import type { ContentAsset } from "@/types/content"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatDuration } from "@/lib/format"
+import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 
 type LibraryFilter =
@@ -53,9 +52,16 @@ export function LibraryPage() {
   useDocumentTitle(isAr ? "مكتبة المحتوى والملفات" : "Resource Library")
 
   const { subscriber: currentSubscriber, subscriberId } = usePanelSubscriber()
-  const { data: assets = [] } = useContentAssetsQuery({ audience: "subscriber" })
+  const {
+    data: assets = [],
+    isLoading: assetsLoading,
+    isError: assetsError,
+    refetch: refetchAssets,
+  } = useContentAssetsQuery({
+    audience: "subscriber",
+    enabled: Boolean(subscriberId),
+  })
   const { data: mySubs = [] } = useSubscriberSubscriptionsQuery(subscriberId)
-  usePackagesQuery()
   const { data: workoutPrograms = [] } = useWorkoutProgramsQuery({
     subscriberId,
     enabled: Boolean(subscriberId),
@@ -64,6 +70,7 @@ export function LibraryPage() {
     subscriberId,
     enabled: Boolean(subscriberId),
   })
+  const { data: ptRecords = [] } = useSubscriberPTRecordsQuery(subscriberId)
 
   const [filter, setFilter] = useState<LibraryFilter>("all")
   const [query, setQuery] = useState("")
@@ -75,30 +82,60 @@ export function LibraryPage() {
     return (
       mySubs.find((s) => s.status === "active" || s.status === "suspended") ??
       mySubs[0] ??
-      currentSubscriptionFor(subscriberId)
+      null
     )
   }, [subscriberId, mySubs])
 
-  const currentPackage = useMemo(() => {
-    if (!subscription) return null
-    return getPackageById(subscription.packageId) as CatalogPackage | undefined
-  }, [subscription])
+  const { data: currentPackage = null } = usePackageByIdQuery(
+    subscription?.packageId,
+  )
 
-  // 3. Identify active workout and nutrition programs
-  const activeWorkoutProgram = useMemo(() => {
-    return workoutPrograms.find((p) => p.status === "active")
-  }, [workoutPrograms])
+  const activeWorkoutProgram = useMemo(
+    () => workoutPrograms.find((p) => p.status === "active") ?? null,
+    [workoutPrograms],
+  )
+  const activeNutritionProgram = useMemo(
+    () => nutritionPrograms.find((p) => p.status === "active") ?? null,
+    [nutritionPrograms],
+  )
 
-  const activeNutritionProgram = useMemo(() => {
-    return nutritionPrograms.find((p) => p.status === "active")
-  }, [nutritionPrograms])
+  /** Assets linked from assigned programs + PT rehab drills. */
+  const programLinkedAssetIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const program of workoutPrograms) {
+      if (program.pdfContentId) ids.add(program.pdfContentId)
+      for (const day of program.days ?? []) {
+        for (const ex of day.exercises ?? []) {
+          if (ex.videoContentId) ids.add(ex.videoContentId)
+          for (const alt of ex.alternatives ?? []) {
+            if (alt.videoContentId) ids.add(alt.videoContentId)
+          }
+        }
+      }
+    }
+    for (const program of nutritionPrograms) {
+      if (program.pdfContentId) ids.add(program.pdfContentId)
+    }
+    for (const record of ptRecords) {
+      for (const reh of record.rehabExercises ?? []) {
+        if (reh.videoContentId) ids.add(reh.videoContentId)
+      }
+    }
+    return ids
+  }, [workoutPrograms, nutritionPrograms, ptRecords])
 
-  // 4. Enrich all non-reference assets with permissions and program linkages
+  const myProgramIdSet = useMemo(() => {
+    return new Set([
+      ...workoutPrograms.map((p) => p.id),
+      ...nutritionPrograms.map((p) => p.id),
+    ])
+  }, [workoutPrograms, nutritionPrograms])
+
   const enrichedAssets = useMemo(() => {
-    // Staff reference internal files must never appear in subscriber library
     const publicAssets = assets.filter((item) => item.category !== "reference")
 
     return publicAssets.map((asset) => {
+      // Server callable is source of truth for delivery entitlement.
       const access = evaluateSubscriberContentAccess({
         asset,
         subscriber: currentSubscriber,
@@ -106,41 +143,81 @@ export function LibraryPage() {
         pkg: currentPackage,
       })
 
-      // Check linkage with active workout program
       const isLinkedToWorkout = Boolean(
-        activeWorkoutProgram &&
+        (activeWorkoutProgram &&
           (asset.programIds?.includes(activeWorkoutProgram.id) ||
+            activeWorkoutProgram.pdfContentId === asset.id ||
             activeWorkoutProgram.days?.some((d) =>
-              d.exercises?.some((ex) => ex.videoContentId === asset.id),
-            ) ||
-            (asset.fileName &&
-              activeWorkoutProgram.pdfName?.en === asset.fileName)),
+              d.exercises?.some(
+                (ex) =>
+                  ex.videoContentId === asset.id ||
+                  ex.alternatives?.some((alt) => alt.videoContentId === asset.id),
+              ),
+            ))) ||
+          (asset.programIds?.some((id) =>
+            workoutPrograms.some((p) => p.id === id),
+          ) &&
+            asset.category === "exerciseVideo"),
       )
 
-      // Check linkage with active nutrition plan
       const isLinkedToNutrition = Boolean(
-        activeNutritionProgram &&
+        (activeNutritionProgram &&
           (asset.programIds?.includes(activeNutritionProgram.id) ||
-            (asset.fileName &&
-              activeNutritionProgram.pdfName?.en === asset.fileName)),
+            activeNutritionProgram.pdfContentId === asset.id)) ||
+          asset.programIds?.some((id) =>
+            nutritionPrograms.some((p) => p.id === id),
+          ),
       )
 
-      // Check direct assignment by coach
       const isDirectlyAssigned = Boolean(
         currentSubscriber &&
           asset.subscriberIds?.includes(currentSubscriber.id),
       )
 
       const isPartOfMyPrograms =
-        isLinkedToWorkout || isLinkedToNutrition || isDirectlyAssigned
+        isDirectlyAssigned ||
+        programLinkedAssetIds.has(asset.id) ||
+        (asset.programIds?.some((id) => myProgramIdSet.has(id)) ?? false)
+
+      const matchesWorkout = (p: (typeof workoutPrograms)[number]) =>
+        p.pdfContentId === asset.id ||
+        Boolean(asset.programIds?.includes(p.id)) ||
+        Boolean(
+          p.days?.some((d) =>
+            d.exercises?.some(
+              (ex) =>
+                ex.videoContentId === asset.id ||
+                ex.alternatives?.some((alt) => alt.videoContentId === asset.id),
+            ),
+          ),
+        )
+
+      const linkedWorkout =
+        workoutPrograms.find((p) => p.status === "active" && matchesWorkout(p)) ??
+        workoutPrograms.find(matchesWorkout) ??
+        null
+
+      const matchesNutrition = (p: (typeof nutritionPrograms)[number]) =>
+        p.pdfContentId === asset.id ||
+        Boolean(asset.programIds?.includes(p.id))
+
+      const linkedNutrition =
+        nutritionPrograms.find(
+          (p) => p.status === "active" && matchesNutrition(p),
+        ) ??
+        nutritionPrograms.find(matchesNutrition) ??
+        null
 
       return {
         asset,
         access,
-        isLinkedToWorkout,
-        isLinkedToNutrition,
+        isLinkedToWorkout: Boolean(isLinkedToWorkout || linkedWorkout),
+        isLinkedToNutrition: Boolean(isLinkedToNutrition || linkedNutrition),
         isDirectlyAssigned,
         isPartOfMyPrograms,
+        linkedWorkoutTitle: linkedWorkout?.title ?? activeWorkoutProgram?.title,
+        linkedNutritionTitle:
+          linkedNutrition?.title ?? activeNutritionProgram?.title,
       }
     })
   }, [
@@ -150,7 +227,33 @@ export function LibraryPage() {
     currentPackage,
     activeWorkoutProgram,
     activeNutritionProgram,
+    workoutPrograms,
+    nutritionPrograms,
+    programLinkedAssetIds,
+    myProgramIdSet,
   ])
+
+  function openAsset(asset: ContentAsset, allowed: boolean) {
+    // Server callable is authoritative — never open locked / URL-redacted assets.
+    if (!allowed || asset.accessAllowed === false) {
+      appToast.error(
+        isAr
+          ? "هذا المحتوى غير متاح في باقتك الحالية."
+          : "This content is locked for your current package.",
+      )
+      return
+    }
+    const deliveryUrl = asset.streamUrl || asset.fileUrl
+    if (!deliveryUrl) {
+      appToast.error(
+        isAr
+          ? "رابط الملف غير متاح حالياً. تواصل مع المدرب."
+          : "Delivery URL is unavailable. Please contact your coach.",
+      )
+      return
+    }
+    setPreviewAsset(asset)
+  }
 
   // 5. Compute counts for metric cards and filter chips
   const counts = useMemo(() => {
@@ -218,6 +321,43 @@ export function LibraryPage() {
       return titleMatch || descMatch || tagMatch || exMatch || fileMatch
     })
   }, [enrichedAssets, filter, query, unlockedOnly])
+
+  if (!subscriberId || assetsLoading) {
+    return (
+      <div className="flex min-h-64 flex-col items-center justify-center rounded-[28px] bg-white p-8 text-center shadow-xs border border-black/6">
+        <Clapperboard className="size-10 mb-3 animate-pulse text-[var(--gym-orange,#fb5001)] stroke-1" />
+        <p className="text-[13px] font-medium text-[#8c8c8c]">
+          {isAr
+            ? "جاري تحميل مكتبة المحتوى المصرّح بها..."
+            : "Loading your authorized media library..."}
+        </p>
+      </div>
+    )
+  }
+
+  if (assetsError) {
+    return (
+      <div className="flex min-h-64 flex-col items-center justify-center gap-3 rounded-[28px] bg-white p-8 text-center shadow-xs border border-black/6">
+        <ShieldAlert className="size-10 text-rose-500 stroke-1" />
+        <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#111111)]">
+          {isAr ? "تعذر تحميل المكتبة" : "Could not load library"}
+        </h2>
+        <p className="max-w-md text-[13px] text-[#8c8c8c]">
+          {isAr
+            ? "صلاحية الوصول للمحتوى تُتحقق من الخادم. أعد المحاولة أو تواصل مع المدرب."
+            : "Content access is verified on the server. Retry or contact your coach."}
+        </p>
+        <button
+          type="button"
+          onClick={() => void refetchAssets()}
+          className="inline-flex items-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-4 py-2 text-[12px] font-bold text-white"
+        >
+          <RefreshCw className="size-3.5" />
+          {isAr ? "إعادة المحاولة" : "Retry"}
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-5 pb-12">
@@ -560,30 +700,52 @@ export function LibraryPage() {
       {/* 3. Resource Cards Grid                                   */}
       {/* ======================================================== */}
       {visibleItems.length === 0 ? (
-        /* Empty State */
         <div className="flex min-h-64 flex-col items-center justify-center rounded-[26px] bg-white p-8 text-center shadow-xs border border-black/6">
           <div className="flex size-14 items-center justify-center rounded-2xl bg-black/5 text-[#8c8c8c] mb-3">
-            <Search className="size-6 text-[var(--gym-lime,#fb5001)]" />
+            {counts.total === 0 ? (
+              <Clapperboard className="size-6 text-[var(--gym-lime,#fb5001)]" />
+            ) : (
+              <Search className="size-6 text-[var(--gym-lime,#fb5001)]" />
+            )}
           </div>
           <h3 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#111111)]">
-            {isAr ? "لا توجد ملفات تطابق معايير البحث" : "No resources found"}
+            {counts.total === 0
+              ? isAr
+                ? "لا يوجد محتوى مرتبط بحسابك بعد"
+                : "No content linked to your account yet"
+              : isAr
+                ? "لا توجد ملفات تطابق معايير البحث"
+                : "No resources found"}
           </h3>
           <p className="mt-1 max-w-sm text-[13px] text-[#8c8c8c]">
-            {isAr
-              ? "جرّب تغيير كلمات البحث أو إعادة ضبط التصفية لعرض جميع المواد التدريبية المتاحة."
-              : "Try adjusting your search query or reset filters to view all available resources."}
+            {counts.total === 0
+              ? isAr
+                ? "سيظهر هنا الفيديو وملفات PDF التي يربطها المدرب بباقتك أو برامجك المعيّنة."
+                : "Videos and PDFs your coach links to your package or assigned programs will appear here."
+              : isAr
+                ? "جرّب تغيير كلمات البحث أو إعادة ضبط التصفية."
+                : "Try adjusting your search or reset filters."}
           </p>
-          <button
-            type="button"
-            onClick={() => {
-              setFilter("all")
-              setQuery("")
-              setUnlockedOnly(false)
-            }}
-            className="mt-4 inline-flex h-10 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[12.5px] font-bold text-white transition hover:bg-[var(--gym-lime,#fb5001)]"
-          >
-            {isAr ? "إعادة ضبط التصفية" : "Reset Filters"}
-          </button>
+          {counts.total > 0 ? (
+            <button
+              type="button"
+              onClick={() => {
+                setFilter("all")
+                setQuery("")
+                setUnlockedOnly(false)
+              }}
+              className="mt-4 inline-flex h-10 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[12.5px] font-bold text-white transition hover:bg-[var(--gym-lime,#fb5001)]"
+            >
+              {isAr ? "إعادة ضبط التصفية" : "Reset Filters"}
+            </button>
+          ) : (
+            <Link
+              to={APP_ROUTES.subscriber.subscription}
+              className="mt-4 inline-flex h-10 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[12.5px] font-bold text-white transition hover:bg-[var(--gym-lime,#fb5001)]"
+            >
+              {isAr ? "عرض الاشتراك" : "View subscription"}
+            </Link>
+          )}
         </div>
       ) : (
         <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -594,6 +756,8 @@ export function LibraryPage() {
               isLinkedToWorkout,
               isLinkedToNutrition,
               isDirectlyAssigned,
+              linkedWorkoutTitle,
+              linkedNutritionTitle,
             }) => (
               <div
                 key={asset.id}
@@ -634,21 +798,21 @@ export function LibraryPage() {
                     />
                   </div>
 
-                  {/* Program Linkage Indicators */}
-                  {isLinkedToWorkout && activeWorkoutProgram ? (
+                  {/* Program Linkage Indicators (active or archived assigned programs) */}
+                  {isLinkedToWorkout && linkedWorkoutTitle ? (
                     <div className="mt-3 flex items-center gap-1.5 rounded-xl bg-black/5 px-2.5 py-1 text-[11px] font-bold text-[var(--gym-ink,#111111)]">
                       <Dumbbell className="size-3 text-[var(--gym-lime,#fb5001)] shrink-0" />
                       <span className="truncate">
                         {isAr ? "برنامجك: " : "Workout: "}
-                        {activeWorkoutProgram.title[locale]}
+                        {linkedWorkoutTitle[locale]}
                       </span>
                     </div>
-                  ) : isLinkedToNutrition && activeNutritionProgram ? (
+                  ) : isLinkedToNutrition && linkedNutritionTitle ? (
                     <div className="mt-3 flex items-center gap-1.5 rounded-xl bg-black/5 px-2.5 py-1 text-[11px] font-bold text-[var(--gym-ink,#111111)]">
                       <Apple className="size-3 text-[var(--gym-lime,#fb5001)] shrink-0" />
                       <span className="truncate">
                         {isAr ? "خطتك: " : "Nutrition: "}
-                        {activeNutritionProgram.title[locale]}
+                        {linkedNutritionTitle[locale]}
                       </span>
                     </div>
                   ) : isDirectlyAssigned ? (
@@ -686,8 +850,8 @@ export function LibraryPage() {
                   <div className="flex items-center justify-between text-[11.5px] font-bold text-[#8c8c8c]">
                     <span>
                       {asset.kind === "video"
-                        ? `${formatDuration(asset.durationSeconds)} · 1080p HD`
-                        : `${asset.pageCount ? `${asset.pageCount} ${isAr ? "صفحات" : "pages"} · ` : ""}${asset.sizeLabel}`}
+                        ? formatDuration(asset.durationSeconds)
+                        : `${asset.pageCount ? `${asset.pageCount} ${isAr ? "صفحات" : "pages"} · ` : ""}${asset.sizeLabel || (isAr ? "مستند" : "Document")}`}
                     </span>
                     <span className="capitalize text-[10.5px] rounded-md bg-black/5 px-2 py-0.5">
                       {asset.category === "exerciseVideo"
@@ -699,7 +863,7 @@ export function LibraryPage() {
                   {access.allowed ? (
                     <button
                       type="button"
-                      onClick={() => setPreviewAsset(asset)}
+                      onClick={() => openAsset(asset, true)}
                       className={cn(
                         "inline-flex h-10 w-full items-center justify-center gap-2 rounded-full px-4 text-[13px] font-extrabold shadow-xs transition-all duration-200 active:scale-98",
                         asset.kind === "video"

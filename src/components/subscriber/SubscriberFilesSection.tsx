@@ -1,23 +1,47 @@
+import { useMemo } from "react"
 import { Link } from "react-router-dom"
-import { ArrowLeft, ArrowRight, BookMarked } from "lucide-react"
+import {
+  ArrowLeft,
+  ArrowRight,
+  BookMarked,
+  Clapperboard,
+  FileText,
+} from "lucide-react"
 import authImage from "@/assets/auth.avif"
 import heroPattern from "@/assets/hero-pattern.avif"
 import { BRAND_LOGO_ON_DARK } from "@/components/shared/BrandLogo"
 import { APP_ROUTES } from "@/config/constants"
+import { useContentAssetsQuery } from "@/features/content/hooks"
+import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
 import { useLocale } from "@/hooks/useLocale"
 import { cn } from "@/lib/utils"
 
 export function SubscriberFilesSection() {
   const { locale, isRtl } = useLocale()
   const isAr = locale === "ar"
+  const { subscriberId } = usePanelSubscriber()
+  const { data: assets = [], isLoading } = useContentAssetsQuery({
+    audience: "subscriber",
+    enabled: Boolean(subscriberId),
+  })
+
+  const stats = useMemo(() => {
+    const catalog = assets.filter((a) => a.category !== "reference")
+    const unlocked = catalog.filter((a) => a.accessAllowed !== false)
+    const videos = unlocked.filter((a) => a.kind === "video" || a.category === "exerciseVideo")
+    const docs = unlocked.filter((a) => a.kind !== "video" && a.category !== "exerciseVideo")
+    return {
+      unlocked: unlocked.length,
+      total: catalog.length,
+      videos: videos.length,
+      docs: docs.length,
+    }
+  }, [assets])
 
   const ArrowIcon = isRtl ? ArrowLeft : ArrowRight
 
   return (
     <section dir={isRtl ? "rtl" : "ltr"} className="space-y-3.5 select-none">
-      {/* ======================================================== */}
-      {/* Section Header: Title & Subtitle                         */}
-      {/* ======================================================== */}
       <div className="px-1">
         <h2
           className={cn(
@@ -33,28 +57,25 @@ export function SubscriberFilesSection() {
             isAr ? "font-arabic" : "font-sans",
           )}
         >
-          {isAr
-            ? "اصبح افضل نسخة من نفسك"
-            : "Become the best version of yourself"}
+          {isLoading
+            ? isAr
+              ? "جاري مزامنة الملفات المصرّح بها..."
+              : "Syncing your authorized files..."
+            : isAr
+              ? `${stats.unlocked} ملف متاح من ${stats.total} · ${stats.videos} فيديو · ${stats.docs} مستند`
+              : `${stats.unlocked} unlocked of ${stats.total} · ${stats.videos} videos · ${stats.docs} docs`}
         </p>
       </div>
 
-      {/* ======================================================== */}
-      {/* Fitness-Themed Window Card (Website Dark & Athletic Style)*/}
-      {/* Entire card is clickable and links to /app/library       */}
-      {/* ======================================================== */}
       <Link
         to={APP_ROUTES.subscriber.library}
         aria-label={isAr ? "فتح مكتبة الملفات" : "Open resource library"}
         className="group relative block w-full overflow-hidden rounded-[22px] sm:rounded-[26px] bg-gradient-to-r from-[#1a040b] via-[#24030c] to-[#120206] shadow-[0_12px_36px_rgba(26,4,11,0.22)] border border-white/10 hover:border-white/20 hover:shadow-[0_16px_44px_rgba(26,4,11,0.32)] transition-all duration-300"
       >
-        {/* Fitness Athlete Image at Trailing End with Smooth Alpha Mask Fade */}
         <div
           className={cn(
             "pointer-events-none absolute inset-y-0 end-0 z-[1] h-full select-none overflow-hidden",
-            isRtl
-              ? "w-[65%] sm:w-[55%] lg:w-[48%]"
-              : "w-[65%] sm:w-[55%] lg:w-[48%]",
+            "w-[65%] sm:w-[55%] lg:w-[48%]",
           )}
           style={{
             maskImage: isRtl
@@ -73,7 +94,6 @@ export function SubscriberFilesSection() {
           />
         </div>
 
-        {/* Soft Fade Gradient — Solid Behind Text, Seamlessly Blends Over Athlete */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 z-[2]"
@@ -84,7 +104,6 @@ export function SubscriberFilesSection() {
           }}
         />
 
-        {/* Hero Pattern Overlay (Signature Website Dark Texture) */}
         <img
           src={heroPattern}
           alt=""
@@ -93,23 +112,18 @@ export function SubscriberFilesSection() {
           className="pointer-events-none absolute inset-0 z-[3] size-full object-cover opacity-20 mix-blend-screen select-none rtl:-scale-x-100"
         />
 
-        {/* Ambient Backlight Glow behind Brand Badge */}
         <div
           aria-hidden
           className="pointer-events-none absolute -start-10 -top-10 size-36 rounded-full bg-[var(--gym-lime,#fb5001)]/20 blur-2xl"
         />
 
-        {/* Top Specular Rim Line */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 z-[4] h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent"
         />
 
-        {/* Card Foreground Content */}
         <div className="relative z-10 flex min-h-[190px] sm:min-h-[210px] flex-col justify-between p-5 sm:p-7 lg:p-8 max-w-full sm:max-w-[70%] lg:max-w-[62%]">
-          {/* Top Row: Brand & Playbook Badge */}
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            {/* DerpyFit Logo Pill */}
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
             <div className="flex items-center rounded-full bg-black/60 px-3 py-1 backdrop-blur-md border border-white/15 shadow-sm">
               <img
                 src={BRAND_LOGO_ON_DARK}
@@ -118,7 +132,6 @@ export function SubscriberFilesSection() {
               />
             </div>
 
-            {/* Fitness Guide Badge */}
             <span
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full bg-[var(--gym-lime,#fb5001)]/15 px-3 py-1 text-[11px] sm:text-[11.5px] font-bold text-[var(--gym-lime,#fb5001)] border border-[var(--gym-lime,#fb5001)]/30 backdrop-blur-sm",
@@ -126,11 +139,25 @@ export function SubscriberFilesSection() {
               )}
             >
               <BookMarked className="size-3.5" strokeWidth={2.2} />
-              <span>{isAr ? "أدلة وكتيبات المشترك" : "Subscriber Playbooks"}</span>
+              <span>
+                {isAr ? "أدلة وكتيبات المشترك" : "Subscriber Playbooks"}
+              </span>
             </span>
+
+            {!isLoading ? (
+              <>
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[10.5px] font-bold text-white/85 border border-white/10">
+                  <Clapperboard className="size-3" />
+                  {stats.videos}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[10.5px] font-bold text-white/85 border border-white/10">
+                  <FileText className="size-3" />
+                  {stats.docs}
+                </span>
+              </>
+            ) : null}
           </div>
 
-          {/* Middle: Title & Description */}
           <div className="my-2 sm:my-3">
             <h3
               className={cn(
@@ -149,13 +176,16 @@ export function SubscriberFilesSection() {
                 isAr ? "font-arabic" : "font-sans",
               )}
             >
-              {isAr
-                ? "شروحات التكنيك، أنظمة التغذية الشاملة، وخطط التدريب في ملفات تفاعلية لتسريع نتائجك الرياضية."
-                : "Technique guides, comprehensive nutrition systems, and structured training PDFs in one place."}
+              {stats.unlocked > 0
+                ? isAr
+                  ? "فيديوهات التكنيك وملفات PDF المرتبطة بباقتك وبرامجك المعيّنة — محمية بصلاحيات الاشتراك."
+                  : "Technique videos and PDFs linked to your package and assigned programs — entitlement protected."
+                : isAr
+                  ? "سيظهر هنا المحتوى الذي يربطه المدرب بباقتك أو برامجك. لا يمكن فتح الملفات الخاصة عبر الروابط فقط."
+                  : "Content your coach links to your package or programs appears here. Private files stay locked without entitlement."}
             </p>
           </div>
 
-          {/* Bottom: Website Theme Signature Button */}
           <div className="pt-1">
             <span
               className={cn(
@@ -163,8 +193,13 @@ export function SubscriberFilesSection() {
                 isAr ? "font-arabic" : "font-heading",
               )}
             >
-              <span>{isAr ? "تصفح المكتبة والملفات" : "Browse All Playbooks"}</span>
-              <ArrowIcon className="size-4 rtl:rotate-180 transition-transform group-hover/btn:translate-x-1 rtl:group-hover/btn:-translate-x-1" strokeWidth={2.5} />
+              <span>
+                {isAr ? "تصفح المكتبة والملفات" : "Browse All Playbooks"}
+              </span>
+              <ArrowIcon
+                className="size-4 rtl:rotate-180 transition-transform group-hover/btn:translate-x-1 rtl:group-hover/btn:-translate-x-1"
+                strokeWidth={2.5}
+              />
             </span>
           </div>
         </div>

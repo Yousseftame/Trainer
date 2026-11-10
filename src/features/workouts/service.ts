@@ -587,6 +587,14 @@ export async function restoreWorkoutProgram(
 }
 
 export async function deleteWorkoutProgram(id: string): Promise<void> {
+  const existing = await fetchWorkoutProgramById(id)
+  if (!existing) return
+  // Assigned / historical versions must stay for History — archive instead of purge.
+  if (existing.subscriberId) {
+    throw new Error(
+      "Assigned workout programs cannot be permanently deleted. Archive them to preserve subscriber history.",
+    )
+  }
   const db = getDb()
   await deleteDoc(doc(db, WORKOUT_PROGRAMS_COLLECTION, id))
 }
@@ -616,46 +624,32 @@ export async function listWorkoutLogs(
   }
 }
 
+/**
+ * Subscriber session logging — secured Cloud Function.
+ * Forces auth uid ownership, validates assigned program/day, bumps completion.
+ * Client cannot forge logs or mutate program docs via DevTools.
+ */
 export async function logWorkoutSession(
   input: Omit<WorkoutSessionLog, "id" | "completedAt">,
 ): Promise<WorkoutSessionLog> {
-  const now = new Date().toISOString()
-  const db = getDb()
-  const id = doc(collection(db, WORKOUT_LOGS_COLLECTION)).id
+  const { callLogWorkoutSession } = await import("@/lib/firebase/callables")
+  const result = await callLogWorkoutSession({
+    programId: input.programId,
+    dayId: input.dayId,
+    weekday: input.weekday,
+    date: input.date,
+    workoutTitle: input.workoutTitle,
+    durationMinutes: input.durationMinutes,
+    activeMinutes: input.activeMinutes,
+    restMinutes: input.restMinutes,
+    totalVolumeKg: input.totalVolumeKg,
+    perceivedEffort: input.perceivedEffort,
+    energyLevel: input.energyLevel,
+    exercisesCompleted: input.exercisesCompleted,
+    notes: input.notes,
+    // subscriberId intentionally omitted — server binds to auth.uid
+  })
 
-  const newLog: WorkoutSessionLog = {
-    ...input,
-    id,
-    completedAt: now,
-  }
-
-  await setDoc(
-    doc(db, WORKOUT_LOGS_COLLECTION, id),
-    stripUndefined({ ...newLog }),
-  )
-
-  // Update assigned program completion counters (history-safe)
-  if (input.programId) {
-    const program = await fetchWorkoutProgramById(input.programId)
-    if (program?.completion) {
-      const updated: WorkoutProgram = {
-        ...program,
-        completion: {
-          ...program.completion,
-          done: Math.min(
-            program.completion.total,
-            program.completion.done + 1,
-          ),
-        },
-        updatedAt: now,
-      }
-      await setDoc(
-        doc(db, WORKOUT_PROGRAMS_COLLECTION, program.id),
-        stripUndefined({ ...updated }),
-        { merge: true },
-      )
-    }
-  }
-
-  return newLog
+  const raw = result.log
+  return normalizeWorkoutLog(raw.id, raw as Record<string, unknown>)
 }

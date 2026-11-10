@@ -11,7 +11,6 @@ import {
   updateProfile,
 } from "firebase/auth"
 import { AuthContext, type AuthContextValue } from "@/features/auth/auth-context"
-import { getStoredPasswords, saveStoredPassword } from "@/features/auth/credentials"
 import {
   mapFirebaseUser,
   mapFirebaseUserWithClaims,
@@ -22,13 +21,13 @@ import {
   verifyLiveFirebaseSession,
 } from "@/features/auth/session"
 import { hasActiveEntitlement, type AuthState } from "@/features/auth/types"
+import { updateMySubscriberProfile } from "@/features/subscribers/service"
+import { useSubscriberSubscriptionsQuery } from "@/features/subscriptions/hooks"
 import {
-  fetchSubscriberByEmail,
-  fetchSubscriberById,
-  saveSubscriber,
-} from "@/features/subscribers/service"
-import { currentSubscriptionFor } from "@/features/subscriptions/demo"
-import { resolveEffectiveSubscriptionStatus } from "@/features/subscriptions/entitlements"
+  pickCurrentSubscription,
+  resolveEffectiveSubscriptionStatus,
+} from "@/features/subscriptions/entitlements"
+import type { SubscriberSubscription } from "@/types/subscription"
 import { callBootstrapStaffClaims } from "@/lib/firebase/callables"
 import { getFirebaseAuth } from "@/lib/firebase/auth"
 import { can } from "@/lib/permissions/can"
@@ -116,15 +115,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       await updateProfile(current, { displayName: patch.displayName })
     }
 
-    const matchedSub =
-      (await fetchSubscriberById(current.uid)) ??
-      (current.email ? await fetchSubscriberByEmail(current.email) : null)
-
-    if (matchedSub) {
-      await saveSubscriber({
-        ...matchedSub,
-        displayName: patch.displayName?.trim() || matchedSub.displayName,
-        phone: patch.phone?.trim() || matchedSub.phone,
+    // Subscribers persist soft-profile fields via secured callable only.
+    // Staff account settings stay Auth-side (staff docs are CF-managed).
+    if (isSubscriberRole(state.user?.role)) {
+      await updateMySubscriberProfile({
+        displayName: patch.displayName?.trim(),
+        phone: patch.phone,
       })
     }
 
@@ -140,37 +136,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
         },
       }
     })
-  }, [])
+  }, [state.user?.role])
 
   const changePassword = useCallback(async (currentPassword: string, nextPassword: string) => {
     const current = getFirebaseAuth().currentUser
-    const email = current?.email || state.user?.email
-    if (current && current.email) {
-      const credential = EmailAuthProvider.credential(current.email, currentPassword)
-      await reauthenticateWithCredential(current, credential)
-      await updatePassword(current, nextPassword)
-    } else if (email) {
-      const stored = getStoredPasswords()
-      const expected = stored[email.toLowerCase()] || "Member@123456"
-      if (
-        currentPassword !== expected &&
-        currentPassword !== "Member@123456" &&
-        currentPassword !== "Trainer@123456"
-      ) {
-        throw new Error("Invalid current password")
-      }
-      saveStoredPassword(email, nextPassword)
+    if (!current?.email) {
+      throw new Error("auth/unauthenticated")
     }
-  }, [state.user])
+    if (!currentPassword || nextPassword.trim().length < 6) {
+      throw new Error("auth/weak-password")
+    }
+    const credential = EmailAuthProvider.credential(current.email, currentPassword)
+    await reauthenticateWithCredential(current, credential)
+    await updatePassword(current, nextPassword.trim())
+  }, [])
 
   const sendPasswordResetLink = useCallback(async (emailToReset?: string) => {
     const targetEmail = emailToReset || state.user?.email
     if (!targetEmail) throw new Error("Email required")
-    try {
-      await sendPasswordResetEmail(getFirebaseAuth(), targetEmail)
-    } catch (err) {
-      console.warn("sendPasswordResetEmail fallback:", err)
-    }
+    await sendPasswordResetEmail(getFirebaseAuth(), targetEmail)
   }, [state.user])
 
   useEffect(() => {
@@ -266,6 +250,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [])
 
+  const provisionalUser =
+    state.user ??
+    (getLiveFirebaseUser() ? mapFirebaseUser(getLiveFirebaseUser()!) : null)
+  const liveSubscriptionsQuery = useSubscriberSubscriptionsQuery(
+    provisionalUser && isSubscriberRole(provisionalUser.role)
+      ? provisionalUser.uid
+      : undefined,
+  )
+
   const value = useMemo<AuthContextValue>(() => {
     const live = getLiveFirebaseUser()
     const activeIdentity = live ? mapFirebaseUser(live) : null
@@ -286,20 +279,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
             ? "authenticated"
             : "unauthenticated"
 
-    const subscriberLookupId = user?.uid
-    const currentSub = subscriberLookupId
-      ? (currentSubscriptionFor(subscriberLookupId) || (user?.email ? currentSubscriptionFor(user.email) : null))
-      : (user?.email ? currentSubscriptionFor(user.email) : null)
+    const liveSubs = (liveSubscriptionsQuery.data ?? []) as SubscriberSubscription[]
+    const currentSub = pickCurrentSubscription(liveSubs)
+    const resolvedFromSub = resolveEffectiveSubscriptionStatus(currentSub)
+    const subscriptionLoading =
+      Boolean(user) &&
+      isSubscriberRole(user?.role) &&
+      liveSubscriptionsQuery.isPending &&
+      !liveSubscriptionsQuery.isFetched
 
     const effectiveSubStatus = user
       ? isAdminRole(user.role)
         ? "active"
         : user.status !== "active"
           ? "suspended"
-          : (resolveEffectiveSubscriptionStatus(currentSub) ??
-            (isSubscriberRole(user.role) && user.status === "active"
-              ? "active"
-              : state.subscriptionStatus))
+          : resolvedFromSub ??
+            // Keep last-known status while loading — never invent "active".
+            (subscriptionLoading ? state.subscriptionStatus : null)
       : null
 
     return {
@@ -312,6 +308,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       hasPermission: (permission: Permission) => can(user, permission),
       hasActiveSubscription:
         user?.status === "active" && hasActiveEntitlement(effectiveSubStatus),
+      subscriptionLoading,
       refreshProfile,
       signIn,
       signOut,
@@ -319,7 +316,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
       changePassword,
       sendPasswordResetLink,
     }
-  }, [state, refreshProfile, signIn, signOut, updateAccount, changePassword, sendPasswordResetLink])
+  }, [
+    state,
+    liveSubscriptionsQuery.data,
+    liveSubscriptionsQuery.isPending,
+    liveSubscriptionsQuery.isFetched,
+    refreshProfile,
+    signIn,
+    signOut,
+    updateAccount,
+    changePassword,
+    sendPasswordResetLink,
+  ])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

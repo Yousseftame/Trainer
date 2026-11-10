@@ -23,9 +23,24 @@ export {
   purgeDemoSubscriberData,
   approveRegistrationRequest,
   rejectRegistrationRequest,
+  assignSubscription,
+  updateSubscriptionLifecycle,
+  resolveSubscriptionChangeRequest,
 } from "./admin/index.js";
 
-export {listSubscriberContentLibrary} from "./subscriber/index.js";
+export {
+  listSubscriberContentLibrary,
+  logWorkoutSession,
+  logNutritionAdherence,
+  logProgressMeasurement,
+  deleteProgressMeasurement,
+  logProgressPerformance,
+  deleteProgressPerformance,
+  saveProgressPhotoMeta,
+  deleteProgressPhoto,
+  requestSubscriptionChange,
+  updateMySubscriberProfile,
+} from "./subscriber/index.js";
 
 export {
   dispatchNotice,

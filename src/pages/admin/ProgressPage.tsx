@@ -36,6 +36,7 @@ import { FilterChip, StatCard } from "@/components/dashboard/StatCard"
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
 import { APP_ROUTES } from "@/config/constants"
 import {
+  adherenceScoreFromWeeks,
   computeAdherenceWeeks,
   latestAdherenceWeek,
   type AdherenceWeek,
@@ -65,10 +66,10 @@ import {
 } from "@/features/nutrition/hooks"
 import { useSubscribersQuery } from "@/features/subscribers/hooks"
 import {
-  currentSubscriptionFor,
-  getPackageById,
-} from "@/features/subscriptions/cache"
-import { useSubscriptionsQuery } from "@/features/subscriptions/hooks"
+  usePackageByIdQuery,
+  useSubscriptionsQuery,
+} from "@/features/subscriptions/hooks"
+import type { SubscriberSubscription } from "@/types/subscription"
 import {
   useWorkoutLogsQuery,
   useWorkoutProgramsQuery,
@@ -124,7 +125,28 @@ export function ProgressPage() {
   const { data: allLifts = [] } = usePerformanceQuery()
   const { data: allWorkouts = [] } = useWorkoutProgramsQuery()
   const { data: allNutrition = [] } = useNutritionProgramsQuery()
-  useSubscriptionsQuery()
+  const { data: allWorkoutLogs = [] } = useWorkoutLogsQuery()
+  const { data: allNutritionLogs = [] } = useNutritionLogsQuery()
+  const { data: allSubscriptions = [] } = useSubscriptionsQuery()
+
+  const subscriptionsBySubscriber = useMemo(() => {
+    const map = new Map<string, SubscriberSubscription>()
+    for (const sub of allSubscriptions) {
+      const prev = map.get(sub.subscriberId)
+      if (!prev) {
+        map.set(sub.subscriberId, sub)
+        continue
+      }
+      if (sub.status === "active") map.set(sub.subscriberId, sub)
+      else if (
+        prev.status !== "active" &&
+        (sub.status === "suspended" || !prev)
+      ) {
+        map.set(sub.subscriberId, sub)
+      }
+    }
+    return map
+  }, [allSubscriptions])
 
   const saveMeasurementMutation = useSaveMeasurementMutation()
   const deleteMeasurementMutation = useDeleteMeasurementMutation()
@@ -152,14 +174,64 @@ export function ProgressPage() {
   const [tab, setTab] = useState<ReviewTab>("overview")
   const [params] = useSearchParams()
 
+  const adherenceBySubscriber = useMemo(() => {
+    const workoutLogsBySub = new Map<string, typeof allWorkoutLogs>()
+    for (const log of allWorkoutLogs) {
+      const list = workoutLogsBySub.get(log.subscriberId) ?? []
+      list.push(log)
+      workoutLogsBySub.set(log.subscriberId, list)
+    }
+    const nutritionLogsBySub = new Map<string, typeof allNutritionLogs>()
+    for (const log of allNutritionLogs) {
+      const list = nutritionLogsBySub.get(log.subscriberId) ?? []
+      list.push(log)
+      nutritionLogsBySub.set(log.subscriberId, list)
+    }
+    const workoutsBySub = new Map<string, typeof allWorkouts>()
+    for (const program of allWorkouts) {
+      if (!program.subscriberId) continue
+      const list = workoutsBySub.get(program.subscriberId) ?? []
+      list.push(program)
+      workoutsBySub.set(program.subscriberId, list)
+    }
+    const nutritionBySub = new Map<string, typeof allNutrition>()
+    for (const program of allNutrition) {
+      if (!program.subscriberId) continue
+      const list = nutritionBySub.get(program.subscriberId) ?? []
+      list.push(program)
+      nutritionBySub.set(program.subscriberId, list)
+    }
+
+    const scores: Record<string, number | null> = {}
+    for (const subscriber of subscribers) {
+      if (subscriber.status === "rejected") continue
+      const weeks = computeAdherenceWeeks({
+        workoutLogs: workoutLogsBySub.get(subscriber.id) ?? [],
+        nutritionLogs: nutritionLogsBySub.get(subscriber.id) ?? [],
+        workoutPrograms: workoutsBySub.get(subscriber.id) ?? [],
+        nutritionPrograms: nutritionBySub.get(subscriber.id) ?? [],
+        weeks: 4,
+      })
+      scores[subscriber.id] = adherenceScoreFromWeeks(weeks)
+    }
+    return scores
+  }, [
+    subscribers,
+    allWorkoutLogs,
+    allNutritionLogs,
+    allWorkouts,
+    allNutrition,
+  ])
+
   const roster: RosterPerson[] = useMemo(
     () =>
       buildProgressRoster({
         subscribers,
         measurements: allMeasurements,
         photos: allPhotos,
+        adherenceBySubscriber,
       }),
-    [subscribers, allMeasurements, allPhotos],
+    [subscribers, allMeasurements, allPhotos, adherenceBySubscriber],
   )
 
   const requested = params.get("subscriber")
@@ -236,14 +308,24 @@ export function ProgressPage() {
   }, [allWorkouts, allNutrition, selected])
 
   const selectedSubscriberId = selected?.subscriber.id
-  const { data: selectedWorkoutLogs = [] } = useWorkoutLogsQuery({
-    subscriberId: selectedSubscriberId,
-    enabled: Boolean(selectedSubscriberId),
-  })
-  const { data: selectedNutritionLogs = [] } = useNutritionLogsQuery({
-    subscriberId: selectedSubscriberId,
-    enabled: Boolean(selectedSubscriberId),
-  })
+  const selectedWorkoutLogs = useMemo(
+    () =>
+      selectedSubscriberId
+        ? allWorkoutLogs.filter(
+            (log) => log.subscriberId === selectedSubscriberId,
+          )
+        : [],
+    [allWorkoutLogs, selectedSubscriberId],
+  )
+  const selectedNutritionLogs = useMemo(
+    () =>
+      selectedSubscriberId
+        ? allNutritionLogs.filter(
+            (log) => log.subscriberId === selectedSubscriberId,
+          )
+        : [],
+    [allNutritionLogs, selectedSubscriberId],
+  )
 
   const selectedAdherenceWeeks = useMemo(
     () =>
@@ -272,7 +354,10 @@ export function ProgressPage() {
       confirmLabel: isAr ? "تأكيد الحذف" : "Delete Record",
       tone: "danger",
       onConfirm: async () => {
-        await deleteMeasurementMutation.mutateAsync(row.id)
+        await deleteMeasurementMutation.mutateAsync({
+          id: row.id,
+          subscriberId: row.subscriberId,
+        })
         appToast.success(isAr ? "تم حذف السجل بنجاح" : "Record deleted successfully")
       },
     })
@@ -288,7 +373,10 @@ export function ProgressPage() {
       confirmLabel: isAr ? "تأكيد الحذف" : "Delete Photo",
       tone: "danger",
       onConfirm: async () => {
-        await deletePhotoMutation.mutateAsync(item.id)
+        await deletePhotoMutation.mutateAsync({
+          id: item.id,
+          subscriberId: item.subscriberId,
+        })
         appToast.success(isAr ? "تم حذف الصورة بنجاح" : "Photo deleted successfully")
       },
     })
@@ -304,7 +392,10 @@ export function ProgressPage() {
       confirmLabel: isAr ? "تأكيد الحذف" : "Delete Record",
       tone: "danger",
       onConfirm: async () => {
-        await deletePerformanceMutation.mutateAsync(row.id)
+        await deletePerformanceMutation.mutateAsync({
+          id: row.id,
+          subscriberId: row.subscriberId,
+        })
         appToast.success(isAr ? "تم حذف السجل بنجاح" : "Record deleted successfully")
       },
     })
@@ -435,6 +526,9 @@ export function ProgressPage() {
               liveLifts={selectedLifts}
               adherenceWeeks={selectedAdherenceWeeks}
               programs={subscriberPrograms}
+              liveSubscription={
+                subscriptionsBySubscriber.get(selected.subscriber.id) ?? null
+              }
               onOpenMeasurementModal={() => setMeasurementModalOpen(true)}
               onOpenPhotoModal={() => setPhotoModalOpen(true)}
               onOpenPerformanceModal={() => setPerformanceModalOpen(true)}
@@ -646,6 +740,7 @@ function ReviewPanel({
   liveLifts,
   adherenceWeeks = [],
   programs: assignedPrograms,
+  liveSubscription = null,
   onOpenMeasurementModal,
   onOpenPhotoModal,
   onOpenPerformanceModal,
@@ -663,6 +758,7 @@ function ReviewPanel({
   liveLifts?: PerformanceRecord[]
   adherenceWeeks?: AdherenceWeek[]
   programs?: { workouts: WorkoutProgram[]; nutrition: NutritionProgram[] }
+  liveSubscription?: SubscriberSubscription | null
   onOpenMeasurementModal: () => void
   onOpenPhotoModal: () => void
   onOpenPerformanceModal: () => void
@@ -673,8 +769,7 @@ function ReviewPanel({
 }) {
   const { t } = useTranslation()
   const { subscriber } = person
-  const subscription = currentSubscriptionFor(subscriber.id)
-  const pkg = getPackageById(subscription?.packageId)
+  const { data: pkg = null } = usePackageByIdQuery(liveSubscription?.packageId)
   const days = daysSinceCheckIn(person.lastCheckIn)
 
   const measurements = liveMeasurements ?? []

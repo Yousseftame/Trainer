@@ -1,5 +1,8 @@
 import { defaultEntitlementForCategory } from "@/features/content/paths"
-import { normalizeEntitlements } from "@/features/subscriptions/entitlements"
+import {
+  normalizeEntitlements,
+  resolveEffectiveSubscriptionStatus,
+} from "@/features/subscriptions/entitlements"
 import type { CatalogPackage } from "@/features/subscriptions/types"
 import type { Subscriber } from "@/features/subscribers/types"
 import type { ContentAsset } from "@/types/content"
@@ -167,7 +170,10 @@ export function evaluateSubscriberContentAccess(input: {
     }
   }
 
-  if (!subscription || subscription.status !== "active") {
+  if (
+    !subscription ||
+    resolveEffectiveSubscriptionStatus(subscription) !== "active"
+  ) {
     return {
       allowed: false,
       reason: {

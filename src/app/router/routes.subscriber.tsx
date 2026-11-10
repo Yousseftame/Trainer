@@ -62,6 +62,8 @@ export const subscriberRoutes: RouteObject[] = [
               { path: "community", element: <CommunityPage /> },
               { path: "profile", element: <ProfilePage /> },
               { path: "subscription", element: <SubscriptionPage /> },
+              // History stays readable after subscription changes (docs §07).
+              { path: "history", element: <HistoryPage /> },
               {
                 element: <RequireActiveSubscription />,
                 children: [
@@ -97,7 +99,6 @@ export const subscriberRoutes: RouteObject[] = [
                     children: [{ path: "progress", element: <ProgressPage /> }],
                   },
                   { path: "physical-therapy", element: <PhysicalTherapyPage /> },
-                  { path: "history", element: <HistoryPage /> },
                 ],
               },
             ],

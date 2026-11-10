@@ -20,6 +20,7 @@ import {
   isRenderablePhotoSrc,
   PROGRESS_UPLOAD_LIMITS,
 } from "@/features/progress/paths"
+import { getFirebaseAuth } from "@/lib/firebase/auth"
 import { getDb } from "@/lib/firebase/firestore"
 import { getFirebaseStorage } from "@/lib/firebase/storage"
 import type {
@@ -51,6 +52,20 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
     if (v !== undefined) out[k] = v
   }
   return out as T
+}
+
+/** Staff with progress:write (or head coach) may use client SDK; subscribers use callables. */
+async function canWriteProgressViaSdk(): Promise<boolean> {
+  const user = getFirebaseAuth().currentUser
+  if (!user) return false
+  const token = await user.getIdTokenResult()
+  const role = typeof token.claims.role === "string" ? token.claims.role : ""
+  if (role === "head_coach") return true
+  if (!role || role === "subscriber") return false
+  const perms = Array.isArray(token.claims.permissions)
+    ? (token.claims.permissions as string[])
+    : []
+  return perms.includes("progress:write")
 }
 
 function asNumber(value: unknown): number | undefined {
@@ -221,7 +236,7 @@ export async function fetchMeasurements(
       )
       .sort(
         (a, b) =>
-          new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime(),
+          new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime(),
       )
   } catch (err) {
     console.warn("[progress] Failed to load measurements:", err)
@@ -247,6 +262,28 @@ export async function saveMeasurement(
   input: SaveMeasurementInput,
 ): Promise<BodyMeasurement> {
   if (!input.subscriberId) throw new Error("Subscriber is required")
+
+  if (!(await canWriteProgressViaSdk())) {
+    const { callLogProgressMeasurement } = await import(
+      "@/lib/firebase/callables"
+    )
+    const result = await callLogProgressMeasurement({
+      id: input.id,
+      recordedAt: input.recordedAt,
+      weightKg: input.weightKg,
+      chestCm: input.chestCm,
+      waistCm: input.waistCm,
+      hipsCm: input.hipsCm,
+      armsCm: input.armsCm,
+      thighsCm: input.thighsCm,
+      notes: input.notes,
+    })
+    return normalizeMeasurement(
+      String(result.measurement.id),
+      result.measurement as Record<string, unknown>,
+    )
+  }
+
   const now = new Date().toISOString()
   const db = getDb()
   const existing = input.id
@@ -285,6 +322,13 @@ export async function saveMeasurement(
 }
 
 export async function deleteMeasurement(id: string): Promise<void> {
+  if (!(await canWriteProgressViaSdk())) {
+    const { callDeleteProgressMeasurement } = await import(
+      "@/lib/firebase/callables"
+    )
+    await callDeleteProgressMeasurement(id)
+    return
+  }
   await deleteDoc(doc(getDb(), MEASUREMENTS_COLLECTION, id))
 }
 
@@ -305,7 +349,7 @@ export async function fetchPhotos(
       .map((d) => normalizePhoto(d.id, d.data() as Record<string, unknown>))
       .sort(
         (a, b) =>
-          new Date(b.takenAt).getTime() - new Date(a.takenAt).getTime(),
+          new Date(a.takenAt).getTime() - new Date(b.takenAt).getTime(),
       )
   } catch (err) {
     console.warn("[progress] Failed to load photos:", err)
@@ -329,6 +373,7 @@ export type SavePhotoInput = {
 export async function savePhoto(input: SavePhotoInput): Promise<ProgressPhoto> {
   if (!input.subscriberId) throw new Error("Subscriber is required")
   const now = new Date().toISOString()
+  const staffWriter = await canWriteProgressViaSdk()
   const db = getDb()
   const existingSnap = input.id
     ? await getDoc(doc(db, PHOTOS_COLLECTION, input.id))
@@ -384,9 +429,28 @@ export async function savePhoto(input: SavePhotoInput): Promise<ProgressPhoto> {
     mimeType = file.type || "image/jpeg"
     sizeBytes = file.size
   } else if (input.storagePath && isRenderablePhotoSrc(input.storagePath)) {
-    // Legacy path — keep working for already-saved data URLs, but do not encourage
     storagePath = input.storagePath
     downloadUrl = input.storagePath
+  }
+
+  if (!staffWriter) {
+    const { callSaveProgressPhotoMeta } = await import(
+      "@/lib/firebase/callables"
+    )
+    const result = await callSaveProgressPhotoMeta({
+      id, // same Firestore auto-id used in the Storage path
+      storagePath,
+      downloadUrl,
+      takenAt: input.takenAt || existing?.takenAt || now,
+      pose,
+      caption: input.caption?.trim() || existing?.caption,
+      mimeType,
+      sizeBytes,
+    })
+    return normalizePhoto(
+      String(result.photo.id),
+      result.photo as Record<string, unknown>,
+    )
   }
 
   const record: ProgressPhoto = {
@@ -418,6 +482,13 @@ export async function savePhoto(input: SavePhotoInput): Promise<ProgressPhoto> {
 }
 
 export async function deletePhoto(id: string): Promise<void> {
+  if (!(await canWriteProgressViaSdk())) {
+    const { callDeleteProgressPhoto } = await import(
+      "@/lib/firebase/callables"
+    )
+    await callDeleteProgressPhoto(id)
+    return
+  }
   const db = getDb()
   const snap = await getDoc(doc(db, PHOTOS_COLLECTION, id))
   const existing = snap.exists()
@@ -446,7 +517,7 @@ export async function fetchPerformance(
       )
       .sort(
         (a, b) =>
-          new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime(),
+          new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime(),
       )
   } catch (err) {
     console.warn("[progress] Failed to load performance:", err)
@@ -476,6 +547,26 @@ export async function savePerformance(
   const cleanName = input.name.trim()
   if (!cleanName) throw new Error("Lift / metric name is required")
   if (!Number.isFinite(input.value)) throw new Error("Value is required")
+
+  if (!(await canWriteProgressViaSdk())) {
+    const { callLogProgressPerformance } = await import(
+      "@/lib/firebase/callables"
+    )
+    const result = await callLogProgressPerformance({
+      id: input.id,
+      recordedAt: input.recordedAt,
+      name: cleanName,
+      value: input.value,
+      unit: input.unit || "kg",
+      notes: input.notes,
+      programId: input.programId,
+      exerciseId: input.exerciseId,
+    })
+    return normalizePerformance(
+      String(result.performance.id),
+      result.performance as Record<string, unknown>,
+    )
+  }
 
   const now = new Date().toISOString()
   const db = getDb()
@@ -514,5 +605,12 @@ export async function savePerformance(
 }
 
 export async function deletePerformance(id: string): Promise<void> {
+  if (!(await canWriteProgressViaSdk())) {
+    const { callDeleteProgressPerformance } = await import(
+      "@/lib/firebase/callables"
+    )
+    await callDeleteProgressPerformance(id)
+    return
+  }
   await deleteDoc(doc(getDb(), PERFORMANCE_COLLECTION, id))
 }

@@ -52,6 +52,10 @@ import {
   useSavePerformanceMutation,
   useSavePhotoMutation,
 } from "@/features/progress/hooks"
+import {
+  firstMeasurement as firstMeasurementOf,
+  latestMeasurement as latestMeasurementOf,
+} from "@/features/progress/metrics"
 import { useNutritionLogsQuery } from "@/features/nutrition/hooks"
 import { useNutritionProgramsQuery } from "@/features/nutrition/hooks"
 import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
@@ -107,11 +111,34 @@ export function ProgressPage() {
   } = usePanelSubscriber({ allowStaffPicker: true })
 
   // React Query hooks for real-time progress data (scoped)
-  const { data: measurements = [] } = useMeasurementsQuery(
-    subscriberId || undefined,
-  )
-  const { data: photos = [] } = usePhotosQuery(subscriberId || undefined)
-  const { data: lifts = [] } = usePerformanceQuery(subscriberId || undefined)
+  const {
+    data: measurements = [],
+    isLoading: measurementsLoading,
+    isError: measurementsError,
+    refetch: refetchMeasurements,
+  } = useMeasurementsQuery(subscriberId || undefined)
+  const {
+    data: photos = [],
+    isLoading: photosLoading,
+    isError: photosError,
+    refetch: refetchPhotos,
+  } = usePhotosQuery(subscriberId || undefined)
+  const {
+    data: lifts = [],
+    isLoading: liftsLoading,
+    isError: liftsError,
+    refetch: refetchLifts,
+  } = usePerformanceQuery(subscriberId || undefined)
+
+  const progressLoading =
+    measurementsLoading || photosLoading || liftsLoading
+  const progressError = measurementsError || photosError || liftsError
+
+  function refetchProgress() {
+    void refetchMeasurements()
+    void refetchPhotos()
+    void refetchLifts()
+  }
   const { data: allWorkoutPrograms = [] } = useWorkoutProgramsQuery({
     subscriberId,
     enabled: Boolean(subscriberId),
@@ -164,9 +191,9 @@ export function ProgressPage() {
     onConfirm: () => Promise<void> | void
   } | null>(null)
 
-  // Computed metrics
-  const firstMeasurement = measurements[0]
-  const latestMeasurement = measurements[measurements.length - 1]
+  // Computed metrics (canonical chronological helpers — same as admin)
+  const firstMeasurement = firstMeasurementOf(measurements)
+  const latestMeasurement = latestMeasurementOf(measurements)
   const currentWeight =
     latestMeasurement?.weightKg ?? currentSubscriber?.startingWeightKg
   const startWeight =
@@ -195,9 +222,9 @@ export function ProgressPage() {
 
   // Body circumference comparisons (First vs Latest)
   const circumferenceDiffs = useMemo(() => {
-    if (measurements.length < 2) return null
-    const base = measurements[0]
-    const cur = measurements[measurements.length - 1]
+    const base = firstMeasurementOf(measurements)
+    const cur = latestMeasurementOf(measurements)
+    if (!base || !cur || base.id === cur.id) return null
 
     const calc = (c?: number | null, b?: number | null) => {
       if (c == null || b == null) return null
@@ -330,6 +357,42 @@ export function ProgressPage() {
         >
           {isAr ? "تسجيل الدخول" : "Sign in"}
         </Link>
+      </div>
+    )
+  }
+
+  if (progressLoading) {
+    return (
+      <div className="flex min-h-64 flex-col items-center justify-center gap-2 rounded-[28px] bg-white p-8 text-center shadow-xs border border-black/6">
+        <Scale className="size-8 animate-pulse text-[var(--gym-lime,#fb5001)]" />
+        <p className="text-[13px] font-medium text-[#8c8c8c]">
+          {isAr
+            ? "جاري تحميل سجلات التقدم المحمية..."
+            : "Loading your protected progress records..."}
+        </p>
+      </div>
+    )
+  }
+
+  if (progressError) {
+    return (
+      <div className="flex min-h-64 flex-col items-center justify-center gap-3 rounded-[28px] bg-white p-8 text-center shadow-xs border border-black/6">
+        <Lock className="size-10 text-rose-500 stroke-1" />
+        <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#111111)]">
+          {isAr ? "تعذر تحميل التقدم" : "Could not load progress"}
+        </h2>
+        <p className="max-w-md text-[13px] text-[#8c8c8c]">
+          {isAr
+            ? "سجلات الوزن والقياسات والصور محمية بصلاحيات الحساب. أعد المحاولة أو تواصل مع المدرب."
+            : "Weight, measurements, and photos are account-protected. Retry or contact your coach."}
+        </p>
+        <button
+          type="button"
+          onClick={refetchProgress}
+          className="inline-flex items-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-4 py-2 text-[12px] font-bold text-white"
+        >
+          {isAr ? "إعادة المحاولة" : "Retry"}
+        </button>
       </div>
     )
   }
@@ -896,9 +959,10 @@ export function ProgressPage() {
                                       : "Delete Record",
                                     tone: "danger",
                                     onConfirm: async () => {
-                                      await deleteMeasurementMutation.mutateAsync(
-                                        row.id,
-                                      )
+                                      await deleteMeasurementMutation.mutateAsync({
+                                        id: row.id,
+                                        subscriberId: row.subscriberId,
+                                      })
                                       appToast.success(
                                         isAr ? "تم الحذف بنجاح" : "Record deleted",
                                       )
@@ -1060,7 +1124,10 @@ export function ProgressPage() {
                               : "Delete Photo",
                             tone: "danger",
                             onConfirm: async () => {
-                              await deletePhotoMutation.mutateAsync(item.id)
+                              await deletePhotoMutation.mutateAsync({
+                                id: item.id,
+                                subscriberId: item.subscriberId,
+                              })
                               appToast.success(
                                 isAr ? "تم حذف الصورة بنجاح" : "Photo deleted",
                               )
@@ -1302,9 +1369,10 @@ export function ProgressPage() {
                                     : "Delete Record",
                                   tone: "danger",
                                   onConfirm: async () => {
-                                    await deletePerformanceMutation.mutateAsync(
-                                      row.id,
-                                    )
+                                    await deletePerformanceMutation.mutateAsync({
+                                      id: row.id,
+                                      subscriberId: row.subscriberId,
+                                    })
                                     appToast.success(
                                       isAr ? "تم الحذف بنجاح" : "Record deleted",
                                     )

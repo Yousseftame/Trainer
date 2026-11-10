@@ -80,12 +80,22 @@ export function useWorkoutLogsQuery(
   })
 }
 
+function invalidateSubscriberContentLibrary(
+  queryClient: ReturnType<typeof useQueryClient>,
+) {
+  // Exercise videoContentId / pdfContentId links unlock library items server-side.
+  void queryClient.invalidateQueries({
+    queryKey: ["content_assets", "subscriber_library"],
+  })
+}
+
 export function useSaveWorkoutProgramMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: SaveWorkoutProgramInput) => saveWorkoutProgram(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: workoutKeys.all })
+      invalidateSubscriberContentLibrary(queryClient)
     },
   })
 }
@@ -96,6 +106,7 @@ export function useAssignWorkoutMutation() {
     mutationFn: (input: AssignWorkoutInput) => assignWorkoutProgram(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: workoutKeys.all })
+      invalidateSubscriberContentLibrary(queryClient)
     },
   })
 }
@@ -136,7 +147,10 @@ export function useLogWorkoutSessionMutation() {
     mutationFn: (input: Omit<WorkoutSessionLog, "id" | "completedAt">) =>
       logWorkoutSession(input),
     onSuccess: () => {
+      // Programs (completion), logs, and any admin/subscriber views sharing these keys.
       void queryClient.invalidateQueries({ queryKey: workoutKeys.all })
+      void queryClient.invalidateQueries({ queryKey: ["subscribers"] })
+      void queryClient.invalidateQueries({ queryKey: ["overview"] })
     },
   })
 }

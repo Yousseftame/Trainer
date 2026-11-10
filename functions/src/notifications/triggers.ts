@@ -49,6 +49,7 @@ export const onRegistrationRequestCreated = onDocumentCreated(
       toName: name,
       requestId,
       packageId,
+      actionUrl: `/admin/registration-requests?request=${encodeURIComponent(requestId)}`,
       dedupeKey: `registration:${requestId}`,
       // Customer email / inbox copy
       subject: bilingual(

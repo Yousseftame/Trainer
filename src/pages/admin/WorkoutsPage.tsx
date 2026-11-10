@@ -223,12 +223,29 @@ export function WorkoutsPage() {
 
   function handleDelete(program: WorkoutProgram) {
     if (actionsBusy) return
+    // Assigned versions are part of subscriber History — archive only.
+    if (program.subscriberId) {
+      setConfirmDialog({
+        open: true,
+        title: isAr ? "أرشفة البرنامج" : "Archive Program",
+        description: isAr
+          ? `"${program.title[locale]}" مُسند لمشترك. لا يمكن حذفه نهائياً حتى يبقى في السجل التاريخي. هل تريد أرشفته؟`
+          : `"${program.title[locale]}" is assigned to a subscriber and cannot be permanently deleted (History retention). Archive it instead?`,
+        confirmLabel: isAr ? "أرشفة" : "Archive",
+        tone: "warning",
+        onConfirm: async () => {
+          await archiveMutation.mutateAsync(program.id)
+          appToast.success(isAr ? "تمت الأرشفة" : "Program archived")
+        },
+      })
+      return
+    }
     setConfirmDialog({
       open: true,
       title: isAr ? "حذف برنامج التمارين" : "Delete Workout Program",
       description: isAr
-        ? `هل أنت متأكد من حذف "${program.title[locale]}" نهائياً؟ هذا الإجراء لا يمكن التراجع عنه. سجلات الأداء التاريخية تبقى إن وُجدت.`
-        : `Permanently delete "${program.title[locale]}"? This cannot be undone. Existing performance logs remain.`,
+        ? `هل أنت متأكد من حذف القالب "${program.title[locale]}" نهائياً؟ هذا الإجراء لا يمكن التراجع عنه.`
+        : `Permanently delete template "${program.title[locale]}"? This cannot be undone.`,
       confirmLabel: isAr ? "تأكيد الحذف" : "Delete Program",
       tone: "danger",
       onConfirm: async () => {
@@ -243,17 +260,31 @@ export function WorkoutsPage() {
     ? subscribers.find((s) => s.id === selected.subscriberId)
     : undefined
 
-  // Find all version records for selected subscriber/program
+  // Version lineage for the selected assigned program (History-safe)
   const relatedVersions = useMemo(() => {
-    if (!selected?.subscriberId) return [selected].filter(Boolean)
+    if (!selected) return []
+    if (!selected.subscriberId) return [selected]
     return allPrograms.filter((p) => p.subscriberId === selected.subscriberId)
   }, [allPrograms, selected])
 
-  // Logs for selected program
+  // Logs for the selected program document (history-safe across reassignment)
   const subscriberLogs = useMemo(() => {
-    if (!selected?.subscriberId) return []
-    return allLogs.filter((l) => l.subscriberId === selected.subscriberId)
+    if (!selected?.id) return []
+    return allLogs.filter((l) => l.programId === selected.id)
   }, [allLogs, selected])
+
+  const selectedWeekSessionCount = useMemo(() => {
+    const now = new Date()
+    const day = now.getUTCDay() || 7
+    const monday = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    )
+    monday.setUTCDate(monday.getUTCDate() - (day - 1))
+    const weekStart = monday.toISOString().slice(0, 10)
+    return subscriberLogs.filter(
+      (l) => (l.date || l.completedAt).slice(0, 10) >= weekStart,
+    ).length
+  }, [subscriberLogs])
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
@@ -482,7 +513,7 @@ export function WorkoutsPage() {
 
                 {/* Right controls: completion badge + action buttons */}
                 <div className="flex flex-wrap items-center gap-2">
-                  {selected.completion ? (
+                  {selected.subscriberId ? (
                     <button
                       type="button"
                       onClick={() =>
@@ -493,14 +524,24 @@ export function WorkoutsPage() {
                         })
                       }
                       className="rounded-2xl bg-white px-3.5 py-2 text-start shadow-sm transition hover:bg-[#F9F9F9]"
-                      title={isAr ? "عرض سجل الجلسات" : "View session log"}
+                      title={isAr ? "عرض سجل الجلسات لهذا البرنامج" : "View session logs for this program"}
                     >
                       <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#8c8c8c]">
                         {t("admin.workouts.thisWeek")}
                       </p>
                       <p className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
-                        {selected.completion.done}/{selected.completion.total}
+                        {selectedWeekSessionCount}
+                        {selected.completion?.total
+                          ? `/${selected.completion.total}`
+                          : ""}
                       </p>
+                      {selected.completion ? (
+                        <p className="text-[10px] font-semibold text-[#8c8c8c]">
+                          {isAr
+                            ? `إجمالي: ${selected.completion.done}/${selected.completion.total}`
+                            : `Total: ${selected.completion.done}/${selected.completion.total}`}
+                        </p>
+                      ) : null}
                     </button>
                   ) : null}
 
@@ -842,6 +883,7 @@ export function WorkoutsPage() {
           title={isAr ? "سجل إصدارات البرنامج" : "Program Version History"}
           subscriberName={selectedSubscriber?.displayName}
           programs={relatedVersions}
+          initialProgramId={historyModal.program.id}
           type="workout"
           onClose={() => setHistoryModal({ open: false, program: null })}
         />
@@ -851,7 +893,15 @@ export function WorkoutsPage() {
       {logsModal.open ? (
         <ProgramLogsDialog
           open={logsModal.open}
-          title={isAr ? "سجل إنجاز وأداء التمارين" : "Workout Completion & Performance"}
+          title={
+            selected
+              ? isAr
+                ? `سجل أداء: ${selected.title.ar || selected.title.en}`
+                : `Performance log: ${selected.title.en || selected.title.ar}`
+              : isAr
+                ? "سجل إنجاز وأداء التمارين"
+                : "Workout Completion & Performance"
+          }
           subscriberName={logsModal.subscriberName}
           workoutLogs={subscriberLogs}
           type="workout"

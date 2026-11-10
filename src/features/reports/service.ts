@@ -77,6 +77,7 @@ function normalizeNotice(
           ar: String(staffDetailRaw.ar ?? staffDetailRaw.en ?? ""),
         }
       : undefined,
+    actionUrl: typeof raw.actionUrl === "string" ? raw.actionUrl : undefined,
     createdAt:
       typeof raw.createdAt === "string"
         ? raw.createdAt

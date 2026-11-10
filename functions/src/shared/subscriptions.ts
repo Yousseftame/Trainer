@@ -2,6 +2,7 @@ import {db} from "../config/firebase.js";
 import {COLLECTIONS} from "../config/collections.js";
 import type {UserStatus} from "../lib/types.js";
 import {stripUndefined} from "../lib/utils.js";
+import {normalizeEntitlements} from "./contentAccess.js";
 
 export async function syncSubscriptionForStatus(
   subscriberId: string,
@@ -27,7 +28,7 @@ export async function syncSubscriptionForStatus(
       current === "active"
     ) {
       batch.update(docSnap.ref, {
-        status: status === "rejected" ? "terminated" : "suspended",
+        status: status === "rejected" ? "cancelled" : "suspended",
         updatedAt: now,
         notes:
           notes ??
@@ -82,7 +83,7 @@ export async function createInitialSubscription(input: {
     const st = String(docSnap.data().status ?? "");
     if (st === "active" || st === "pending" || st === "suspended") {
       batch.update(docSnap.ref, {
-        status: "terminated",
+        status: "cancelled",
         updatedAt: now,
         notes: "Replaced by new assignment",
       });
@@ -98,7 +99,9 @@ export async function createInitialSubscription(input: {
       subscriberEmail: input.subscriberEmail,
       packageId: input.packageId,
       packageName: pkg?.name ?? {en: input.packageId, ar: input.packageId},
-      entitlementsSnapshot: pkg?.entitlements ?? {},
+      entitlementsSnapshot: normalizeEntitlements(
+        (pkg?.entitlements as Record<string, boolean> | undefined) ?? null,
+      ),
       status: input.status,
       startsAt,
       endsAt,

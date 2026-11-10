@@ -1,8 +1,17 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
-import { Activity, AlertTriangle, Check, Plus, Trash2, X } from "lucide-react"
+import {
+  Activity,
+  AlertTriangle,
+  Check,
+  ChevronDown,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react"
 import { buildRestrictionMatchTokens } from "@/features/physicalTherapy/paths"
 import type { SavePTRecordInput } from "@/features/physicalTherapy/service"
+import { useContentAssetsQuery } from "@/features/content/hooks"
 import { subscriberDisplayName } from "@/features/subscribers/types"
 import { useSubscribersQuery } from "@/features/subscribers/hooks"
 import { useLocale } from "@/hooks/useLocale"
@@ -28,7 +37,7 @@ interface PTRecordFormDialogProps {
 
 function blankRestriction(): PTMovementRestriction {
   return {
-    id: allocateFirestoreId("pt_restrictions"),
+    id: allocateFirestoreId(),
     prohibited: { en: "", ar: "" },
     safeAlternative: { en: "", ar: "" },
     reason: { en: "", ar: "" },
@@ -38,7 +47,7 @@ function blankRestriction(): PTMovementRestriction {
 
 function blankRehab(): PTRehabExercise {
   return {
-    id: allocateFirestoreId("pt_rehab"),
+    id: allocateFirestoreId(),
     name: { en: "", ar: "" },
     sets: 3,
     reps: "12-15 reps",
@@ -70,6 +79,14 @@ export function PTRecordFormDialog({
   const isAr = locale === "ar"
 
   const { data: subscribers = [] } = useSubscribersQuery({ enabled: open })
+  const { data: contentAssets = [] } = useContentAssetsQuery({ enabled: open })
+  const videoAssets = useMemo(
+    () =>
+      contentAssets.filter(
+        (asset) => asset.category === "exerciseVideo" || asset.kind === "video",
+      ),
+    [contentAssets],
+  )
 
   const [subscriberId, setSubscriberId] = useState("")
   const [injuryEn, setInjuryEn] = useState("")
@@ -216,6 +233,10 @@ export function PTRecordFormDialog({
             sets: Math.max(1, Number(rx.sets) || 1),
             reps: rx.reps.trim() || "12-15",
             frequency: rx.frequency.trim() || "3x / week",
+            videoContentId: rx.videoContentId?.trim() || undefined,
+            videoUrl: rx.videoContentId?.trim()
+              ? undefined
+              : rx.videoUrl?.trim() || undefined,
           })),
         therapistNotes: {
           en: notesEn.trim(),
@@ -613,7 +634,7 @@ export function PTRecordFormDialog({
                     </div>
                   </div>
 
-                  <div className="mt-2.5">
+                  <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
                     <input
                       type="text"
                       value={reh.notes?.en || ""}
@@ -630,6 +651,42 @@ export function PTRecordFormDialog({
                       placeholder={isAr ? "تعليمات خاصة بالأداء والتكنيك" : "Cues, form notes, or tempo"}
                       className="h-8 w-full rounded-lg border border-black/5 bg-[#FAFAFA] px-2.5 text-[11px] text-[#666] outline-none"
                     />
+                    <div className="relative">
+                      <select
+                        value={reh.videoContentId || ""}
+                        onChange={(e) => {
+                          const val = e.target.value || undefined
+                          setRehabExercises((prev) =>
+                            prev.map((r, i) =>
+                              i === idx
+                                ? {
+                                    ...r,
+                                    videoContentId: val,
+                                    // Prefer library delivery — drop stale external URLs
+                                    videoUrl: val ? undefined : r.videoUrl,
+                                  }
+                                : r,
+                            ),
+                          )
+                        }}
+                        className="h-8 w-full appearance-none rounded-lg border border-black/5 bg-[#FAFAFA] pe-7 ps-2.5 text-[11px] font-semibold text-[var(--gym-ink,#111111)] outline-none"
+                      >
+                        <option value="">
+                          {isAr
+                            ? "بدون فيديو من المكتبة"
+                            : "No library video linked"}
+                        </option>
+                        {videoAssets.map((vid) => (
+                          <option key={vid.id} value={vid.id}>
+                            {vid.title[locale]}
+                            {vid.durationSeconds
+                              ? ` (${vid.durationSeconds}s)`
+                              : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute end-2 top-2 size-3.5 text-[#8c8c8c]" />
+                    </div>
                   </div>
                 </div>
               ))}

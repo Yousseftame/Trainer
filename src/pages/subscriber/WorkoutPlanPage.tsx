@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import {
@@ -20,18 +20,19 @@ import { ExerciseChangeModal } from "@/components/subscriber/ExerciseChangeModal
 import { WorkoutFeedbackModal } from "@/components/subscriber/WorkoutFeedbackModal"
 import { WorkoutLiveSessionModal } from "@/components/subscriber/WorkoutLiveSessionModal"
 import { WorkoutSummaryModal } from "@/components/subscriber/WorkoutSummaryModal"
+import { APP_ROUTES } from "@/config/constants"
 import { useContentAssetsQuery } from "@/features/content/hooks"
 import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
-import {
-  formatRest,
-  resolveBilingualText,
-  trainingDayCount,
-} from "@/features/workouts/demo"
 import {
   useLogWorkoutSessionMutation,
   useWorkoutLogsQuery,
   useWorkoutProgramsQuery,
 } from "@/features/workouts/hooks"
+import {
+  formatRest,
+  resolveBilingualText,
+  trainingDayCount,
+} from "@/lib/program-text"
 import { useSubscriberPTQuery } from "@/features/physicalTherapy/hooks"
 import { exerciseConflictsWithRestriction } from "@/features/physicalTherapy/service"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
@@ -59,23 +60,44 @@ export function WorkoutPlanPage() {
   const todayFormatted = formatDate(new Date().toISOString(), locale)
 
   const { subscriber: currentSubscriber, subscriberId } = usePanelSubscriber()
-  const { data: allPrograms = [] } = useWorkoutProgramsQuery({
+  const {
+    data: allPrograms = [],
+    isLoading: programsLoading,
+    isError: programsError,
+    refetch: refetchPrograms,
+  } = useWorkoutProgramsQuery({
     subscriberId,
     enabled: Boolean(subscriberId),
   })
   const { data: contentAssets = [] } = useContentAssetsQuery({
     audience: "subscriber",
+    enabled: Boolean(subscriberId),
   })
 
   const activeProgram = useMemo(() => {
-    return (
-      allPrograms.find((p) => p.status === "active") ?? allPrograms[0] ?? null
-    )
+    return allPrograms.find((p) => p.status === "active") ?? null
   }, [allPrograms])
 
-  const { data: logs = [] } = useWorkoutLogsQuery(subscriberId)
+  const entitledAssets = useMemo(
+    () => contentAssets.filter((asset) => asset.accessAllowed !== false),
+    [contentAssets],
+  )
+
+  const { data: logs = [], isLoading: logsLoading } = useWorkoutLogsQuery({
+    subscriberId,
+    enabled: Boolean(subscriberId),
+  })
   const { data: ptRecord } = useSubscriberPTQuery(subscriberId)
   const logMutation = useLogWorkoutSessionMutation()
+
+  function resolveExerciseVideoUrl(exercise: WorkoutExercise): string | undefined {
+    if (exercise.videoContentId) {
+      const asset = entitledAssets.find((a) => a.id === exercise.videoContentId)
+      if (asset?.accessAllowed === false) return undefined
+      return asset?.streamUrl || asset?.fileUrl || undefined
+    }
+    return exercise.videoUrl || undefined
+  }
 
   const hasActivePTContraindications = Boolean(
     ptRecord &&
@@ -85,11 +107,27 @@ export function WorkoutPlanPage() {
   )
 
   const [selectedDayIdx, setSelectedDayIdx] = useState(0)
+  const [didAutoSelectToday, setDidAutoSelectToday] = useState(false)
 
-  // Local exercise overrides (e.g. when subscriber substitutes an exercise in today's day)
+  // Local exercise overrides (session-only substitutes — never mutate the assigned program)
   const [exerciseOverrides, setExerciseOverrides] = useState<
     Record<string, WorkoutExercise>
   >({})
+
+  // When coach assigns a new active program, reset local session state.
+  useEffect(() => {
+    setExerciseOverrides({})
+    setDidAutoSelectToday(false)
+    setSelectedDayIdx(0)
+  }, [activeProgram?.id])
+
+  useEffect(() => {
+    if (!activeProgram?.days?.length || didAutoSelectToday) return
+    const todayWeekday = (new Date().getDay() + 6) % 7
+    const idx = activeProgram.days.findIndex((d) => d.weekday === todayWeekday)
+    if (idx >= 0) setSelectedDayIdx(idx)
+    setDidAutoSelectToday(true)
+  }, [activeProgram, didAutoSelectToday])
 
   // Modals state
   const [changeModalExercise, setChangeModalExercise] =
@@ -126,7 +164,34 @@ export function WorkoutPlanPage() {
   }, [rawSelectedDay, exerciseOverrides])
 
   const todayIso = new Date().toISOString().slice(0, 10)
-  const isTodayLogged = logs.some((l) => l.date === todayIso)
+  const completedDayIds = useMemo(() => {
+    if (!activeProgram) return new Set<string>()
+    return new Set(
+      logs
+        .filter((l) => l.programId === activeProgram.id)
+        .map((l) => l.dayId)
+        .filter(Boolean),
+    )
+  }, [logs, activeProgram])
+
+  const isSelectedDayLogged = Boolean(
+    activeProgram &&
+      selectedDay?.id &&
+      logs.some(
+        (l) =>
+          l.programId === activeProgram.id &&
+          l.dayId === selectedDay.id &&
+          l.date === todayIso,
+      ),
+  )
+  const isTodayLogged = isSelectedDayLogged
+  const isPdfProgram = activeProgram?.format === "pdf"
+  const pdfAsset = useMemo(() => {
+    if (!activeProgram?.pdfContentId) return null
+    return (
+      entitledAssets.find((a) => a.id === activeProgram.pdfContentId) ?? null
+    )
+  }, [activeProgram?.pdfContentId, entitledAssets])
 
   // 1. Substitute Exercise Handler
   function handleSwapExercise(substitute: ExerciseAlternative, _reason: string) {
@@ -202,27 +267,51 @@ export function WorkoutPlanPage() {
     }
   }
 
-  // 4. Download / Print PDF Handler
+  // 4. Download / open entitled PDF
   function handleDownloadPdf() {
-    if (activeProgram?.format === "pdf" && activeProgram.pdfContentId) {
-      const asset = contentAssets.find((a) => a.id === activeProgram.pdfContentId)
-      if (asset?.fileUrl) {
-        window.open(asset.fileUrl, "_blank")
-        return
-      }
+    if (pdfAsset?.fileUrl) {
+      window.open(pdfAsset.fileUrl, "_blank", "noopener,noreferrer")
+      return
     }
-    // Interactive print/save as PDF
+    if (isPdfProgram) {
+      appToast.error(
+        isAr
+          ? "ملف PDF غير متاح حالياً. تأكد من صلاحية الباقة أو تواصل مع المدرب."
+          : "PDF is unavailable. Check your package access or contact your coach.",
+      )
+      return
+    }
     window.print()
   }
 
-  // 5. Open exercise video demo
+  // 5. Open exercise video demo (entitled library assets only)
   function handlePlayExerciseVideo(exercise: WorkoutExercise) {
     if (exercise.videoContentId) {
-      const asset = contentAssets.find((a) => a.id === exercise.videoContentId)
+      const asset = entitledAssets.find((a) => a.id === exercise.videoContentId)
+      if (asset?.accessAllowed === false) {
+        appToast.error(
+          isAr
+            ? "هذا الفيديو غير متاح في باقتك الحالية."
+            : "This video is locked for your current package.",
+        )
+        return
+      }
       if (asset) {
         setPreviewAsset(asset)
         return
       }
+      appToast.error(
+        isAr
+          ? "الفيديو التعليمي غير متاح حالياً."
+          : "Instructional video is unavailable right now.",
+      )
+      return
+    }
+    if (!exercise.videoUrl) {
+      appToast.error(
+        isAr ? "لا يوجد فيديو مرتبط بهذا التمرين." : "No video linked to this exercise.",
+      )
+      return
     }
     const name = resolveBilingualText(exercise.name, locale)
     const desc = resolveBilingualText(exercise.description, locale)
@@ -233,17 +322,48 @@ export function WorkoutPlanPage() {
       title: { en: name, ar: name },
       description: { en: desc || "", ar: desc || "" },
       streamUrl: exercise.videoUrl,
-      storagePath: `content/videos/${exercise.id}.mp4`,
+      storagePath: "",
       tags: ["workout", "exercise"],
-      sizeLabel: "1080p HD",
+      sizeLabel: "Stream",
       visibility: "assigned",
       requiredEntitlement: "exerciseVideos",
       packageIds: [],
       subscriberIds: [],
-      programIds: [],
+      programIds: activeProgram ? [activeProgram.id] : [],
+      accessAllowed: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     })
+  }
+
+  if (!subscriberId || programsLoading || logsLoading) {
+    return (
+      <div className="flex min-h-60 flex-col items-center justify-center rounded-[28px] bg-white p-8 text-center shadow-xs">
+        <Dumbbell className="size-10 mb-3 animate-pulse text-[var(--gym-orange,#fb5001)] stroke-1" />
+        <p className="text-[13px] font-medium text-[#8c8c8c]">
+          {isAr ? "جاري تحميل برنامج التمارين..." : "Loading your workout program..."}
+        </p>
+      </div>
+    )
+  }
+
+  if (programsError) {
+    return (
+      <div className="flex min-h-60 flex-col items-center justify-center gap-3 rounded-[28px] bg-white p-8 text-center shadow-xs">
+        <ShieldAlert className="size-10 text-rose-500 stroke-1" />
+        <h2 className="font-heading text-[18px] font-extrabold text-[var(--gym-ink,#111111)]">
+          {isAr ? "تعذر تحميل برنامج التمارين" : "Could not load workout program"}
+        </h2>
+        <button
+          type="button"
+          onClick={() => void refetchPrograms()}
+          className="inline-flex items-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-4 py-2 text-[12px] font-bold text-white"
+        >
+          <RefreshCw className="size-3.5" />
+          {isAr ? "إعادة المحاولة" : "Retry"}
+        </button>
+      </div>
+    )
   }
 
   return (
@@ -256,9 +376,16 @@ export function WorkoutPlanPage() {
           </h2>
           <p className="mt-1 max-w-md text-[13px] text-[#8c8c8c]">
             {isAr
-              ? "يقوم المدرب بتجهيز خطتك التدريبية المخصصة وستظهر هنا بمجرد اعتمادها."
-              : "Your coach will assign your personalized workout plan soon."}
+              ? "يقوم المدرب بتجهيز خطتك التدريبية المخصصة وستظهر هنا بمجرد اعتمادها. يمكنك مراجعة البرامج السابقة من صفحة السجل."
+              : "Your coach will assign your personalized workout plan soon. Previous programs stay available in History."}
           </p>
+          <Link
+            to="/app/history"
+            className="mt-4 inline-flex items-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-4 py-2 text-[12px] font-bold text-white"
+          >
+            <History className="size-3.5" />
+            {isAr ? "عرض السجل" : "View history"}
+          </Link>
         </div>
       ) : (
         <div className="flex flex-col gap-4">
@@ -404,21 +531,35 @@ export function WorkoutPlanPage() {
 
               {/* Bottom: Actions Row */}
               <div className="flex flex-wrap items-center gap-2 pt-0.5 sm:pt-1">
-                {/* 1. Primary Action: Start Workout (ابدأ التمرين) */}
-                <button
-                  type="button"
-                  onClick={() => setIsLivePlayerOpen(true)}
-                  disabled={selectedDay?.isRest || !selectedDay?.exercises?.length}
-                  className={cn(
-                    "group/btn inline-flex items-center gap-2 rounded-full bg-[var(--gym-orange,#fb5001)] hover:bg-[#e04500] text-white px-4 py-2 sm:px-6 sm:py-3 text-[12px] sm:text-[14px] font-black shadow-[0_8px_24px_rgba(251,80,1,0.45)] border border-white/20 transition-all duration-300 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:pointer-events-none disabled:shadow-none",
-                    isAr ? "font-arabic" : "font-heading",
-                  )}
-                >
-                  <Play className="size-3.5 sm:size-4 fill-white text-white" />
-                  <span>{isAr ? "ابدأ التمرين" : "Start Workout"}</span>
-                </button>
+                {/* 1. Primary: interactive session OR open PDF program */}
+                {isPdfProgram ? (
+                  <button
+                    type="button"
+                    onClick={handleDownloadPdf}
+                    className={cn(
+                      "group/btn inline-flex items-center gap-2 rounded-full bg-[var(--gym-orange,#fb5001)] hover:bg-[#e04500] text-white px-4 py-2 sm:px-6 sm:py-3 text-[12px] sm:text-[14px] font-black shadow-[0_8px_24px_rgba(251,80,1,0.45)] border border-white/20 transition-all duration-300 hover:scale-105 active:scale-95",
+                      isAr ? "font-arabic" : "font-heading",
+                    )}
+                  >
+                    <FileDown className="size-3.5 sm:size-4 text-white" strokeWidth={2.2} />
+                    <span>{isAr ? "فتح برنامج PDF" : "Open PDF Program"}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsLivePlayerOpen(true)}
+                    disabled={selectedDay?.isRest || !selectedDay?.exercises?.length}
+                    className={cn(
+                      "group/btn inline-flex items-center gap-2 rounded-full bg-[var(--gym-orange,#fb5001)] hover:bg-[#e04500] text-white px-4 py-2 sm:px-6 sm:py-3 text-[12px] sm:text-[14px] font-black shadow-[0_8px_24px_rgba(251,80,1,0.45)] border border-white/20 transition-all duration-300 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:pointer-events-none disabled:shadow-none",
+                      isAr ? "font-arabic" : "font-heading",
+                    )}
+                  >
+                    <Play className="size-3.5 sm:size-4 fill-white text-white" />
+                    <span>{isAr ? "ابدأ التمرين" : "Start Workout"}</span>
+                  </button>
+                )}
 
-                {/* 2. Secondary Action: Download PDF (تحميل PDF) */}
+                {/* 2. Secondary Action: Download PDF */}
                 <button
                   type="button"
                   onClick={handleDownloadPdf}
@@ -473,7 +614,7 @@ export function WorkoutPlanPage() {
               </div>
 
               <Link
-                to="/app/physical-therapy"
+                to={APP_ROUTES.subscriber.physicalTherapy}
                 className="inline-flex items-center justify-center gap-1.5 self-start sm:self-auto rounded-full bg-[var(--gym-ink,#111111)] hover:bg-black text-white px-4 py-2 text-[12px] font-bold transition shrink-0 shadow-2xs"
               >
                 <span>{isAr ? "عرض البدائل المعتمدة" : "View Safe Alternatives"}</span>
@@ -486,6 +627,7 @@ export function WorkoutPlanPage() {
             {programDays.map((d, idx) => {
               const active = idx === selectedDayIdx
               const isTrained = !d.isRest && d.exercises.length > 0
+              const dayCompleted = Boolean(d.id && completedDayIds.has(d.id))
               const dayTitle = isAr ? WEEKDAY_NAMES_AR[idx] : WEEKDAY_NAMES_EN[idx]
 
               return (
@@ -494,12 +636,22 @@ export function WorkoutPlanPage() {
                   type="button"
                   onClick={() => setSelectedDayIdx(idx)}
                   className={cn(
-                    "flex min-w-[76px] sm:min-w-[90px] h-[82px] sm:h-[90px] shrink-0 flex-col items-center justify-center rounded-2xl p-2 text-center transition shadow-2xs border select-none",
+                    "relative flex min-w-[76px] sm:min-w-[90px] h-[82px] sm:h-[90px] shrink-0 flex-col items-center justify-center rounded-2xl p-2 text-center transition shadow-2xs border select-none",
                     active
                       ? "bg-[var(--gym-orange,#fb5001)] border-[var(--gym-orange,#fb5001)] text-white shadow-md scale-[1.02]"
-                      : "bg-[#181818] border-transparent text-white/80 hover:bg-[#222222] hover:text-white",
+                      : dayCompleted
+                        ? "bg-[#181818] border-[var(--gym-orange,#fb5001)]/50 text-white/90 hover:bg-[#222222]"
+                        : "bg-[#181818] border-transparent text-white/80 hover:bg-[#222222] hover:text-white",
                   )}
                 >
+                  {dayCompleted ? (
+                    <CheckCircle2
+                      className={cn(
+                        "absolute top-1.5 end-1.5 size-3.5",
+                        active ? "text-white" : "text-[var(--gym-orange,#fb5001)]",
+                      )}
+                    />
+                  ) : null}
                   <span className="text-[11px] font-bold uppercase tracking-wider opacity-80">
                     {dayTitle}
                   </span>
@@ -514,11 +666,15 @@ export function WorkoutPlanPage() {
                       active ? "text-white/90" : "text-white/60",
                     )}
                   >
-                    {isTrained
-                      ? `${d.exercises.length} ${isAr ? "تمارين" : "ex"}`
-                      : isAr
-                        ? "راحة"
-                        : "Rest"}
+                    {dayCompleted
+                      ? isAr
+                        ? "تم"
+                        : "Done"
+                      : isTrained
+                        ? `${d.exercises.length} ${isAr ? "تمارين" : "ex"}`
+                        : isAr
+                          ? "راحة"
+                          : "Rest"}
                   </span>
                 </button>
               )
@@ -697,7 +853,7 @@ export function WorkoutPlanPage() {
                             </span>
                           </div>
                           <Link
-                            to="/app/physical-therapy"
+                            to={APP_ROUTES.subscriber.physicalTherapy}
                             className="text-[11px] font-bold text-rose-700 hover:underline shrink-0 ms-2"
                           >
                             {isAr ? "التفاصيل" : "Details"}
@@ -717,10 +873,11 @@ export function WorkoutPlanPage() {
               </div>
             )}
 
-            {/* 3. Bottom Sticky / Action Bar (Matching Image 1) */}
-            {!selectedDay?.isRest && selectedDay?.exercises.length ? (
+            {/* 3. Bottom action bar — interactive days only */}
+            {!isPdfProgram &&
+            !selectedDay?.isRest &&
+            selectedDay?.exercises.length ? (
               <div className="pt-4 border-t border-black/[0.06] flex flex-col sm:flex-row items-center gap-3">
-                {/* Primary Button: Start Workout */}
                 <button
                   type="button"
                   onClick={() => setIsLivePlayerOpen(true)}
@@ -730,7 +887,6 @@ export function WorkoutPlanPage() {
                   <span>{isAr ? "ابدأ التمرين" : "Start Workout"}</span>
                 </button>
 
-                {/* Secondary Button: Download PDF */}
                 <button
                   type="button"
                   onClick={handleDownloadPdf}
@@ -741,20 +897,39 @@ export function WorkoutPlanPage() {
                 </button>
               </div>
             ) : null}
+
+            {isPdfProgram ? (
+              <div className="pt-4 border-t border-black/[0.06] flex flex-col sm:flex-row items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleDownloadPdf}
+                  className="w-full sm:flex-1 inline-flex h-12 sm:h-13 items-center justify-center gap-2 rounded-2xl bg-[var(--gym-orange,#fb5001)] px-6 text-[15px] sm:text-[16px] font-black text-white shadow-md hover:opacity-95 active:scale-[0.98] transition"
+                >
+                  <FileDown className="size-5" />
+                  <span>{isAr ? "فتح / تحميل PDF" : "Open / Download PDF"}</span>
+                </button>
+                <p className="text-[12px] text-[#8c8c8c] sm:max-w-xs">
+                  {isAr
+                    ? "هذا البرنامج بصيغة PDF. سجلات الأداء التاريخية تبقى محفوظة عند تحديث البرنامج."
+                    : "This assignment is PDF-based. Historical session logs stay preserved when the program changes."}
+                </p>
+              </div>
+            ) : null}
           </div>
         </div>
       )}
 
       {/* 4. Interactive Live Workout Player Modal */}
-      {selectedDay && (
+      {selectedDay && !isPdfProgram ? (
         <WorkoutLiveSessionModal
           isOpen={isLivePlayerOpen}
           onClose={() => setIsLivePlayerOpen(false)}
           day={selectedDay}
           programTitle={activeProgram?.title[locale]}
+          resolveExerciseVideoUrl={resolveExerciseVideoUrl}
           onCompleteWorkout={handleLiveWorkoutComplete}
         />
-      )}
+      ) : null}
 
       {/* 5. Post-Workout Feedback Modal */}
       <WorkoutFeedbackModal

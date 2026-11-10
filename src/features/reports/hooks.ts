@@ -22,6 +22,7 @@ import {
   subscribeOpsNotices,
 } from "@/features/reports/service"
 import { EXPIRING_DAYS, type OpsNotice } from "@/features/reports/types"
+import { resolveNoticeActionUrl } from "@/features/reports/notice-action-url"
 import { claimNoticeAlert } from "@/features/notifications/dedupe"
 import {
   registerPushNotifications,
@@ -67,7 +68,7 @@ function alertFromNotice(
   showBrowserNotification({
     title,
     body,
-    url: "/admin/reports",
+    url: resolveNoticeActionUrl(notice),
     tag: `notice-${notice.id}`,
   })
 }
@@ -87,7 +88,9 @@ export function useAdminNotificationsBridge(options?: {
   const localeRef = useRef(locale)
   localeRef.current = locale
 
-  const noticesQuery = useOpsNoticesQuery({ enabled })
+  // Snapshot-only: skip the extra getDocs on every admin shell mount.
+  // Reports page still loads the full desk via useReportsDeskQuery (fetch-on-need).
+  const noticesQuery = useOpsNoticesQuery({ enabled: false })
 
   useEffect(() => {
     if (!enabled) return
@@ -95,6 +98,7 @@ export function useAdminNotificationsBridge(options?: {
     const unsub = subscribeOpsNotices((notices) => {
       const prev = knownIdsRef.current
       queryClient.setQueryData(REPORTS_QUERY_KEYS.notices, notices)
+      // Only patch desk when it was already loaded on the Reports page.
       queryClient.setQueryData(
         REPORTS_QUERY_KEYS.desk,
         (old: ReportsLiveInput | undefined) =>

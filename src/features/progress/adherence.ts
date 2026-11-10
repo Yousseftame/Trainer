@@ -31,10 +31,17 @@ function rate(done: number, total: number) {
 function expectedWorkoutDays(programs: WorkoutProgram[]): number {
   const active = programs.filter((p) => p.status === "active")
   if (!active.length) return 0
+  // Match admin assign completion.total / subscriber trainingDayCount
   const counts = active.map((p) =>
-    Math.max(1, p.days?.filter((d) => !d.isRest)?.length || p.days?.length || 0),
+    Math.max(
+      0,
+      p.completion?.total ??
+        p.days?.filter((d) => !d.isRest && (d.exercises?.length ?? 0) > 0)
+          .length ??
+        0,
+    ),
   )
-  return Math.max(...counts)
+  return Math.max(...counts, 0)
 }
 
 function expectedNutritionDays(programs: NutritionProgram[]): number {

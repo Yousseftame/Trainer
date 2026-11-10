@@ -8,11 +8,14 @@ import {
   Layers,
   Play,
   Plus,
+  ShieldAlert,
   Trash2,
   X,
 } from "lucide-react"
 import { ContentPreviewDialog } from "@/components/dashboard/ContentPreviewDialog"
 import { useContentAssetsQuery } from "@/features/content/hooks"
+import { useSubscriberPTQuery } from "@/features/physicalTherapy/hooks"
+import { exerciseConflictsWithRestriction } from "@/features/physicalTherapy/service"
 import { useSubscribersQuery } from "@/features/subscribers/hooks"
 import { currentSubscriptionFor } from "@/features/subscriptions/demo"
 import { useSubscriptionsQuery } from "@/features/subscriptions/hooks"
@@ -82,6 +85,15 @@ export function WorkoutProgramFormDialog({
     (asset) => asset.category === "workoutPdf" || asset.kind === "pdf",
   )
 
+  const [selectedSubscriberId, setSelectedSubscriberId] = useState("")
+  const { data: subscriberPt } = useSubscriberPTQuery(
+    open && selectedSubscriberId ? selectedSubscriberId : undefined,
+  )
+  const openPtRestrictions = useMemo(() => {
+    if (!subscriberPt || subscriberPt.status === "cleared") return []
+    return subscriberPt.restrictions ?? []
+  }, [subscriberPt])
+
   const [activeLangTab, setActiveLangTab] = useState<"ar" | "en">(
     locale === "ar" ? "ar" : "en",
   )
@@ -98,7 +110,6 @@ export function WorkoutProgramFormDialog({
   const [notesEn, setNotesEn] = useState("")
   const [notesAr, setNotesAr] = useState("")
   const [format, setFormat] = useState<ProgramFormat>("interactive")
-  const [selectedSubscriberId, setSelectedSubscriberId] = useState("")
   const [selectedTemplateId, setSelectedTemplateId] = useState("")
   const [createNewVersion, setCreateNewVersion] = useState(true)
   const [pdfContentId, setPdfContentId] = useState("")
@@ -566,6 +577,25 @@ export function WorkoutProgramFormDialog({
                     </span>
                   </div>
                 ) : null}
+
+                {/* Live PT contraindications for the assigned subscriber */}
+                {selectedSubscriber && openPtRestrictions.length > 0 && subscriberPt ? (
+                  <div className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50/80 p-3 text-[12px] text-rose-950">
+                    <ShieldAlert className="size-4 shrink-0 text-rose-600 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="font-bold">
+                        {isAr
+                          ? `ملف تأهيل نشط: ${subscriberPt.injuryTitle[locale] || subscriberPt.injuryTitle.en}`
+                          : `Active rehab case: ${subscriberPt.injuryTitle[locale] || subscriberPt.injuryTitle.en}`}
+                      </p>
+                      <p className="mt-0.5 text-[11.5px] text-rose-800/90">
+                        {isAr
+                          ? `${openPtRestrictions.length} موانع حركة معتمدة — ستظهر تحذيرات عند إضافة تمارين متعارضة.`
+                          : `${openPtRestrictions.length} approved restrictions — conflicting exercises will be flagged below.`}
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
@@ -844,11 +874,40 @@ export function WorkoutProgramFormDialog({
                             (v) => v.id === ex.videoContentId,
                           )
 
+                          const exerciseLabel =
+                            typeof ex.name === "string"
+                              ? ex.name
+                              : `${ex.name?.en || ""} ${ex.name?.ar || ""}`
+                          const ptHit = openPtRestrictions.find((r) =>
+                            exerciseConflictsWithRestriction(exerciseLabel, r),
+                          )
+
                           return (
                             <div
                               key={ex.id}
-                              className="rounded-2xl border border-[#E5E5E5] bg-white p-4 shadow-sm space-y-3"
+                              className={cn(
+                                "rounded-2xl border bg-white p-4 shadow-sm space-y-3",
+                                ptHit
+                                  ? "border-rose-300 ring-1 ring-rose-100"
+                                  : "border-[#E5E5E5]",
+                              )}
                             >
+                              {ptHit ? (
+                                <div className="flex items-start gap-2 rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-[11.5px] text-rose-900">
+                                  <ShieldAlert className="size-3.5 shrink-0 text-rose-600 mt-0.5" />
+                                  <span>
+                                    <strong>
+                                      {isAr ? "تعارض مع التأهيل: " : "PT conflict: "}
+                                    </strong>
+                                    {isAr ? "البديل الآمن: " : "Safe substitute: "}
+                                    <strong>
+                                      {ptHit.safeAlternative[locale] ||
+                                        ptHit.safeAlternative.en}
+                                    </strong>
+                                  </span>
+                                </div>
+                              ) : null}
+
                               <div className="flex items-center justify-between gap-2">
                                 <span className="flex size-6 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] text-[11px] font-extrabold text-white">
                                   {idx + 1}

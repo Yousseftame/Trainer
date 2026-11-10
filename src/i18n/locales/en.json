@@ -663,7 +663,8 @@
         "registration": "Registration",
         "approval": "Approval",
         "activation": "Activation",
-        "expiration": "Expiration"
+        "expiration": "Expiration",
+        "subscription_change": "Package change"
       },
       "noticeStatus": {
         "queued": "Queued",
@@ -671,13 +672,14 @@
         "failed": "Failed"
       },
       "unreadBadge": "New",
+      "reviewRequest": "Review & act",
       "channel": {
         "email": "Email",
         "push": "Push alarm"
       },
       "inbox": {
         "title": "Operational emails",
-        "note": "Registration, approval, activation, and expiration reminders. Send only the queued items — nothing is broadcast."
+        "note": "Registration, approval, activation, expiration, and package-change requests. Send only the queued items — nothing is broadcast."
       },
       "activity": {
         "title": "Subscriber activity",
@@ -738,12 +740,12 @@
         "packages": "Package occupancy",
         "packagesHint": "Live packages with active, pending, and expiring seats.",
         "notices": "Email log",
-        "noticesHint": "Registration, approval, activation, and expiration emails.",
+        "noticesHint": "Registration, approval, activation, expiration, and package-change notices.",
         "roster": "Subscriber roster",
         "rosterHint": "Current accounts with package, dates, and last check-in. Rejected requests excluded."
       },
       "empty": {
-        "inbox": "No operational notices yet — they appear when registrations, approvals, activations, or expirations fire.",
+        "inbox": "No operational notices yet — they appear when registrations, approvals, activations, expirations, or package-change requests fire.",
         "expiring": "No active subscriptions end in the next 21 days.",
         "activity": "No active subscribers to report on yet.",
         "packages": "No live packages to summarize.",
@@ -854,13 +856,13 @@
     "slideHint": "Slide the handle all the way to submit your request",
     "slideLabel": "Slide to reserve your spot",
     "slideDone": "Reserved",
-    "slideError": "Please complete the form",
+    "slideError": "Fix the highlighted fields and try again",
     "success": "Thank you! Your submission has been received.",
     "successHint": "We’ll review your details and get back to you shortly.",
     "newForm": "Submit another request",
     "toast": {
       "success": "Request sent successfully",
-      "invalid": "Please fill in all fields correctly",
+      "invalid": "Please fix the highlighted fields",
       "failed": "Something went wrong. Please try again."
     },
     "fields": {
@@ -878,6 +880,20 @@
       "phone": "+20",
       "plan": "Select one...",
       "message": "Tell us about your goals or ask a question..."
+    },
+    "errors": {
+      "firstNameRequired": "Enter your first name",
+      "firstNameShort": "First name must be at least 2 characters",
+      "lastNameRequired": "Enter your last name",
+      "lastNameShort": "Last name must be at least 2 characters",
+      "emailRequired": "Enter your email address",
+      "emailInvalid": "Enter a valid email like name@example.com",
+      "phoneRequired": "Enter your phone number",
+      "phoneInvalid": "Enter a valid phone number (at least 8 digits)",
+      "planRequired": "Select a plan",
+      "messageRequired": "Write a short message about your goals",
+      "messageShort": "Message must be at least {{min}} characters",
+      "messageLong": "Message must be {{max}} characters or fewer"
     }
   },
   "goalsBanner": {

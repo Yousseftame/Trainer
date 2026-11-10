@@ -29,6 +29,7 @@ export type NoticeKind =
   | "approval"
   | "activation"
   | "expiration"
+  | "subscription_change"
 
 export type NoticeStatus = "queued" | "sent" | "failed"
 export type NoticeChannel = "email" | "push" | "email+push"
@@ -59,6 +60,8 @@ export type OpsNotice = {
   mailQueued?: boolean
   /** Staff inbox badge — true until opened on Reports. */
   unread?: boolean
+  /** Optional deep-link for the Reports “View” action / FCM click. */
+  actionUrl?: string
 }
 
 export type ActivityRow = {

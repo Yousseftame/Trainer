@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { AnimatePresence, motion } from "motion/react"
@@ -7,7 +7,11 @@ import { ProfileMenu } from "@/components/dashboard/ProfileMenu"
 import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher"
 import { APP_ROUTES } from "@/config/constants"
 import { useAuth } from "@/features/auth/auth-context"
-import { currentSubscriptionFor, getPackageById } from "@/features/subscriptions/demo"
+import { pickCurrentSubscription } from "@/features/subscriptions/entitlements"
+import {
+  usePackageByIdQuery,
+  useSubscriberSubscriptionsQuery,
+} from "@/features/subscriptions/hooks"
 import { useLocale } from "@/hooks/useLocale"
 import { cn } from "@/lib/utils"
 
@@ -32,8 +36,12 @@ export function SubscriberTopbar({
   const { user } = useAuth()
   const [query, setQuery] = useState("")
 
-  const sub = user?.uid ? currentSubscriptionFor(user.uid) : null
-  const pkg = getPackageById(sub?.packageId)
+  const { data: subscriptions = [] } = useSubscriberSubscriptionsQuery(user?.uid)
+  const sub = useMemo(
+    () => pickCurrentSubscription(subscriptions),
+    [subscriptions],
+  )
+  const { data: pkg } = usePackageByIdQuery(sub?.packageId)
 
   return (
     <header

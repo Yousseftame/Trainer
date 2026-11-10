@@ -63,22 +63,3 @@ export {
   PROGRESS_QUERY_KEYS,
 } from "@/features/progress/hooks"
 
-/** @deprecated Empty seeds — kept for reports/overview shims */
-export {
-  DEMO_ADHERENCE,
-  DEMO_LIFTS,
-  DEMO_MEASUREMENTS,
-  DEMO_PHOTOS,
-  DEMO_TODAY,
-  adherenceFor,
-  adherenceScore,
-  daysSinceCheckIn,
-  isStale,
-  lastCheckIn,
-  latestWeek,
-  liftsFor,
-  measurementsFor,
-  photosFor,
-  programsFor,
-  progressRoster,
-} from "@/features/progress/demo"

@@ -16,12 +16,13 @@ export type ContentCategory =
   | "education"
   | "reference";
 
+/** Deny-by-default — missing keys must never unlock content. */
 const DEFAULT_ENTITLEMENTS: PackageEntitlements = {
-  workoutProgram: true,
-  nutritionProgram: true,
-  exerciseVideos: true,
-  pdfDocuments: true,
-  progressTracking: true,
+  workoutProgram: false,
+  nutritionProgram: false,
+  exerciseVideos: false,
+  pdfDocuments: false,
+  progressTracking: false,
 };
 
 export function normalizeEntitlements(
@@ -61,6 +62,7 @@ export type ContentAccessInput = {
   requiredEntitlement?: string;
   packageIds?: string[];
   subscriberIds?: string[];
+  programIds?: string[];
 };
 
 export type ContentAccessResult = {
@@ -79,6 +81,12 @@ export function evaluateSubscriberContentAccess(input: {
   subscriptionStatus: string | null;
   packageId: string | null;
   entitlements: PackageEntitlements;
+  /** Content asset ids linked from the subscriber's assigned programs */
+  linkedAssetIds?: Set<string> | string[];
+  /** Program document ids currently/previously assigned to the subscriber */
+  assignedProgramIds?: Set<string> | string[];
+  /** Asset id being evaluated (for linkedAssetIds match) */
+  assetId?: string;
 }): ContentAccessResult {
   const {asset, subscriberId, subscriberStatus, subscriptionStatus, packageId} =
     input;
@@ -107,12 +115,23 @@ export function evaluateSubscriberContentAccess(input: {
     ? asset.subscriberIds
     : [];
   const packageIds = Array.isArray(asset.packageIds) ? asset.packageIds : [];
+  const programIds = Array.isArray(asset.programIds) ? asset.programIds : [];
   const directlyAssigned = subscriberIds.includes(subscriberId);
   const inPackage = Boolean(packageId && packageIds.includes(packageId));
   const visibility = (asset.visibility || "package") as ContentVisibility;
 
+  const linkedAssetIds = toIdSet(input.linkedAssetIds);
+  const assignedProgramIds = toIdSet(input.assignedProgramIds);
+  const linkedFromProgram =
+    Boolean(input.assetId && linkedAssetIds.has(input.assetId)) ||
+    programIds.some((id) => assignedProgramIds.has(id));
+
   if (directlyAssigned) {
     return {allowed: true, reason: "direct_assignment"};
+  }
+
+  if (linkedFromProgram) {
+    return {allowed: true, reason: "program_link"};
   }
 
   if (visibility === "assigned") {
@@ -130,17 +149,24 @@ export function evaluateSubscriberContentAccess(input: {
   return {allowed: false, reason: "not_linked"};
 }
 
+function toIdSet(value?: Set<string> | string[]): Set<string> {
+  if (!value) return new Set();
+  if (value instanceof Set) return value;
+  return new Set(value.map(String));
+}
+
 export function resolveEffectiveSubscriptionStatus(
   status: string | undefined,
   endsAt: string | null | undefined,
   now: Date = new Date(),
 ): string | null {
   if (!status) return null;
-  if (status === "active" && endsAt) {
+  const normalized = status === "terminated" ? "cancelled" : status;
+  if (normalized === "active" && endsAt) {
     const endMs = new Date(endsAt).getTime();
     if (!Number.isNaN(endMs) && endMs < now.getTime()) {
       return "expired";
     }
   }
-  return status;
+  return normalized;
 }

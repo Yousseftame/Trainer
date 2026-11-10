@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import {
@@ -14,6 +14,7 @@ import {
   Info,
   RefreshCw,
   Scale,
+  ShieldAlert,
   Utensils,
 } from "lucide-react"
 import adminBanner from "@/assets/admin.webp"
@@ -21,10 +22,6 @@ import { StatCard } from "@/components/dashboard/StatCard"
 import { MealChangeModal } from "@/components/subscriber/MealChangeModal"
 import { MealPhotoUploadDialog } from "@/components/subscriber/MealPhotoUploadDialog"
 import { useContentAssetsQuery } from "@/features/content/hooks"
-import {
-  dayMacros,
-  resolveBilingualText,
-} from "@/features/nutrition/demo"
 import {
   useLogNutritionAdherenceMutation,
   useNutritionLogsQuery,
@@ -34,6 +31,7 @@ import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatDate } from "@/lib/format"
+import { dayMacros, resolveBilingualText } from "@/lib/program-text"
 import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 import type {
@@ -54,39 +52,64 @@ export function NutritionPlanPage() {
   const todayFormatted = formatDate(new Date().toISOString(), locale)
 
   const { subscriber: currentSubscriber, subscriberId } = usePanelSubscriber()
-  const { data: allPrograms = [] } = useNutritionProgramsQuery({
+  const {
+    data: allPrograms = [],
+    isLoading: programsLoading,
+    isError: programsError,
+    refetch: refetchPrograms,
+  } = useNutritionProgramsQuery({
     subscriberId,
     enabled: Boolean(subscriberId),
   })
   const { data: contentAssets = [] } = useContentAssetsQuery({
     audience: "subscriber",
+    enabled: Boolean(subscriberId),
   })
 
   const activePlan = useMemo(() => {
-    return allPrograms.find((p) => p.status === "active") ?? allPrograms[0] ?? null
+    return allPrograms.find((p) => p.status === "active") ?? null
   }, [allPrograms])
 
-  const { data: logs = [] } = useNutritionLogsQuery(subscriberId)
+  const entitledAssets = useMemo(
+    () => contentAssets.filter((asset) => asset.accessAllowed !== false),
+    [contentAssets],
+  )
+
+  const { data: logs = [], isLoading: logsLoading } = useNutritionLogsQuery({
+    subscriberId,
+    enabled: Boolean(subscriberId),
+  })
   const logMutation = useLogNutritionAdherenceMutation()
 
   const [selectedDayIdx, setSelectedDayIdx] = useState(0)
+  const [didAutoSelectToday, setDidAutoSelectToday] = useState(false)
   const [logging, setLogging] = useState(false)
 
-  // Track meal slot completions locally for today
+  // Local UI-only meal tracking (session substitutes / photos — not program mutations)
   const [completedSlots, setCompletedSlots] = useState<Record<string, boolean>>({})
-
-  // Track meal item substitutions locally: itemId -> substitute MealAlternative
   const [swappedItems, setSwappedItems] = useState<
     Record<string, { substitute: MealAlternative; reason: string }>
   >({})
-
-  // Track meal photo uploads locally: slotId -> { photoUrl, note }
   const [slotPhotos, setSlotPhotos] = useState<
     Record<string, { photoUrl: string; note?: string }>
   >({})
-
-  // Expandable coaching notes toggle per slot
   const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    setCompletedSlots({})
+    setSwappedItems({})
+    setSlotPhotos({})
+    setDidAutoSelectToday(false)
+    setSelectedDayIdx(0)
+  }, [activePlan?.id])
+
+  useEffect(() => {
+    if (!activePlan?.days?.length || didAutoSelectToday) return
+    const todayWeekday = (new Date().getDay() + 6) % 7
+    const idx = activePlan.days.findIndex((d) => d.weekday === todayWeekday)
+    if (idx >= 0) setSelectedDayIdx(idx)
+    setDidAutoSelectToday(true)
+  }, [activePlan, didAutoSelectToday])
 
   // Modal states
   const [changeModalItem, setChangeModalItem] = useState<{
@@ -136,7 +159,35 @@ export function NutritionPlanPage() {
 
   const dayMacroSummary = dayMacros(selectedDay)
   const todayIso = new Date().toISOString().slice(0, 10)
-  const isTodayLogged = logs.some((l) => l.date === todayIso)
+  const isPdfPlan = activePlan?.format === "pdf"
+  const pdfAsset = useMemo(() => {
+    if (!activePlan?.pdfContentId) return null
+    return entitledAssets.find((a) => a.id === activePlan.pdfContentId) ?? null
+  }, [activePlan?.pdfContentId, entitledAssets])
+
+  const loggedDayIds = useMemo(() => {
+    if (!activePlan) return new Set<string>()
+    return new Set(
+      logs
+        .filter(
+          (l) =>
+            l.programId === activePlan.id &&
+            (l.status === "adhered" || l.status === "mostly"),
+        )
+        .map((l) => l.dayId)
+        .filter((id): id is string => Boolean(id)),
+    )
+  }, [logs, activePlan])
+
+  const isTodayLogged = Boolean(
+    activePlan &&
+      logs.some(
+        (l) =>
+          l.programId === activePlan.id &&
+          l.date === todayIso &&
+          (!selectedDay?.id || !l.dayId || l.dayId === selectedDay.id),
+      ),
+  )
 
   // Handlers
   function toggleSlotCompleted(slotId: string) {
@@ -181,30 +232,36 @@ export function NutritionPlanPage() {
     }))
   }
 
-  // PDF Export / Download
   function handleDownloadPdf() {
-    if (activePlan?.format === "pdf" && activePlan.pdfContentId) {
-      const asset = contentAssets.find((a) => a.id === activePlan.pdfContentId)
-      if (asset?.fileUrl) {
-        window.open(asset.fileUrl, "_blank")
-        return
-      }
+    if (pdfAsset?.fileUrl) {
+      window.open(pdfAsset.fileUrl, "_blank", "noopener,noreferrer")
+      return
+    }
+    if (isPdfPlan) {
+      appToast.error(
+        isAr
+          ? "ملف PDF غير متاح حالياً. تأكد من صلاحية الباقة أو تواصل مع المدرب."
+          : "PDF is unavailable. Check your package access or contact your coach.",
+      )
+      return
     }
     window.print()
   }
 
-  // Full Day Adherence Log Mutation
   async function handleLogTodayAdherence(status: "adhered" | "mostly") {
-    if (!activePlan || !currentSubscriber) return
+    if (!activePlan || !currentSubscriber || !selectedDay) return
     setLogging(true)
     try {
       await logMutation.mutateAsync({
         subscriberId: currentSubscriber.id,
         programId: activePlan.id,
         date: todayIso,
+        dayId: selectedDay.id,
+        weekday: selectedDay.weekday,
         status,
-        caloriesActual: dayMacroSummary?.calories || activePlan.targetCalories || 1690,
-        waterLitersActual: activePlan.targetWaterLiters || 3.0,
+        caloriesActual:
+          dayMacroSummary?.calories || activePlan.targetCalories || undefined,
+        waterLitersActual: activePlan.targetWaterLiters || undefined,
         notes:
           status === "adhered"
             ? isAr
@@ -214,6 +271,12 @@ export function NutritionPlanPage() {
               ? "التزام جزئي بمعظم الوجبات"
               : "Mostly followed meals",
       })
+      // Mark all slots complete locally after a successful day log
+      if (selectedDay.meals.length) {
+        const next: Record<string, boolean> = {}
+        for (const slot of selectedDay.meals) next[slot.id] = true
+        setCompletedSlots((prev) => ({ ...prev, ...next }))
+      }
       appToast.success(
         isAr ? "تم تسجيل الالتزام بنجاح في سجلك!" : "Today's nutrition adherence logged!",
       )
@@ -224,12 +287,41 @@ export function NutritionPlanPage() {
     }
   }
 
-  // Completion calculation for selected day
   const mealsCount = selectedDay?.meals.length ?? 0
   const completedCount =
     selectedDay?.meals.filter((m) => m.completed).length ?? 0
   const completionPercent =
     mealsCount > 0 ? Math.round((completedCount / mealsCount) * 100) : 0
+
+  if (!subscriberId || programsLoading || logsLoading) {
+    return (
+      <div className="flex min-h-64 flex-col items-center justify-center rounded-[28px] bg-white p-8 text-center shadow-xs border border-black/[0.04]">
+        <Apple className="size-10 mb-3 animate-pulse text-[#fb5001] stroke-1" />
+        <p className="text-[13px] font-medium text-[#8c8c8c]">
+          {isAr ? "جاري تحميل الخطة الغذائية..." : "Loading your nutrition plan..."}
+        </p>
+      </div>
+    )
+  }
+
+  if (programsError) {
+    return (
+      <div className="flex min-h-64 flex-col items-center justify-center gap-3 rounded-[28px] bg-white p-8 text-center shadow-xs border border-black/[0.04]">
+        <ShieldAlert className="size-10 text-rose-500 stroke-1" />
+        <h2 className="font-heading text-[18px] font-extrabold text-[#111111]">
+          {isAr ? "تعذر تحميل الخطة الغذائية" : "Could not load nutrition plan"}
+        </h2>
+        <button
+          type="button"
+          onClick={() => void refetchPrograms()}
+          className="inline-flex items-center gap-2 rounded-full bg-[#111111] px-4 py-2 text-[12px] font-bold text-white"
+        >
+          <RefreshCw className="size-3.5" />
+          {isAr ? "إعادة المحاولة" : "Retry"}
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-4 pb-14">
@@ -241,9 +333,16 @@ export function NutritionPlanPage() {
           </h2>
           <p className="mt-1 max-w-md text-[13px] text-[#8c8c8c]">
             {isAr
-              ? "يقوم المدرب بتجهيز خطتك الغذائية والسعرات المناسبة لأهدافك البدنية."
-              : "Your coach will assign your customized nutrition plan soon."}
+              ? "يقوم المدرب بتجهيز خطتك الغذائية والسعرات المناسبة لأهدافك البدنية. يمكنك مراجعة الخطط السابقة من السجل."
+              : "Your coach will assign your customized nutrition plan soon. Previous plans stay in History."}
           </p>
+          <Link
+            to="/app/history"
+            className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#111111] px-4 py-2 text-[12px] font-bold text-white"
+          >
+            <History className="size-3.5" />
+            {isAr ? "عرض السجل" : "View history"}
+          </Link>
         </div>
       ) : (
         <div className="flex flex-col gap-4">
@@ -302,9 +401,21 @@ export function NutritionPlanPage() {
                   </p>
                   <span className="text-white/30">•</span>
                   <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-0.5 text-[12px] font-black text-white backdrop-blur-xs border border-white/15">
-                    <span>kCal {activePlan.targetCalories ?? 1690}</span>
+                    <span>
+                      {activePlan.targetCalories != null
+                        ? `kCal ${activePlan.targetCalories}`
+                        : isAr
+                          ? "سعرات حسب الخطة"
+                          : "Plan calories"}
+                    </span>
                     <Flame className="size-3.5 text-[var(--gym-orange,#fb5001)] fill-[var(--gym-orange,#fb5001)]" />
                   </div>
+                  {isTodayLogged ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-bold text-white border border-white/20">
+                      <CheckCircle2 className="size-3 text-[var(--gym-orange,#fb5001)]" />
+                      {isAr ? "تم تسجيل اليوم" : "Today logged"}
+                    </span>
+                  ) : null}
                 </div>
 
                 {/* Main Title */}
@@ -362,38 +473,52 @@ export function NutritionPlanPage() {
             </div>
           </section>
 
-          {/* 2. Daily Targets (DerpyFit Default Stat Cards) */}
+          {/* 2. Daily Targets from assigned plan (no dummy defaults) */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatCard
               label={isAr ? "السعرات اليومية" : "Daily Calories"}
-              value={activePlan.targetCalories ?? 1690}
+              value={activePlan.targetCalories ?? "—"}
               hint={isAr ? "كيلو كالوري / يوم" : "kcal / day"}
               icon={<Flame className="size-4" strokeWidth={1.8} />}
             />
             <StatCard
               label={isAr ? "البروتين" : "Protein Target"}
-              value={`${activePlan.macros?.proteinGrams ?? 155}g`}
+              value={
+                activePlan.macros?.proteinGrams != null
+                  ? `${activePlan.macros.proteinGrams}g`
+                  : "—"
+              }
               hint={isAr ? "جرام بروتين يومياً" : "Grams per day"}
               icon={<Utensils className="size-4" strokeWidth={1.8} />}
             />
             <StatCard
               label={isAr ? "الكاربوهيدرات" : "Carbohydrates"}
-              value={`${activePlan.macros?.carbsGrams ?? 185}g`}
+              value={
+                activePlan.macros?.carbsGrams != null
+                  ? `${activePlan.macros.carbsGrams}g`
+                  : "—"
+              }
               hint={isAr ? "جرام كاربوهيدرات" : "Grams per day"}
               icon={<Apple className="size-4" strokeWidth={1.8} />}
             />
             <StatCard
               label={isAr ? "الماء المستهدف" : "Hydration"}
-              value={`${activePlan.targetWaterLiters ?? 3.0}L`}
+              value={
+                activePlan.targetWaterLiters != null
+                  ? `${activePlan.targetWaterLiters}L`
+                  : "—"
+              }
               hint={isAr ? "لتر ماء / يوم" : "Liters per day"}
               icon={<Droplet className="size-4" strokeWidth={1.8} />}
             />
           </div>
 
-          {/* 3. Days Horizontal Strip (Matching Workout Schedule Styling) */}
+          {/* 3. Days Horizontal Strip */}
+          {!isPdfPlan ? (
           <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5 no-scrollbar">
             {programDays.map((d, idx) => {
               const active = idx === selectedDayIdx
+              const dayDone = Boolean(d.id && loggedDayIds.has(d.id))
               const dayTitle = isAr ? WEEKDAY_NAMES_AR[idx] : WEEKDAY_NAMES_EN[idx]
 
               return (
@@ -402,12 +527,22 @@ export function NutritionPlanPage() {
                   type="button"
                   onClick={() => setSelectedDayIdx(idx)}
                   className={cn(
-                    "flex min-w-[74px] sm:min-w-[88px] h-[78px] sm:h-[86px] shrink-0 flex-col items-center justify-center rounded-2xl p-2 text-center transition shadow-2xs border select-none",
+                    "relative flex min-w-[74px] sm:min-w-[88px] h-[78px] sm:h-[86px] shrink-0 flex-col items-center justify-center rounded-2xl p-2 text-center transition shadow-2xs border select-none",
                     active
                       ? "bg-[#fb5001] border-[#fb5001] text-white shadow-md scale-[1.02]"
-                      : "bg-[#181818] border-transparent text-white/80 hover:bg-[#222222] hover:text-white",
+                      : dayDone
+                        ? "bg-[#181818] border-[#fb5001]/50 text-white/90 hover:bg-[#222222]"
+                        : "bg-[#181818] border-transparent text-white/80 hover:bg-[#222222] hover:text-white",
                   )}
                 >
+                  {dayDone ? (
+                    <CheckCircle2
+                      className={cn(
+                        "absolute top-1.5 end-1.5 size-3.5",
+                        active ? "text-white" : "text-[#fb5001]",
+                      )}
+                    />
+                  ) : null}
                   <span className="text-[11px] font-bold uppercase tracking-wider opacity-80">
                     {dayTitle}
                   </span>
@@ -420,12 +555,17 @@ export function NutritionPlanPage() {
                       active ? "text-white/95" : "text-white/60",
                     )}
                   >
-                    {d.meals.length} {isAr ? "وجبات" : "meals"}
+                    {dayDone
+                      ? isAr
+                        ? "تم"
+                        : "Done"
+                      : `${d.meals.length} ${isAr ? "وجبات" : "meals"}`}
                   </span>
                 </button>
               )
             })}
           </div>
+          ) : null}
 
           {/* 4. Day Adherence Tracker Bar */}
           <div className="rounded-[22px] bg-white p-4 shadow-2xs border border-black/[0.04] flex flex-col sm:flex-row sm:items-center justify-between gap-3">

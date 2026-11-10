@@ -33,6 +33,3 @@ export {
 } from "@/features/physicalTherapy/hooks"
 
 export { buildRestrictionMatchTokens } from "@/features/physicalTherapy/paths"
-
-/** @deprecated Empty seed */
-export { DEMO_PT_RECORDS } from "@/features/physicalTherapy/demo"

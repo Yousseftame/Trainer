@@ -16,12 +16,13 @@ export type PackageEntitlementKey =
 
 export type PackageEntitlements = Record<PackageEntitlementKey, boolean>
 
+/** Deny-by-default — missing keys must never unlock content. */
 export const DEFAULT_PACKAGE_ENTITLEMENTS: PackageEntitlements = {
-  workoutProgram: true,
-  nutritionProgram: true,
-  exerciseVideos: true,
-  pdfDocuments: true,
-  progressTracking: true,
+  workoutProgram: false,
+  nutritionProgram: false,
+  exerciseVideos: false,
+  pdfDocuments: false,
+  progressTracking: false,
 }
 
 export type SubscriptionPackage = {

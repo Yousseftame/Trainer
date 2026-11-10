@@ -35,8 +35,19 @@ export function useContentAssetsQuery(options?: ContentQueryOptions) {
       audience === "subscriber"
         ? fetchSubscriberContentLibrary
         : fetchContentAssets,
-    staleTime: QUERY_STALE_TIMES.catalog,
+    staleTime:
+      audience === "subscriber"
+        ? QUERY_STALE_TIMES.subscriberDashboard
+        : QUERY_STALE_TIMES.catalog,
     enabled: options?.enabled ?? true,
+  })
+}
+
+function invalidateAllContentCaches(queryClient: ReturnType<typeof useQueryClient>) {
+  // Staff catalog + subscriber entitled library (signed URLs / locks)
+  void queryClient.invalidateQueries({ queryKey: CONTENT_QUERY_KEYS.all })
+  void queryClient.invalidateQueries({
+    queryKey: CONTENT_QUERY_KEYS.subscriberLibrary,
   })
 }
 
@@ -45,7 +56,7 @@ export function useSaveContentAssetMutation() {
   return useMutation({
     mutationFn: (input: SaveContentAssetInput) => saveContentAsset(input),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: CONTENT_QUERY_KEYS.all })
+      invalidateAllContentCaches(queryClient)
     },
   })
 }
@@ -56,7 +67,7 @@ export function useUpdateContentAssociationsMutation() {
     mutationFn: (input: UpdateContentAssociationsInput) =>
       updateContentAssociations(input),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: CONTENT_QUERY_KEYS.all })
+      invalidateAllContentCaches(queryClient)
     },
   })
 }
@@ -66,7 +77,7 @@ export function useDeleteContentAssetMutation() {
   return useMutation({
     mutationFn: (assetId: string) => deleteContentAsset(assetId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: CONTENT_QUERY_KEYS.all })
+      invalidateAllContentCaches(queryClient)
     },
   })
 }

@@ -19,14 +19,9 @@ import { useAuth } from "@/features/auth/auth-context"
 import { evaluateSubscriberContentAccess } from "@/features/content/access"
 import { useMySubscriberQuery } from "@/features/subscribers/hooks"
 import {
-  currentSubscriptionFor,
-  getPackageById,
-} from "@/features/subscriptions/cache"
-import {
-  usePackagesQuery,
+  usePackageByIdQuery,
   useSubscriberSubscriptionsQuery,
 } from "@/features/subscriptions/hooks"
-import type { CatalogPackage } from "@/features/subscriptions/types"
 import { useLocale } from "@/hooks/useLocale"
 import type { ContentAsset } from "@/types/content"
 import { formatDuration } from "@/lib/format"
@@ -88,7 +83,6 @@ export function ContentPreviewDialog({
   const { data: mySubs = [] } = useSubscriberSubscriptionsQuery(
     !isAdmin ? mySubscriber?.id : undefined,
   )
-  usePackagesQuery({ enabled: !isAdmin })
 
   const currentSubscriber = mySubscriber ?? null
   const mySubscription = useMemo(() => {
@@ -96,9 +90,13 @@ export function ContentPreviewDialog({
     return (
       mySubs.find((s) => s.status === "active" || s.status === "suspended") ??
       mySubs[0] ??
-      currentSubscriptionFor(currentSubscriber.id)
+      null
     )
   }, [currentSubscriber, mySubs])
+
+  const { data: livePackage = null } = usePackageByIdQuery(
+    !isAdmin ? mySubscription?.packageId : undefined,
+  )
 
   const access = useMemo(() => {
     if (isAdmin) {
@@ -129,18 +127,21 @@ export function ContentPreviewDialog({
       asset,
       subscriber: currentSubscriber,
       subscription: mySubscription,
-      pkg: getPackageById(mySubscription?.packageId) as
-        | CatalogPackage
-        | undefined,
+      pkg: livePackage,
     })
-  }, [isAdmin, asset, currentSubscriber, mySubscription])
+  }, [isAdmin, asset, currentSubscriber, mySubscription, livePackage])
 
   if (!asset || typeof document === "undefined") return null
 
-  const mediaUrl = asset.streamUrl || asset.fileUrl
+  // Never surface delivery URLs when the server marked the asset locked.
+  const mediaUrl =
+    access.allowed && asset.accessAllowed !== false
+      ? asset.streamUrl || asset.fileUrl
+      : undefined
 
   function handleCopyPath() {
-    if (!asset) return
+    if (!asset || !isAdmin) return
+    if (!asset.storagePath) return
     void navigator.clipboard?.writeText(asset.storagePath)
     setCopied(true)
     appToast.success(
@@ -273,10 +274,12 @@ export function ContentPreviewDialog({
                       {asset.description[locale]}
                     </p>
                     <div className="relative mt-4 flex flex-wrap items-center justify-center gap-2 text-[11px] font-bold">
-                      <span className="rounded-full bg-white/15 px-3 py-1">
-                        Provider: {(asset.videoProvider ?? "bunny").toUpperCase()}
-                      </span>
-                      {asset.videoAssetId ? (
+                      {isAdmin ? (
+                        <span className="rounded-full bg-white/15 px-3 py-1">
+                          Provider: {(asset.videoProvider ?? "bunny").toUpperCase()}
+                        </span>
+                      ) : null}
+                      {isAdmin && asset.videoAssetId ? (
                         <span className="rounded-full bg-white/15 px-3 py-1 font-mono">
                           Asset ID: {asset.videoAssetId}
                         </span>
@@ -285,6 +288,13 @@ export function ContentPreviewDialog({
                         {formatDuration(asset.durationSeconds)}
                       </span>
                     </div>
+                    {!isAdmin ? (
+                      <p className="relative mt-3 max-w-sm text-[12px] text-white/70">
+                        {isAr
+                          ? "تعذر تحميل رابط التشغيل المصرّح. أعد فتح المكتبة أو تواصل مع المدرب."
+                          : "Authorized stream URL is missing. Refresh the library or contact your coach."}
+                      </p>
+                    ) : null}
                   </div>
                 )
               ) : mediaUrl ? (

@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import {
   CalendarClock,
@@ -32,6 +32,8 @@ import {
 import {
   useAssignSubscriptionMutation,
   usePackagesQuery,
+  usePendingChangeRequestsQuery,
+  useResolveSubscriptionChangeRequestMutation,
   useSubscriptionsQuery,
   useUpdateSubscriptionLifecycleMutation,
 } from "@/features/subscriptions/hooks"
@@ -63,6 +65,9 @@ export function SubscriptionsPage() {
   const { locale } = useLocale()
   const { user } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const focusRequestId = searchParams.get("request") || ""
+  const focusRequestRef = useRef<HTMLDivElement | null>(null)
   useDocumentTitle(t("nav.subscriptions"))
 
   const {
@@ -77,6 +82,8 @@ export function SubscriptionsPage() {
     useSubscribersQuery()
   const assignMutation = useAssignSubscriptionMutation()
   const lifecycleMutation = useUpdateSubscriptionLifecycleMutation()
+  const { data: pendingChangeRequests = [] } = usePendingChangeRequestsQuery()
+  const resolveChangeMutation = useResolveSubscriptionChangeRequestMutation()
 
   const [query, setQuery] = useState("")
   const [status, setStatus] = useState<FilterMode>("all")
@@ -92,8 +99,21 @@ export function SubscriptionsPage() {
     onConfirm: () => Promise<void>
   } | null>(null)
 
+  useEffect(() => {
+    if (!focusRequestId || !pendingChangeRequests.length) return
+    const timer = window.setTimeout(() => {
+      focusRequestRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      })
+    }, 120)
+    return () => window.clearTimeout(timer)
+  }, [focusRequestId, pendingChangeRequests])
+
   const actionsBusy =
-    assignMutation.isPending || lifecycleMutation.isPending
+    assignMutation.isPending ||
+    lifecycleMutation.isPending ||
+    resolveChangeMutation.isPending
 
   const packageMap = useMemo(
     () => new Map(allPackages.map((p) => [p.id, p])),
@@ -339,6 +359,127 @@ export function SubscriptionsPage() {
           icon={<CalendarOff className="size-4" strokeWidth={1.8} />}
         />
       </div>
+
+      {pendingChangeRequests.length > 0 ? (
+        <section className="rounded-[24px] border border-amber-200/80 bg-amber-50/70 p-4 sm:p-5">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="font-heading text-[15px] font-extrabold text-amber-950">
+              {locale === "ar"
+                ? `طلبات تغيير الباقة (${pendingChangeRequests.length})`
+                : `Package change requests (${pendingChangeRequests.length})`}
+            </h3>
+          </div>
+          <div className="space-y-2.5">
+            {pendingChangeRequests.map((req) => {
+              const pkg = packageMap.get(req.packageId)
+              const name =
+                pkg?.name[locale] ||
+                req.packageName?.[locale] ||
+                req.packageId
+              const focused = focusRequestId === req.id
+              return (
+                <div
+                  key={req.id}
+                  ref={focused ? focusRequestRef : undefined}
+                  id={`change-request-${req.id}`}
+                  className={cn(
+                    "flex flex-col gap-3 rounded-2xl border bg-white p-3.5 sm:flex-row sm:items-center sm:justify-between",
+                    focused
+                      ? "border-[var(--gym-lime,#fb5001)] ring-2 ring-[var(--gym-lime,#fb5001)]/30 shadow-md"
+                      : "border-amber-200/70",
+                  )}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-bold text-[var(--gym-ink,#111111)]">
+                      {req.subscriberName || req.subscriberEmail || req.subscriberId}
+                    </p>
+                    <p className="mt-0.5 text-[12px] text-[#6B7280]">
+                      {locale === "ar" ? "الباقة المطلوبة: " : "Requested: "}
+                      <strong>{name}</strong>
+                      {" · "}
+                      {formatDate(req.createdAt, locale)}
+                    </p>
+                    {req.noteLocalized?.[locale] || req.note ? (
+                      <p className="mt-1 text-[12px] text-[#8c8c8c]">
+                        {req.noteLocalized?.[locale] || req.note}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={actionsBusy}
+                      onClick={() => {
+                        setConfirmDialog({
+                          open: true,
+                          title:
+                            locale === "ar"
+                              ? "اعتماد وتعيين الباقة"
+                              : "Approve & assign package",
+                          description:
+                            locale === "ar"
+                              ? `تعيين باقة "${name}" للمشترك الآن؟`
+                              : `Assign "${name}" to this subscriber now?`,
+                          confirmLabel:
+                            locale === "ar" ? "اعتماد وتعيين" : "Approve & assign",
+                          tone: "primary",
+                          onConfirm: async () => {
+                            await resolveChangeMutation.mutateAsync({
+                              requestId: req.id,
+                              decision: "approved",
+                              assignNow: true,
+                            })
+                            appToast.success(
+                              locale === "ar"
+                                ? "تم اعتماد الطلب وتعيين الباقة"
+                                : "Request approved and package assigned",
+                            )
+                          },
+                        })
+                      }}
+                      className="rounded-full bg-[var(--gym-ink,#111111)] px-3.5 py-1.5 text-[12px] font-bold text-white disabled:opacity-50"
+                    >
+                      {locale === "ar" ? "اعتماد وتعيين" : "Approve & assign"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={actionsBusy}
+                      onClick={() => {
+                        setConfirmDialog({
+                          open: true,
+                          title:
+                            locale === "ar" ? "رفض الطلب" : "Reject request",
+                          description:
+                            locale === "ar"
+                              ? "رفض طلب تغيير الباقة دون تعديل الاشتراك؟"
+                              : "Reject this package change without modifying the subscription?",
+                          confirmLabel:
+                            locale === "ar" ? "رفض" : "Reject",
+                          tone: "danger",
+                          onConfirm: async () => {
+                            await resolveChangeMutation.mutateAsync({
+                              requestId: req.id,
+                              decision: "rejected",
+                            })
+                            appToast.success(
+                              locale === "ar"
+                                ? "تم رفض الطلب"
+                                : "Request rejected",
+                            )
+                          },
+                        })
+                      }}
+                      className="rounded-full bg-white px-3.5 py-1.5 text-[12px] font-bold text-[#6B7280] border border-black/10 disabled:opacity-50"
+                    >
+                      {locale === "ar" ? "رفض" : "Reject"}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      ) : null}
 
       {subscriptionsError ? (
         <section className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-[24px] bg-white px-4 py-10 text-center">

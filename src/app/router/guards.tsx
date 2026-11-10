@@ -1,7 +1,11 @@
+import { useMemo } from "react"
 import { Navigate, Outlet, useLocation } from "react-router-dom"
 import { useAuth } from "@/features/auth/auth-context"
 import { hasLiveFirebaseSession } from "@/features/auth/session"
-import { currentSubscriptionFor, getPackageById } from "@/features/subscriptions/demo"
+import {
+  usePackageByIdQuery,
+  useSubscriberSubscriptionsQuery,
+} from "@/features/subscriptions/hooks"
 import { canAccessPackageEntitlement } from "@/features/subscriptions/entitlements"
 import { FullPageSpinner } from "@/components/feedback/FullPageSpinner"
 import { APP_ROUTES } from "@/config/constants"
@@ -10,7 +14,21 @@ import {
   resolveAdminLandingPath,
 } from "@/lib/permissions/can"
 import type { Permission } from "@/lib/permissions/permissions"
-import type { PackageEntitlementKey } from "@/types/subscription"
+import type {
+  PackageEntitlementKey,
+  SubscriberSubscription,
+} from "@/types/subscription"
+
+function pickCurrentSubscription(
+  list: SubscriberSubscription[] | undefined,
+): SubscriberSubscription | null {
+  if (!list?.length) return null
+  return (
+    list.find((item) => item.status === "active" || item.status === "suspended") ??
+    list[0] ??
+    null
+  )
+}
 
 export function RequireAuth() {
   const { status, user } = useAuth()
@@ -127,11 +145,16 @@ export function RequirePermission({ permission }: RequirePermissionProps) {
  * Authentication and role checks remain separate upstream.
  */
 export function RequireActiveSubscription() {
-  const { hasActiveSubscription, isAdmin, user } = useAuth()
+  const { hasActiveSubscription, isAdmin, user, subscriptionLoading } =
+    useAuth()
 
   // Admins never belong on /app — bounce them home
   if (isAdmin) {
     return <Navigate to={resolveAdminLandingPath(user)} replace />
+  }
+
+  if (subscriptionLoading) {
+    return <FullPageSpinner />
   }
 
   if (!hasActiveSubscription) {
@@ -143,30 +166,69 @@ export function RequireActiveSubscription() {
 
 /**
  * Package-level content access gate.
- * Enforces that the subscriber's active package grants the required content entitlement.
+ * Uses live Firestore subscription + package data (never the empty in-memory cache).
  */
 export function RequirePackageEntitlement({
   entitlement,
 }: {
   entitlement: PackageEntitlementKey | PackageEntitlementKey[]
 }) {
-  const { isAdmin, user, hasActiveSubscription } = useAuth()
+  const {
+    isAdmin,
+    user,
+    hasActiveSubscription,
+    status,
+    subscriptionLoading,
+  } = useAuth()
+  const subscriberId = user?.uid
+
+  const {
+    data: subscriptions,
+    isPending: subscriptionsPending,
+    isError: subscriptionsError,
+  } = useSubscriberSubscriptionsQuery(
+    !isAdmin && status === "authenticated" ? subscriberId : undefined,
+  )
+
+  const sub = useMemo(
+    () => pickCurrentSubscription(subscriptions),
+    [subscriptions],
+  )
+
+  const { data: pkg, isPending: packagePending } = usePackageByIdQuery(
+    sub?.packageId,
+  )
+
+  if (status === "loading" || status === "idle") {
+    return <FullPageSpinner />
+  }
 
   if (isAdmin) {
     return <Navigate to={resolveAdminLandingPath(user)} replace />
+  }
+
+  if (subscriptionLoading || subscriptionsPending) {
+    return <FullPageSpinner />
   }
 
   if (!hasActiveSubscription || !user) {
     return <Navigate to={APP_ROUTES.errors.subscriptionExpired} replace />
   }
 
-  const sub =
-    currentSubscriptionFor(user.uid) ||
-    (user.email ? currentSubscriptionFor(user.email) : null)
-  const pkg = getPackageById(sub?.packageId)
+  // Wait for package doc when the subscription references one.
+  if (sub?.packageId && packagePending && !pkg) {
+    return <FullPageSpinner />
+  }
+
+  if (subscriptionsError) {
+    return <Navigate to={APP_ROUTES.subscriber.subscription} replace />
+  }
 
   const keys = Array.isArray(entitlement) ? entitlement : [entitlement]
-  const hasAny = keys.some((k) => canAccessPackageEntitlement(sub, pkg, k))
+  // Prefer package entitlements; fall back to subscription snapshot / defaults.
+  const hasAny = keys.some((k) =>
+    canAccessPackageEntitlement(sub, pkg ?? undefined, k),
+  )
 
   if (!hasAny) {
     return <Navigate to={APP_ROUTES.subscriber.subscription} replace />

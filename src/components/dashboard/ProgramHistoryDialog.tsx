@@ -1,7 +1,8 @@
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { History, X } from "lucide-react"
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
+import { collectProgramVersionChain } from "@/features/programs/version-chain"
 import { useLocale } from "@/hooks/useLocale"
 import { formatDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
@@ -12,6 +13,8 @@ type ProgramHistoryDialogProps = {
   title: string
   subscriberName?: string
   programs: Array<WorkoutProgram | NutritionProgram>
+  /** Prefer showing the clicked version first (and its lineage). */
+  initialProgramId?: string
   type?: "workout" | "nutrition"
   onClose: () => void
 }
@@ -21,16 +24,34 @@ export function ProgramHistoryDialog({
   title,
   subscriberName,
   programs,
+  initialProgramId,
   onClose,
 }: ProgramHistoryDialogProps) {
   const { locale } = useLocale()
   const isAr = locale === "ar"
 
-  const sorted = [...programs].sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-  )
+  const sorted = useMemo(() => {
+    const source =
+      initialProgramId && programs.some((p) => p.id === initialProgramId)
+        ? collectProgramVersionChain(initialProgramId, programs)
+        : [...programs]
+    return source.sort(
+      (a, b) =>
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    )
+  }, [programs, initialProgramId])
 
-  const [selectedId, setSelectedId] = useState(sorted[0]?.id || "")
+  const [selectedId, setSelectedId] = useState("")
+
+  useEffect(() => {
+    if (!open) return
+    const preferred =
+      (initialProgramId && sorted.some((p) => p.id === initialProgramId)
+        ? initialProgramId
+        : sorted[0]?.id) || ""
+    setSelectedId(preferred)
+  }, [open, initialProgramId, sorted])
+
   const selected = sorted.find((p) => p.id === selectedId) || sorted[0]
 
   if (!open) return null
@@ -41,13 +62,9 @@ export function ProgramHistoryDialog({
       aria-modal="true"
       className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-5"
     >
-      <div
-        className="fixed inset-0 bg-black/60"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 bg-black/60" onClick={onClose} />
 
-      <div className="relative flex max-h-[90vh] w-full max-w-3xl flex-col rounded-[28px] bg-white shadow-2xl overflow-hidden">
-        {/* Header */}
+      <div className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl">
         <div className="flex shrink-0 items-center justify-between border-b border-[#F0F0F0] px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-2xl bg-[var(--gym-ink,#111111)] text-white">
@@ -74,64 +91,67 @@ export function ProgramHistoryDialog({
           </button>
         </div>
 
-        {/* Content Body */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden sm:flex-row">
-          {/* Version List Sidebar */}
-          <div className="w-full border-b border-[#ECECEC] p-3 sm:w-64 sm:border-b-0 sm:border-e overflow-y-auto space-y-2">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-[#8c8c8c] px-2 mb-2">
+          <div className="w-full space-y-2 overflow-y-auto border-b border-[#ECECEC] p-3 sm:w-64 sm:border-b-0 sm:border-e">
+            <p className="mb-2 px-2 text-[11px] font-bold uppercase tracking-wider text-[#8c8c8c]">
               {isAr ? "سجل الإصدارات" : "Version History"}
             </p>
-            {sorted.map((item) => {
-              const active = item.id === selected?.id
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setSelectedId(item.id)}
-                  className={cn(
-                    "w-full rounded-2xl p-3 text-start transition-all",
-                    active
-                      ? "bg-[var(--gym-ink,#111111)] text-white shadow-sm"
-                      : "bg-[#F8F9FA] text-[var(--gym-ink,#111111)] hover:bg-[#EBEBEB]",
-                  )}
-                >
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="font-heading text-[13px] font-extrabold truncate">
-                      {item.title[locale]}
-                    </span>
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[10px] font-extrabold",
-                        active
-                          ? "bg-white/20 text-white"
-                          : item.status === "active"
-                            ? "bg-black/10 text-[var(--gym-ink,#111111)]"
-                            : "bg-gray-200 text-gray-700",
-                      )}
-                    >
-                      v{item.version}
-                    </span>
-                  </div>
-                  <p
+            {sorted.length === 0 ? (
+              <p className="px-2 text-[12px] text-[#8c8c8c]">
+                {isAr ? "لا توجد إصدارات." : "No versions available."}
+              </p>
+            ) : (
+              sorted.map((item) => {
+                const active = item.id === selected?.id
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setSelectedId(item.id)}
                     className={cn(
-                      "mt-1 text-[11px] font-medium",
-                      active ? "text-white/70" : "text-[#8c8c8c]",
+                      "w-full rounded-2xl p-3 text-start transition-all",
+                      active
+                        ? "bg-[var(--gym-ink,#111111)] text-white shadow-sm"
+                        : "bg-[#F8F9FA] text-[var(--gym-ink,#111111)] hover:bg-[#EBEBEB]",
                     )}
                   >
-                    {formatDate(item.updatedAt, locale)}
-                  </p>
-                </button>
-              )
-            })}
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="truncate font-heading text-[13px] font-extrabold">
+                        {item.title[locale]}
+                      </span>
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-[10px] font-extrabold",
+                          active
+                            ? "bg-white/20 text-white"
+                            : item.status === "active"
+                              ? "bg-black/10 text-[var(--gym-ink,#111111)]"
+                              : "bg-gray-200 text-gray-700",
+                        )}
+                      >
+                        v{item.version}
+                      </span>
+                    </div>
+                    <p
+                      className={cn(
+                        "mt-1 text-[11px] font-medium",
+                        active ? "text-white/70" : "text-[#8c8c8c]",
+                      )}
+                    >
+                      {formatDate(item.updatedAt, locale)}
+                    </p>
+                  </button>
+                )
+              })
+            )}
           </div>
 
-          {/* Details Pane */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          <div className="flex-1 space-y-4 overflow-y-auto p-5">
             {selected ? (
               <>
                 <div className="flex items-center justify-between border-b border-[#F0F0F0] pb-3">
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
                         {selected.title[locale]}
                       </h3>
@@ -140,7 +160,15 @@ export function ProgramHistoryDialog({
                         tone={selected.status === "active" ? "success" : "muted"}
                       />
                       <StatusBadge
-                        label={selected.status}
+                        label={
+                          selected.status === "active"
+                            ? isAr
+                              ? "نشط"
+                              : "active"
+                            : isAr
+                              ? "مؤرشف"
+                              : "archived"
+                        }
                         tone={selected.status === "active" ? "success" : "muted"}
                       />
                     </div>
@@ -154,10 +182,11 @@ export function ProgramHistoryDialog({
                   </div>
                 </div>
 
-                {/* Day breakdown */}
                 <div className="space-y-3">
                   <p className="text-[12px] font-bold text-[var(--gym-ink,#111111)]">
-                    {isAr ? "تفاصيل محتوى هذا الإصدار:" : "Content breakdown for this version:"}
+                    {isAr
+                      ? "تفاصيل محتوى هذا الإصدار:"
+                      : "Content breakdown for this version:"}
                   </p>
                   <div className="space-y-2">
                     {selected.days.map((day) => (
@@ -176,30 +205,43 @@ export function ProgramHistoryDialog({
                               {isAr ? "يوم استشفاء وراحة" : "Rest Day"}
                             </span>
                           ) : "exercises" in day ? (
-                            <span>{day.exercises.length} {isAr ? "تمارين" : "exercises"}</span>
+                            <span>
+                              {day.exercises.length}{" "}
+                              {isAr ? "تمارين" : "exercises"}
+                            </span>
                           ) : "meals" in day ? (
-                            <span>{day.meals.length} {isAr ? "وجبات" : "meals"}</span>
+                            <span>
+                              {day.meals.length} {isAr ? "وجبات" : "meals"}
+                            </span>
                           ) : null}
                         </div>
 
-                        {/* Exercise previews if available */}
                         {"exercises" in day && day.exercises.length > 0 ? (
-                          <div className="mt-2.5 space-y-1.5 pt-2 border-t border-black/5">
+                          <div className="mt-2.5 space-y-1.5 border-t border-black/5 pt-2">
                             {day.exercises.map((ex, exIdx) => {
-                              const exName = typeof ex.name === "object" ? ex.name[locale] || ex.name.en : ex.name
+                              const exName =
+                                typeof ex.name === "object"
+                                  ? ex.name[locale] || ex.name.en
+                                  : ex.name
                               return (
-                                <div key={ex.id || exIdx} className="flex items-center justify-between text-[11.5px] text-[#444]">
-                                  <span className="truncate font-medium">{exIdx + 1}. {exName}</span>
-                                  <span className="font-semibold shrink-0 text-[#8c8c8c] ms-2">{ex.sets} × {ex.reps}</span>
+                                <div
+                                  key={ex.id || exIdx}
+                                  className="flex items-center justify-between text-[11.5px] text-[#444]"
+                                >
+                                  <span className="truncate font-medium">
+                                    {exIdx + 1}. {exName}
+                                  </span>
+                                  <span className="ms-2 shrink-0 font-semibold text-[#8c8c8c]">
+                                    {ex.sets} × {ex.reps}
+                                  </span>
                                 </div>
                               )
                             })}
                           </div>
                         ) : null}
 
-                        {/* Meal previews if available */}
                         {"meals" in day && day.meals.length > 0 ? (
-                          <div className="mt-2.5 space-y-1.5 pt-2 border-t border-black/5">
+                          <div className="mt-2.5 space-y-1.5 border-t border-black/5 pt-2">
                             {day.meals.map((meal, mIdx) => {
                               const mName = meal.label
                                 ? typeof meal.label === "object"
@@ -207,11 +249,19 @@ export function ProgramHistoryDialog({
                                   : meal.label
                                 : meal.slot
                               return (
-                                <div key={meal.id || mIdx} className="flex items-center justify-between text-[11.5px] text-[#444]">
-                                  <span className="truncate font-medium">{mIdx + 1}. {mName}</span>
-                                  <span className="font-semibold shrink-0 text-[#8c8c8c] ms-2">
-                                    {meal.items?.length || 0} {isAr ? "أصناف" : "items"}
-                                    {meal.calories ? ` · ${meal.calories} ${isAr ? "سعرة" : "kcal"}` : ""}
+                                <div
+                                  key={meal.id || mIdx}
+                                  className="flex items-center justify-between text-[11.5px] text-[#444]"
+                                >
+                                  <span className="truncate font-medium">
+                                    {mIdx + 1}. {mName}
+                                  </span>
+                                  <span className="ms-2 shrink-0 font-semibold text-[#8c8c8c]">
+                                    {meal.items?.length || 0}{" "}
+                                    {isAr ? "أصناف" : "items"}
+                                    {meal.calories
+                                      ? ` · ${meal.calories} ${isAr ? "سعرة" : "kcal"}`
+                                      : ""}
                                   </span>
                                 </div>
                               )
@@ -227,8 +277,7 @@ export function ProgramHistoryDialog({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex shrink-0 items-center justify-end border-t border-[#F0F0F0] px-6 py-3 bg-[#FBFBFB]">
+        <div className="flex shrink-0 items-center justify-end border-t border-[#F0F0F0] bg-[#FBFBFB] px-6 py-3">
           <button
             type="button"
             onClick={onClose}

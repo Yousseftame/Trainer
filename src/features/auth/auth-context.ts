@@ -7,6 +7,8 @@ export type AuthContextValue = AuthState & {
   isSubscriber: boolean
   hasPermission: (permission: Permission) => boolean
   hasActiveSubscription: boolean
+  /** True while the subscriber's live subscription docs are still loading. */
+  subscriptionLoading: boolean
   refreshProfile: () => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>

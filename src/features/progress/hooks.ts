@@ -26,6 +26,48 @@ export const PROGRESS_QUERY_KEYS = {
     ["progress", "photo-url", storagePath] as const,
 }
 
+function invalidateMeasurementCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  subscriberId?: string,
+) {
+  void queryClient.invalidateQueries({
+    queryKey: PROGRESS_QUERY_KEYS.measurements,
+  })
+  if (subscriberId) {
+    void queryClient.invalidateQueries({
+      queryKey: [...PROGRESS_QUERY_KEYS.measurements, subscriberId],
+    })
+  }
+}
+
+function invalidatePhotoCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  subscriberId?: string,
+) {
+  void queryClient.invalidateQueries({
+    queryKey: PROGRESS_QUERY_KEYS.photos,
+  })
+  if (subscriberId) {
+    void queryClient.invalidateQueries({
+      queryKey: [...PROGRESS_QUERY_KEYS.photos, subscriberId],
+    })
+  }
+}
+
+function invalidatePerformanceCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  subscriberId?: string,
+) {
+  void queryClient.invalidateQueries({
+    queryKey: PROGRESS_QUERY_KEYS.performance,
+  })
+  if (subscriberId) {
+    void queryClient.invalidateQueries({
+      queryKey: [...PROGRESS_QUERY_KEYS.performance, subscriberId],
+    })
+  }
+}
+
 export function useMeasurementsQuery(subscriberId?: string) {
   return useQuery({
     queryKey: subscriberId
@@ -98,10 +140,8 @@ export function useSaveMeasurementMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: SaveMeasurementInput) => saveMeasurement(input),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: PROGRESS_QUERY_KEYS.measurements,
-      })
+    onSuccess: (saved) => {
+      invalidateMeasurementCaches(queryClient, saved.subscriberId)
     },
   })
 }
@@ -110,10 +150,8 @@ export function useSavePhotoMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: SavePhotoInput) => savePhoto(input),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: PROGRESS_QUERY_KEYS.photos,
-      })
+    onSuccess: (saved) => {
+      invalidatePhotoCaches(queryClient, saved.subscriberId)
     },
   })
 }
@@ -122,10 +160,8 @@ export function useSavePerformanceMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: SavePerformanceInput) => savePerformance(input),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: PROGRESS_QUERY_KEYS.performance,
-      })
+    onSuccess: (saved) => {
+      invalidatePerformanceCaches(queryClient, saved.subscriberId)
     },
   })
 }
@@ -133,11 +169,15 @@ export function useSavePerformanceMutation() {
 export function useDeleteMeasurementMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => deleteMeasurement(id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: PROGRESS_QUERY_KEYS.measurements,
-      })
+    mutationFn: async (input: string | { id: string; subscriberId?: string }) => {
+      const id = typeof input === "string" ? input : input.id
+      const subscriberId =
+        typeof input === "string" ? undefined : input.subscriberId
+      await deleteMeasurement(id)
+      return { subscriberId }
+    },
+    onSuccess: (result) => {
+      invalidateMeasurementCaches(queryClient, result.subscriberId)
     },
   })
 }
@@ -145,11 +185,15 @@ export function useDeleteMeasurementMutation() {
 export function useDeletePhotoMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => deletePhoto(id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: PROGRESS_QUERY_KEYS.photos,
-      })
+    mutationFn: async (input: string | { id: string; subscriberId?: string }) => {
+      const id = typeof input === "string" ? input : input.id
+      const subscriberId =
+        typeof input === "string" ? undefined : input.subscriberId
+      await deletePhoto(id)
+      return { subscriberId }
+    },
+    onSuccess: (result) => {
+      invalidatePhotoCaches(queryClient, result.subscriberId)
     },
   })
 }
@@ -157,11 +201,15 @@ export function useDeletePhotoMutation() {
 export function useDeletePerformanceMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => deletePerformance(id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: PROGRESS_QUERY_KEYS.performance,
-      })
+    mutationFn: async (input: string | { id: string; subscriberId?: string }) => {
+      const id = typeof input === "string" ? input : input.id
+      const subscriberId =
+        typeof input === "string" ? undefined : input.subscriberId
+      await deletePerformance(id)
+      return { subscriberId }
+    },
+    onSuccess: (result) => {
+      invalidatePerformanceCaches(queryClient, result.subscriberId)
     },
   })
 }

@@ -8,7 +8,8 @@ export type NoticeKind =
   | "registration"
   | "approval"
   | "activation"
-  | "expiration";
+  | "expiration"
+  | "subscription_change";
 
 export type NoticeStatus = "queued" | "sent" | "failed";
 
@@ -29,6 +30,8 @@ export type NoticeInput = {
   scheduledAt?: string;
   channel?: "email" | "push" | "email+push";
   alarmStaff?: boolean;
+  /** Deep-link for staff FCM / Reports action (defaults by kind). */
+  actionUrl?: string;
 };
 
 function noticeRef() {
@@ -91,6 +94,7 @@ export async function sendStaffAlarm(input: {
   bodyAr?: string;
   noticeId?: string;
   kind?: string;
+  url?: string;
 }): Promise<number> {
   const tokens = await staffFcmTokens();
   if (!tokens.length) return 0;
@@ -100,6 +104,7 @@ export async function sendStaffAlarm(input: {
   const titleAr = input.titleAr ?? input.title;
   const bodyEn = input.bodyEn ?? input.body;
   const bodyAr = input.bodyAr ?? input.body;
+  const url = input.url || "/admin/reports";
   // Data-only web push so the service worker always controls display
   // (avoids double notifications from auto + onBackgroundMessage).
   const res = await messaging.sendEachForMulticast({
@@ -113,14 +118,14 @@ export async function sendStaffAlarm(input: {
       body_ar: bodyAr,
       noticeId: input.noticeId ?? "",
       kind: input.kind ?? "",
-      url: "/admin/reports",
+      url,
     },
     webpush: {
       headers: {
         Urgency: "high",
       },
       fcmOptions: {
-        link: "/admin/reports",
+        link: url,
       },
     },
   });
@@ -171,6 +176,18 @@ export async function enqueueNotice(input: NoticeInput): Promise<{
   const staffSubject = input.staffSubject ?? input.subject;
   const staffDetail = input.staffDetail ?? input.detail;
 
+  const actionUrl =
+    input.actionUrl ||
+    (input.kind === "subscription_change"
+      ? input.requestId
+        ? `/admin/subscriptions?request=${encodeURIComponent(input.requestId)}`
+        : "/admin/subscriptions"
+      : input.kind === "registration"
+        ? input.requestId
+          ? `/admin/registration-requests?request=${encodeURIComponent(input.requestId)}`
+          : "/admin/registration-requests"
+        : "/admin/reports");
+
   const record = stripUndefined({
     id: ref.id,
     kind: input.kind,
@@ -187,6 +204,7 @@ export async function enqueueNotice(input: NoticeInput): Promise<{
     // Staff UI / browser alert copy (may differ from customer email)
     staffSubject,
     staffDetail,
+    actionUrl,
     createdAt: now,
     updatedAt: now,
     scheduledAt: input.scheduledAt ?? now,
@@ -204,22 +222,32 @@ export async function enqueueNotice(input: NoticeInput): Promise<{
   let lastError: string | undefined;
   let sentAt: string | undefined;
 
-  try {
-    await queueMailDoc({
-      to: input.toEmail.trim().toLowerCase(),
-      subject: input.subject.en,
-      text: input.detail.en,
-      html: `<p>${input.detail.en}</p><p dir="rtl">${input.detail.ar}</p>`,
-      noticeId: ref.id,
-    });
-    mailQueued = true;
-    // Mail is handed to the Trigger Email extension (or equivalent).
-    // Mark sent once queued — bounce handling can flip to failed later.
+  const recipient = input.toEmail.trim().toLowerCase();
+  const shouldQueueMail =
+    channel !== "push" && Boolean(recipient) && !recipient.endsWith("@local");
+
+  if (shouldQueueMail) {
+    try {
+      await queueMailDoc({
+        to: recipient,
+        subject: input.subject.en,
+        text: input.detail.en,
+        html: `<p>${input.detail.en}</p><p dir="rtl">${input.detail.ar}</p>`,
+        noticeId: ref.id,
+      });
+      mailQueued = true;
+      // Mail is handed to the Trigger Email extension (or equivalent).
+      // Mark sent once queued — bounce handling can flip to failed later.
+      status = "sent";
+      sentAt = now;
+    } catch (err) {
+      status = "failed";
+      lastError = err instanceof Error ? err.message : "mail_queue_failed";
+    }
+  } else {
+    // Push-only / staff-inbox notices still count as delivered once FCM runs.
     status = "sent";
     sentAt = now;
-  } catch (err) {
-    status = "failed";
-    lastError = err instanceof Error ? err.message : "mail_queue_failed";
   }
 
   if (input.alarmStaff !== false) {
@@ -233,6 +261,7 @@ export async function enqueueNotice(input: NoticeInput): Promise<{
         bodyAr: staffDetail.ar,
         noticeId: ref.id,
         kind: input.kind,
+        url: actionUrl,
       });
       fcmSent = count > 0;
     } catch (err) {

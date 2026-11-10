@@ -1,3 +1,4 @@
+import { useMemo } from "react"
 import { Link } from "react-router-dom"
 import {
   ChevronLeft,
@@ -13,8 +14,10 @@ import { SubscriberBannerCarousel } from "@/components/subscriber/SubscriberBann
 import { SubscriberProgressHeroBanner } from "@/components/subscriber/SubscriberProgressHeroBanner"
 import { SubscriberFilesSection } from "@/components/subscriber/SubscriberFilesSection"
 import { SubscriberAssignedPrograms } from "@/components/subscriber/SubscriberAssignedPrograms"
+import { SubscriberPTSection } from "@/components/subscriber/SubscriberPTSection"
 import { SubscriberActivityProgressChart } from "@/components/subscriber/SubscriberActivityProgressChart"
 import { APP_ROUTES } from "@/config/constants"
+import { useSubscriberOverviewDashboard } from "@/features/subscriber-overview/use-overview-dashboard"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { cn } from "@/lib/utils"
@@ -22,43 +25,54 @@ import { cn } from "@/lib/utils"
 export function OverviewPage() {
   const { locale, isRtl } = useLocale()
   const isAr = locale === "ar"
+  const { canWorkout, canNutrition, canProgress } =
+    useSubscriberOverviewDashboard(locale)
 
   useDocumentTitle(isAr ? "الرئيسية • لوحة المشترك" : "Overview • DerpyFit")
 
   const Chevron = isRtl ? ChevronLeft : ChevronRight
 
-  const quickActions = [
-    {
-      id: "workout",
-      title: isAr ? "برنامج التمارين" : "Workout Plan",
-      to: APP_ROUTES.subscriber.workout,
-      icon: Dumbbell,
-    },
-    {
-      id: "nutrition",
-      title: isAr ? "الخطة الغذائية" : "Nutrition Plan",
-      to: APP_ROUTES.subscriber.nutrition,
-      icon: UtensilsCrossed,
-    },
-    {
-      id: "community",
-      title: isAr ? "مجتمع المشتركين" : "Community Hub",
-      to: APP_ROUTES.subscriber.community,
-      icon: Users,
-    },
-    {
-      id: "progress",
-      title: isAr ? "سجل القياسات" : "Body Metrics",
-      to: APP_ROUTES.subscriber.progress,
-      icon: TrendingUp,
-    },
-    {
-      id: "physicalTherapy",
-      title: isAr ? "العلاج الطبيعي" : "Physical Therapy",
-      to: APP_ROUTES.subscriber.physicalTherapy,
-      icon: HeartPulse,
-    },
-  ]
+  const quickActions = useMemo(
+    () => [
+      {
+        id: "workout",
+        title: isAr ? "برنامج التمارين" : "Workout Plan",
+        to: canWorkout
+          ? APP_ROUTES.subscriber.workout
+          : APP_ROUTES.subscriber.subscription,
+        icon: Dumbbell,
+      },
+      {
+        id: "nutrition",
+        title: isAr ? "الخطة الغذائية" : "Nutrition Plan",
+        to: canNutrition
+          ? APP_ROUTES.subscriber.nutrition
+          : APP_ROUTES.subscriber.subscription,
+        icon: UtensilsCrossed,
+      },
+      {
+        id: "community",
+        title: isAr ? "مجتمع المشتركين" : "Community Hub",
+        to: APP_ROUTES.subscriber.community,
+        icon: Users,
+      },
+      {
+        id: "progress",
+        title: isAr ? "سجل القياسات" : "Body Metrics",
+        to: canProgress
+          ? APP_ROUTES.subscriber.progress
+          : APP_ROUTES.subscriber.subscription,
+        icon: TrendingUp,
+      },
+      {
+        id: "physicalTherapy",
+        title: isAr ? "العلاج الطبيعي" : "Physical Therapy",
+        to: APP_ROUTES.subscriber.physicalTherapy,
+        icon: HeartPulse,
+      },
+    ],
+    [isAr, canWorkout, canNutrition, canProgress],
+  )
 
   return (
     <div className="space-y-6 sm:space-y-8 pb-10">
@@ -76,6 +90,9 @@ export function OverviewPage() {
 
       {/* Current Assigned Workout & Nutrition Programs */}
       <SubscriberAssignedPrograms />
+
+      {/* Live rehab protocol when coach has an open PT case */}
+      <SubscriberPTSection />
 
       {/* Recent Progress & Activity Visual Chart Analytics */}
       <SubscriberActivityProgressChart />

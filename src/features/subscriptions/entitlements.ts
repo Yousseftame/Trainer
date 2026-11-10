@@ -37,13 +37,32 @@ export function resolveEffectiveSubscriptionStatus(
   now: Date = new Date(),
 ): SubscriptionStatus | null {
   if (!subscription) return null
-  if (subscription.status === "active" && subscription.endsAt) {
+  // Legacy Functions wrote "terminated" — treat as cancelled.
+  const rawStatus = String(subscription.status)
+  const status: SubscriptionStatus =
+    rawStatus === "terminated" ? "cancelled" : subscription.status
+  if (status === "active" && subscription.endsAt) {
     const endMs = new Date(subscription.endsAt).getTime()
     if (!Number.isNaN(endMs) && endMs < now.getTime()) {
       return "expired"
     }
   }
-  return subscription.status
+  return status
+}
+
+/** Prefer active → suspended → latest by updatedAt. */
+export function pickCurrentSubscription(
+  items: SubscriberSubscription[] | undefined | null,
+): SubscriberSubscription | null {
+  if (!items?.length) return null
+  const active = items.find((s) => s.status === "active")
+  if (active) return active
+  const suspended = items.find((s) => s.status === "suspended")
+  if (suspended) return suspended
+  return [...items].sort(
+    (a, b) =>
+      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+  )[0]
 }
 
 /**

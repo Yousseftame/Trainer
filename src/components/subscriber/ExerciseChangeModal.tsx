@@ -5,7 +5,7 @@ import { useLocale } from "@/hooks/useLocale"
 import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 import type { ExerciseAlternative, WorkoutExercise } from "@/types/program"
-import { resolveBilingualText } from "@/features/workouts/demo"
+import { resolveBilingualText } from "@/lib/program-text"
 
 interface ExerciseChangeModalProps {
   isOpen: boolean
