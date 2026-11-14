@@ -133,8 +133,8 @@ export function WorkoutLiveSessionModal({
 
   // Overall workout elapsed (wall-clock)
   const [totalSeconds, setTotalSeconds] = useState(0)
-  const [activeSeconds, setActiveSeconds] = useState(0)
-  const [restSecondsTotal, setRestSecondsTotal] = useState(0)
+  const [, setActiveSeconds] = useState(0)
+  const [, setRestSecondsTotal] = useState(0)
   const [isTimerRunning, setIsTimerRunning] = useState(true)
 
   const [isResting, setIsResting] = useState(false)

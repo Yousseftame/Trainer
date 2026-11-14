@@ -111,7 +111,7 @@ export async function refreshAdminPageData(
   const keys = resolveAdminPageQueryKeys(pathname)
   if (!keys.length) return 0
 
-  const results = await Promise.all(
+  await Promise.all(
     keys.map((queryKey) =>
       queryClient.refetchQueries({
         queryKey: [...queryKey],
@@ -120,5 +120,5 @@ export async function refreshAdminPageData(
     ),
   )
 
-  return results.reduce((sum, n) => sum + n, 0)
+  return keys.length
 }
