@@ -1,5 +1,9 @@
 import type { User } from "firebase/auth"
-import { PERMISSIONS, type Permission } from "@/lib/permissions/permissions"
+import {
+  PERMISSIONS,
+  withRequiredPermissions,
+  type Permission,
+} from "@/lib/permissions/permissions"
 import type { Role } from "@/lib/permissions/roles"
 import type { AppUser, UserStatus } from "@/types/user"
 
@@ -63,7 +67,13 @@ export function mapUserIdentity(identity: UserIdentityInput): AppUser {
       permissions:
         identity.role === "head_coach"
           ? [...PERMISSIONS]
-          : [...(identity.permissions ?? [])],
+          : withRequiredPermissions(
+              (identity.permissions ?? []).filter(
+                (item): item is Permission =>
+                  typeof item === "string" &&
+                  (PERMISSIONS as readonly string[]).includes(item),
+              ),
+            ),
       status: identity.status ?? "active",
       locale: localeFromDocument(),
       createdAt,

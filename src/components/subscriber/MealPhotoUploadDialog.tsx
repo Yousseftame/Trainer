@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Camera, Check, Image as ImageIcon, Trash2, UploadCloud, X } from "lucide-react"
 import { useLocale } from "@/hooks/useLocale"
 import { appToast } from "@/lib/toast"
@@ -9,7 +9,12 @@ interface MealPhotoUploadDialogProps {
   slotId: string
   slotTitle?: string
   existingPhotoUrl?: string
-  onPhotoUploaded: (slotId: string, photoUrl: string, note?: string) => void
+  onPhotoUploaded: (payload: {
+    slotId: string
+    file: File
+    previewUrl: string
+    note?: string
+  }) => Promise<void>
 }
 
 export function MealPhotoUploadDialog({
@@ -24,9 +29,21 @@ export function MealPhotoUploadDialog({
   const isAr = locale === "ar"
 
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [photoPreview, setPhotoPreview] = useState<string | null>(existingPhotoUrl ?? null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(
+    existingPhotoUrl ?? null,
+  )
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [note, setNote] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) return
+    setPhotoPreview(existingPhotoUrl ?? null)
+    setSelectedFile(null)
+    setNote("")
+    setIsSubmitting(false)
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }, [isOpen, existingPhotoUrl, slotId])
 
   if (!isOpen) return null
 
@@ -35,10 +52,13 @@ export function MealPhotoUploadDialog({
     if (!file) return
 
     if (!file.type.startsWith("image/")) {
-      appToast.error(isAr ? "يرجى اختيار ملف صورة صالح" : "Please select a valid image file")
+      appToast.error(
+        isAr ? "يرجى اختيار ملف صورة صالح" : "Please select a valid image file",
+      )
       return
     }
 
+    setSelectedFile(file)
     const reader = new FileReader()
     reader.onload = () => {
       setPhotoPreview(reader.result as string)
@@ -48,26 +68,42 @@ export function MealPhotoUploadDialog({
 
   function handleRemovePhoto() {
     setPhotoPreview(null)
+    setSelectedFile(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
   }
 
-  function handleSubmit() {
-    if (!photoPreview) {
-      appToast.error(isAr ? "يرجى التقاط أو اختيار صورة الوجبة أولاً" : "Please take or upload a meal photo first")
+  async function handleSubmit() {
+    if (!selectedFile || !photoPreview) {
+      appToast.error(
+        isAr
+          ? "يرجى التقاط أو اختيار صورة الوجبة أولاً"
+          : "Please take or upload a meal photo first",
+      )
       return
     }
 
     setIsSubmitting(true)
-    setTimeout(() => {
-      onPhotoUploaded(slotId, photoPreview, note.trim())
-      setIsSubmitting(false)
-      appToast.success(
-        isAr ? "تم إرفاق صورة الوجبة وإرسالها للمدرب بنجاح!" : "Meal verification photo uploaded successfully!",
-      )
+    try {
+      await onPhotoUploaded({
+        slotId,
+        file: selectedFile,
+        previewUrl: photoPreview,
+        note: note.trim() || undefined,
+      })
       onClose()
-    }, 400)
+    } catch (err) {
+      appToast.error(
+        err instanceof Error
+          ? err.message
+          : isAr
+            ? "فشل رفع صورة الوجبة"
+            : "Failed to upload meal photo",
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -80,7 +116,6 @@ export function MealPhotoUploadDialog({
         className="w-full max-w-md rounded-t-[32px] sm:rounded-[32px] bg-white p-5 sm:p-6 shadow-2xl transition-transform animate-in slide-in-from-bottom sm:slide-in-from-bottom-4 duration-300 max-h-[90vh] overflow-y-auto flex flex-col gap-4 border border-black/[0.06]"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-black/[0.06]">
           <div className="flex items-center gap-2.5">
             <div className="flex size-9 items-center justify-center rounded-xl bg-[#fb5001]/10 text-[#fb5001]">
@@ -91,7 +126,8 @@ export function MealPhotoUploadDialog({
                 {isAr ? "إرفاق صورة الوجبة" : "Attach Meal Photo"}
               </h3>
               <p className="text-[12px] font-medium text-[#8c8c8c]">
-                {slotTitle || (isAr ? "توثيق التزام الوجبة" : "Meal adherence verification")}
+                {slotTitle ||
+                  (isAr ? "توثيق التزام الوجبة" : "Meal adherence verification")}
               </p>
             </div>
           </div>
@@ -105,7 +141,6 @@ export function MealPhotoUploadDialog({
           </button>
         </div>
 
-        {/* Hidden file input */}
         <input
           ref={fileInputRef}
           type="file"
@@ -115,7 +150,6 @@ export function MealPhotoUploadDialog({
           className="hidden"
         />
 
-        {/* Photo Uploader / Preview Box */}
         {photoPreview ? (
           <div className="relative overflow-hidden rounded-2xl border border-black/10 bg-black/5">
             <img
@@ -126,7 +160,13 @@ export function MealPhotoUploadDialog({
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end justify-between p-3">
               <span className="rounded-full bg-black/60 backdrop-blur-xs px-2.5 py-1 text-[11px] font-bold text-white flex items-center gap-1.5">
                 <Check className="size-3 text-[#fb5001]" />
-                {isAr ? "تم التقاط الصورة" : "Photo Selected"}
+                {selectedFile
+                  ? isAr
+                    ? "جاهز للرفع"
+                    : "Ready to upload"
+                  : isAr
+                    ? "صورة محفوظة"
+                    : "Saved photo"}
               </span>
               <button
                 type="button"
@@ -148,10 +188,14 @@ export function MealPhotoUploadDialog({
             </div>
             <div>
               <p className="font-heading text-[14px] font-extrabold text-[#111111]">
-                {isAr ? "التقط صورة للوجبة أو اختر من جهازك" : "Take a meal photo or upload from device"}
+                {isAr
+                  ? "التقط صورة للوجبة أو اختر من جهازك"
+                  : "Take a meal photo or upload from device"}
               </p>
               <p className="mt-1 text-[11px] text-[#8c8c8c]">
-                {isAr ? "يساعد المدرب على تقييم الكميات وجودة التحضير" : "Helps coach evaluate portion sizes and food quality"}
+                {isAr
+                  ? "يساعد المدرب على تقييم الكميات وجودة التحضير"
+                  : "Helps coach evaluate portion sizes and food quality"}
               </p>
             </div>
             <div className="flex items-center gap-2 mt-2">
@@ -167,7 +211,6 @@ export function MealPhotoUploadDialog({
           </div>
         )}
 
-        {/* Optional Notes */}
         <div className="space-y-1.5">
           <label className="block text-[12px] font-bold text-[#111111]">
             {isAr ? "ملاحظة للمدرب (اختياري):" : "Note for coach (optional):"}
@@ -185,7 +228,6 @@ export function MealPhotoUploadDialog({
           />
         </div>
 
-        {/* Buttons */}
         <div className="flex items-center gap-2 pt-2">
           <button
             type="button"
@@ -196,16 +238,16 @@ export function MealPhotoUploadDialog({
           </button>
           <button
             type="button"
-            onClick={handleSubmit}
-            disabled={isSubmitting || !photoPreview}
+            onClick={() => void handleSubmit()}
+            disabled={isSubmitting || !selectedFile}
             className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#fb5001] px-4 text-[13px] font-extrabold text-white shadow-md shadow-orange-500/20 hover:bg-[#e04800] transition disabled:opacity-50"
           >
             <Check className="size-4" strokeWidth={2.5} />
             <span>
               {isSubmitting
                 ? isAr
-                  ? "جاري الحفظ..."
-                  : "Saving..."
+                  ? "جاري الرفع..."
+                  : "Uploading..."
                 : isAr
                   ? "تأكيد وتوثيق الوجبة"
                   : "Verify Meal"}
@@ -216,4 +258,3 @@ export function MealPhotoUploadDialog({
     </div>
   )
 }
-

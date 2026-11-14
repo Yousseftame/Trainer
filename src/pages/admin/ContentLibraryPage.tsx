@@ -106,7 +106,8 @@ export function ContentLibraryPage() {
   const { t } = useTranslation()
   const { locale } = useLocale()
   const isAr = locale === "ar"
-  const { user } = useAuth()
+  const { user, hasPermission } = useAuth()
+  const canManage = hasPermission("content:manage")
   useDocumentTitle(t("nav.content"))
 
   const { data: assets = [] } = useContentAssetsQuery()
@@ -268,14 +269,16 @@ export function ContentLibraryPage() {
                 <ChevronDown className="pointer-events-none absolute end-3 size-4 text-[#8c8c8c]" />
               </div>
 
-              <button
-                type="button"
-                onClick={() => setFormModal({ open: true, asset: null })}
-                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
-              >
-                <Upload className="size-4" strokeWidth={2} />
-                {t("admin.content.upload")}
-              </button>
+              {canManage ? (
+                <button
+                  type="button"
+                  onClick={() => setFormModal({ open: true, asset: null })}
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
+                >
+                  <Upload className="size-4" strokeWidth={2} />
+                  {t("admin.content.upload")}
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -301,14 +304,16 @@ export function ContentLibraryPage() {
             className="mt-5 flex min-h-40 flex-col items-center justify-center gap-3 rounded-[20px] bg-[#F4F4F4] p-6 text-sm font-medium text-[#8c8c8c]"
           >
             <p>{t("admin.content.empty")}</p>
-            <button
-              type="button"
-              onClick={() => setFormModal({ open: true, asset: null })}
-              className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-4 text-[12px] font-bold text-white"
-            >
-              <Plus className="size-3.5" />
-              {t("admin.content.upload")}
-            </button>
+            {canManage ? (
+              <button
+                type="button"
+                onClick={() => setFormModal({ open: true, asset: null })}
+                className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-4 text-[12px] font-bold text-white"
+              >
+                <Plus className="size-3.5" />
+                {t("admin.content.upload")}
+              </button>
+            ) : null}
           </div>
         ) : (
           <div className="mt-4 grid items-start gap-4 xl:mt-5 xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_350px]">
@@ -495,47 +500,51 @@ export function ContentLibraryPage() {
               </p>
 
               <div className="mt-4 flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setAssocModal({
-                      open: true,
-                      asset: selected,
-                      tab: "programs",
-                    })
-                  }
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-4 text-[13px] font-bold text-white transition hover:opacity-95"
-                >
-                  <Plus className="size-4" strokeWidth={2} />
-                  {t("admin.content.associate")}
-                </button>
-                <div className="grid grid-cols-2 gap-2">
+                {canManage ? (
                   <button
                     type="button"
                     onClick={() =>
                       setAssocModal({
                         open: true,
                         asset: selected,
-                        tab: "subscribers",
+                        tab: "programs",
                       })
                     }
-                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-white px-3 text-[12px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/5"
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-4 text-[13px] font-bold text-white transition hover:opacity-95"
                   >
-                    <Users className="size-3.5" />
-                    {t("admin.content.assign")}
+                    <Plus className="size-4" strokeWidth={2} />
+                    {t("admin.content.associate")}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormModal({ open: true, asset: selected })
-                    }
-                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-white px-3 text-[12px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/5"
-                  >
-                    <Pencil className="size-3.5" />
-                    {t("admin.content.update")}
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
+                ) : null}
+                {canManage ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAssocModal({
+                          open: true,
+                          asset: selected,
+                          tab: "subscribers",
+                        })
+                      }
+                      className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-white px-3 text-[12px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/5"
+                    >
+                      <Users className="size-3.5" />
+                      {t("admin.content.assign")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormModal({ open: true, asset: selected })
+                      }
+                      className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-white px-3 text-[12px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/5"
+                    >
+                      <Pencil className="size-3.5" />
+                      {t("admin.content.update")}
+                    </button>
+                  </div>
+                ) : null}
+                <div className={cn("grid gap-2", canManage ? "grid-cols-2" : "grid-cols-1")}>
                   <button
                     type="button"
                     onClick={() => setPreviewAsset(selected)}
@@ -544,14 +553,16 @@ export function ContentLibraryPage() {
                     <Eye className="size-3.5" />
                     {isAr ? "معاينة / تشغيل" : "Preview"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setDeleteTarget(selected)}
-                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-[#FFE8E4] px-3 text-[12px] font-bold text-[#C44536] transition hover:bg-[#ffd8d1]"
-                  >
-                    <Trash2 className="size-3.5" />
-                    {isAr ? "حذف المحتوى" : "Delete"}
-                  </button>
+                  {canManage ? (
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(selected)}
+                      className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-[#FFE8E4] px-3 text-[12px] font-bold text-[#C44536] transition hover:bg-[#ffd8d1]"
+                    >
+                      <Trash2 className="size-3.5" />
+                      {isAr ? "حذف المحتوى" : "Delete"}
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </aside>
@@ -559,91 +570,99 @@ export function ContentLibraryPage() {
         )}
       </section>
 
-      {/* Upload / Edit Modal */}
-      <ContentAssetFormDialog
-        open={formModal.open}
-        initialAsset={formModal.asset}
-        defaultCategory={filter === "all" ? "exerciseVideo" : filter}
-        packages={packages}
-        subscribers={subscribers}
-        busy={saveMutation.isPending}
-        adminName={user?.displayName || user?.email || "Head Coach"}
-        onClose={() => setFormModal({ open: false, asset: null })}
-        onSave={async (payload) => {
-          const isEdit = Boolean(payload.id)
-          const saved = await saveMutation.mutateAsync(payload)
-          setSelectedId(saved.id)
-          setFormModal({ open: false, asset: null })
-          appToast.success(
-            isEdit
-              ? isAr
-                ? "تم تحديث بيانات المحتوى بنجاح"
-                : "Content asset updated successfully"
-              : isAr
-                ? "تم رفع وإضافة المحتوى بنجاح"
-                : "Content asset uploaded and saved",
-          )
-        }}
-      />
+      {canManage ? (
+        <ContentAssetFormDialog
+          open={formModal.open}
+          initialAsset={formModal.asset}
+          defaultCategory={filter === "all" ? "exerciseVideo" : filter}
+          packages={packages}
+          subscribers={subscribers}
+          busy={saveMutation.isPending}
+          adminName={user?.displayName || user?.email || "Head Coach"}
+          onClose={() => setFormModal({ open: false, asset: null })}
+          onSave={async (payload) => {
+            const isEdit = Boolean(payload.id)
+            const saved = await saveMutation.mutateAsync(payload)
+            setSelectedId(saved.id)
+            setFormModal({ open: false, asset: null })
+            appToast.success(
+              isEdit
+                ? isAr
+                  ? "تم تحديث بيانات المحتوى بنجاح"
+                  : "Content asset updated successfully"
+                : isAr
+                  ? "تم رفع وإضافة المحتوى بنجاح"
+                  : "Content asset uploaded and saved",
+            )
+          }}
+        />
+      ) : null}
 
-      {/* Association & Entitlements Modal */}
-      <ContentAssociationDialog
-        open={assocModal.open}
-        asset={assocModal.asset}
-        initialTab={assocModal.tab}
-        packages={packages}
-        subscribers={subscribers}
-        busy={associateMutation.isPending}
-        onClose={() =>
-          setAssocModal({ open: false, asset: null, tab: "programs" })
-        }
-        onSave={async (payload) => {
-          await associateMutation.mutateAsync(payload)
-          setAssocModal({ open: false, asset: null, tab: "programs" })
-          appToast.success(
-            isAr
-              ? "تم تحديث ارتباطات المحتوى وصلاحيات الوصول"
-              : "Content associations & access rules updated",
-          )
-        }}
-      />
+      {canManage ? (
+        <ContentAssociationDialog
+          open={assocModal.open}
+          asset={assocModal.asset}
+          initialTab={assocModal.tab}
+          packages={packages}
+          subscribers={subscribers}
+          busy={associateMutation.isPending}
+          onClose={() =>
+            setAssocModal({ open: false, asset: null, tab: "programs" })
+          }
+          onSave={async (payload) => {
+            await associateMutation.mutateAsync(payload)
+            setAssocModal({ open: false, asset: null, tab: "programs" })
+            appToast.success(
+              isAr
+                ? "تم تحديث ارتباطات المحتوى وصلاحيات الوصول"
+                : "Content associations & access rules updated",
+            )
+          }}
+        />
+      ) : null}
 
       {/* Media & Document Preview Modal */}
       <ContentPreviewDialog
         asset={previewAsset}
         onClose={() => setPreviewAsset(null)}
-        onEdit={(asset) => setFormModal({ open: true, asset })}
-      />
-
-      <ConfirmActionDialog
-        open={Boolean(deleteTarget)}
-        title={isAr ? "تأكيد حذف المحتوى" : "Delete content asset"}
-        description={
-          deleteTarget
-            ? isAr
-              ? `سيتم حذف «${deleteTarget.title.ar}» من Firestore، وحذف ملف Storage إن وُجد (${deleteTarget.storagePath}).`
-              : `Permanently delete “${deleteTarget.title.en}” from Firestore and remove the Storage object if present (${deleteTarget.storagePath}).`
+        onEdit={
+          canManage
+            ? (asset) => setFormModal({ open: true, asset })
             : undefined
         }
-        confirmLabel={isAr ? "حذف نهائياً" : "Delete permanently"}
-        tone="danger"
-        onCancel={() => setDeleteTarget(null)}
-        onConfirm={async () => {
-          if (!deleteTarget) return
-          const targetId = deleteTarget.id
-          await deleteMutation.mutateAsync(targetId)
-          if (selectedId === targetId) {
-            const remaining = list.filter((i) => i.id !== targetId)
-            setSelectedId(remaining[0]?.id ?? "")
-          }
-          setDeleteTarget(null)
-          appToast.success(
-            isAr
-              ? "تم حذف المحتوى من المكتبة بنجاح"
-              : "Content asset deleted from library",
-          )
-        }}
       />
+
+      {canManage ? (
+        <ConfirmActionDialog
+          open={Boolean(deleteTarget)}
+          title={isAr ? "تأكيد حذف المحتوى" : "Delete content asset"}
+          description={
+            deleteTarget
+              ? isAr
+                ? `سيتم حذف «${deleteTarget.title.ar}» من Firestore، وحذف ملف Storage إن وُجد (${deleteTarget.storagePath}).`
+                : `Permanently delete “${deleteTarget.title.en}” from Firestore and remove the Storage object if present (${deleteTarget.storagePath}).`
+              : undefined
+          }
+          confirmLabel={isAr ? "حذف نهائياً" : "Delete permanently"}
+          tone="danger"
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={async () => {
+            if (!deleteTarget) return
+            const targetId = deleteTarget.id
+            await deleteMutation.mutateAsync(targetId)
+            if (selectedId === targetId) {
+              const remaining = list.filter((i) => i.id !== targetId)
+              setSelectedId(remaining[0]?.id ?? "")
+            }
+            setDeleteTarget(null)
+            appToast.success(
+              isAr
+                ? "تم حذف المحتوى من المكتبة بنجاح"
+                : "Content asset deleted from library",
+            )
+          }}
+        />
+      ) : null}
     </div>
   )
 }

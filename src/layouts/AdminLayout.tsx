@@ -6,6 +6,8 @@ import { useAuth } from "@/features/auth/auth-context"
 import { useAdminNotificationsBridge } from "@/features/reports"
 import { usePendingRegistrationRequestCount } from "@/features/subscribers/hooks"
 import { usePendingChangeRequestCount } from "@/features/subscriptions/hooks"
+import { usePendingMealChangeRequestsQuery } from "@/features/nutrition/hooks"
+import { usePendingExerciseChangeRequestsQuery } from "@/features/workouts/hooks"
 import { useLocale } from "@/hooks/useLocale"
 import {
   filterByPermission,
@@ -22,6 +24,10 @@ export function AdminLayout() {
     hasPermission("reports:read") || hasPermission("notifications:send")
   const canApprove = hasPermission("subscribers:approve")
   const canManageSubs = hasPermission("subscriptions:manage")
+  const canViewWorkouts =
+    hasPermission("workouts:read") || hasPermission("workouts:manage")
+  const canViewNutrition =
+    hasPermission("nutrition:read") || hasPermission("nutrition:manage")
 
   const { badgeCount } = useAdminNotificationsBridge({
     enabled: canListen,
@@ -33,6 +39,11 @@ export function AdminLayout() {
   const pendingPackageChanges = usePendingChangeRequestCount({
     enabled: canManageSubs,
   })
+  const { data: pendingExerciseChanges = [] } =
+    usePendingExerciseChangeRequestsQuery({ enabled: canViewWorkouts })
+  const { data: pendingMealChanges = [] } = usePendingMealChangeRequestsQuery({
+    enabled: canViewNutrition,
+  })
 
   const badgeByTo = useMemo(() => {
     const map: Record<string, number> = {}
@@ -43,8 +54,20 @@ export function AdminLayout() {
     if (pendingPackageChanges) {
       map[APP_ROUTES.admin.subscriptions] = pendingPackageChanges
     }
+    if (pendingExerciseChanges.length) {
+      map[APP_ROUTES.admin.workouts] = pendingExerciseChanges.length
+    }
+    if (pendingMealChanges.length) {
+      map[APP_ROUTES.admin.nutrition] = pendingMealChanges.length
+    }
     return Object.keys(map).length ? map : undefined
-  }, [badgeCount, pendingRegistrations, pendingPackageChanges])
+  }, [
+    badgeCount,
+    pendingRegistrations,
+    pendingPackageChanges,
+    pendingExerciseChanges.length,
+    pendingMealChanges.length,
+  ])
 
   return (
     <DashboardShell

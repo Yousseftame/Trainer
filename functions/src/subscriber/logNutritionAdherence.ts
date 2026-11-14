@@ -8,6 +8,7 @@ import {
   resolveEffectiveSubscriptionStatus,
   type PackageEntitlements,
 } from "../shared/contentAccess.js";
+import {enqueueNotice} from "../shared/notices.js";
 
 type AdherenceStatus = "adhered" | "mostly" | "deviated" | "skipped";
 
@@ -244,6 +245,85 @@ export const logNutritionAdherence = onCall(async (request) => {
   }
 
   await batch.commit();
+
+  try {
+    const subData = (subscriberSnap.data() ?? {}) as Record<string, unknown>;
+    const subscriberName =
+      asOptionalString(subData.displayName) ||
+      (typeof request.auth?.token?.name === "string"
+        ? request.auth.token.name
+        : undefined) ||
+      (typeof request.auth?.token?.email === "string"
+        ? request.auth.token.email
+        : undefined) ||
+      uid;
+    const subscriberEmail =
+      asOptionalString(subData.email) ||
+      (typeof request.auth?.token?.email === "string"
+        ? request.auth.token.email
+        : undefined);
+
+    const statusLabel =
+      status === "adhered"
+        ? "100% adhered"
+        : status === "mostly"
+          ? "mostly adhered"
+          : status === "deviated"
+            ? "deviated"
+            : "skipped";
+    const notes = asOptionalString(record.notes);
+    const calories =
+      typeof record.caloriesActual === "number"
+        ? record.caloriesActual
+        : undefined;
+
+    const staffEn = [
+      `${subscriberName} logged nutrition (${statusLabel}) for ${date}.`,
+    ];
+    if (calories != null) staffEn.push(`${calories} kcal.`);
+    if (notes) staffEn.push(`Notes: ${notes}`);
+    staffEn.push("Open Nutrition to review adherence.");
+
+    const staffAr = [
+      `${subscriberName} سجّل التزام التغذية (${status}) لتاريخ ${date}.`,
+    ];
+    if (calories != null) staffAr.push(`${calories} سعرة.`);
+    if (notes) staffAr.push(`ملاحظات: ${notes}`);
+    staffAr.push("افتح التغذية لمراجعة الالتزام.");
+
+    await enqueueNotice({
+      kind: "nutrition_adherence",
+      toEmail: subscriberEmail || "ops@local",
+      toName: subscriberName,
+      subscriberId: uid,
+      requestId: logId,
+      dedupeKey: `nutrition_adherence:${logId}:${loggedAt}`,
+      channel: "push",
+      alarmStaff: true,
+      actionUrl: `/admin/nutrition?log=${encodeURIComponent(logId)}&subscriber=${encodeURIComponent(uid)}`,
+      subject: {
+        en: `Nutrition logged — ${date}`,
+        ar: `تم تسجيل التغذية — ${date}`,
+      },
+      detail: {
+        en: `Your nutrition adherence for ${date} was saved.`,
+        ar: `تم حفظ التزامك الغذائي ليوم ${date}.`,
+      },
+      staffSubject: {
+        en: `Nutrition log — ${subscriberName}`,
+        ar: `سجل تغذية — ${subscriberName}`,
+      },
+      staffDetail: {
+        en: staffEn.join(" "),
+        ar: staffAr.join(" "),
+      },
+    });
+  } catch (err) {
+    console.warn(
+      "[logNutritionAdherence] Failed to enqueue staff notice:",
+      err,
+    );
+  }
 
   return {
     ok: true,

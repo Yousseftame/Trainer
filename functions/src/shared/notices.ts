@@ -9,7 +9,11 @@ export type NoticeKind =
   | "approval"
   | "activation"
   | "expiration"
-  | "subscription_change";
+  | "subscription_change"
+  | "exercise_change"
+  | "workout_session"
+  | "meal_change"
+  | "nutrition_adherence";
 
 export type NoticeStatus = "queued" | "sent" | "failed";
 
@@ -186,7 +190,31 @@ export async function enqueueNotice(input: NoticeInput): Promise<{
         ? input.requestId
           ? `/admin/registration-requests?request=${encodeURIComponent(input.requestId)}`
           : "/admin/registration-requests"
-        : "/admin/reports");
+        : input.kind === "exercise_change"
+          ? input.requestId
+            ? `/admin/workouts?request=${encodeURIComponent(input.requestId)}`
+            : "/admin/workouts"
+          : input.kind === "workout_session"
+            ? input.requestId
+              ? `/admin/workouts?session=${encodeURIComponent(input.requestId)}${
+                  input.subscriberId
+                    ? `&subscriber=${encodeURIComponent(input.subscriberId)}`
+                    : ""
+                }`
+              : "/admin/workouts"
+            : input.kind === "meal_change"
+              ? input.requestId
+                ? `/admin/nutrition?request=${encodeURIComponent(input.requestId)}`
+                : "/admin/nutrition"
+              : input.kind === "nutrition_adherence"
+                ? input.requestId
+                  ? `/admin/nutrition?log=${encodeURIComponent(input.requestId)}${
+                      input.subscriberId
+                        ? `&subscriber=${encodeURIComponent(input.subscriberId)}`
+                        : ""
+                    }`
+                  : "/admin/nutrition"
+                : "/admin/reports");
 
   const record = stripUndefined({
     id: ref.id,

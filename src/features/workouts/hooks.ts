@@ -1,12 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_STALE_TIMES } from "@/config/constants"
 import {
+  fetchPendingExerciseChangeRequests,
+  resolveExerciseChangeRequest,
+} from "@/features/workouts/exercise-change-requests"
+import {
   archiveWorkoutProgram,
   assignWorkoutProgram,
   deleteWorkoutProgram,
   listWorkoutLogs,
   listWorkoutPrograms,
   logWorkoutSession,
+  requestExerciseChange,
   restoreWorkoutProgram,
   saveWorkoutProgram,
   type AssignWorkoutInput,
@@ -151,6 +156,59 @@ export function useLogWorkoutSessionMutation() {
       void queryClient.invalidateQueries({ queryKey: workoutKeys.all })
       void queryClient.invalidateQueries({ queryKey: ["subscribers"] })
       void queryClient.invalidateQueries({ queryKey: ["overview"] })
+      void queryClient.invalidateQueries({ queryKey: ["reports"] })
+    },
+  })
+}
+
+export function useRequestExerciseChangeMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: {
+      exerciseId: string
+      exerciseName: string
+      reason: string
+      notes?: string
+      programId?: string
+      dayId?: string
+      programTitle?: string
+      dayLabel?: string
+      substituteId?: string
+      substituteName?: string
+    }) => requestExerciseChange(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["reports"] })
+      void queryClient.invalidateQueries({
+        queryKey: [...workoutKeys.all, "exercise-change-requests"],
+      })
+    },
+  })
+}
+
+export function usePendingExerciseChangeRequestsQuery(options?: {
+  enabled?: boolean
+}) {
+  return useQuery({
+    queryKey: [...workoutKeys.all, "exercise-change-requests", "pending"],
+    queryFn: fetchPendingExerciseChangeRequests,
+    staleTime: QUERY_STALE_TIMES.adminList,
+    enabled: options?.enabled !== false,
+  })
+}
+
+export function useResolveExerciseChangeMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: {
+      requestId: string
+      decision: "reviewed" | "dismissed"
+      resolutionNote?: string
+    }) => resolveExerciseChangeRequest(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: [...workoutKeys.all, "exercise-change-requests"],
+      })
+      void queryClient.invalidateQueries({ queryKey: ["reports"] })
     },
   })
 }

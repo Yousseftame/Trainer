@@ -100,7 +100,14 @@ const ENTITLEMENT_LABELS: Record<
 export function SubscriberDetailPage() {
   const { t } = useTranslation()
   const { locale, isRtl } = useLocale()
-  const { user } = useAuth()
+  const { user, hasPermission } = useAuth()
+  const canWrite = hasPermission("subscribers:write")
+  const canManageSubs = hasPermission("subscriptions:manage")
+  const canViewProgress = hasPermission("progress:read")
+  const canViewPt = hasPermission("physicalTherapy:read")
+  const canManagePt = hasPermission("physicalTherapy:manage")
+  const canViewWorkouts = hasPermission("workouts:read")
+  const canViewNutrition = hasPermission("nutrition:read")
   const navigate = useNavigate()
   const { subscriberId = "" } = useParams()
   const {
@@ -302,153 +309,165 @@ export function SubscriberDetailPage() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={actionsBusy || saveSubscriberMutation.isPending}
-              onClick={() => setEditProfileOpen(true)}
-              className="inline-flex h-11 items-center rounded-full bg-[#F4F4F4] px-5 text-[13px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/10 disabled:opacity-60"
-            >
-              {locale === "ar" ? "تعديل البيانات" : "Edit profile"}
-            </button>
-            <button
-              type="button"
-              disabled={actionsBusy}
-              onClick={() => {
-                const nextStatus =
-                  subscriber.status === "active" ? "suspended" : "active"
-                const isSuspending = nextStatus === "suspended"
-                const name = subscriberDisplayName(subscriber, locale)
-                setConfirmDialog({
-                  open: true,
-                  title: isSuspending
-                    ? locale === "ar"
-                      ? "تعليق حساب المشترك"
-                      : "Suspend subscriber account"
-                    : locale === "ar"
-                      ? "تفعيل حساب المشترك"
-                      : "Activate subscriber account",
-                  description: isSuspending
-                    ? locale === "ar"
-                      ? `تعليق حساب "${name}"؟ سيتم منعه من الدخول فوراً.`
-                      : `Suspend "${name}"? They will be blocked from signing in immediately.`
-                    : locale === "ar"
-                      ? `تفعيل حساب "${name}" مجدداً؟`
-                      : `Reactivate "${name}" account?`,
-                  confirmLabel: isSuspending
-                    ? locale === "ar"
-                      ? "تعليق الحساب"
-                      : "Suspend"
-                    : locale === "ar"
-                      ? "تفعيل الحساب"
-                      : "Activate",
-                  tone: isSuspending ? "warning" : "primary",
-                  onConfirm: async () => {
-                    await updateStatusMutation.mutateAsync({
-                      subscriberId: subscriber.id,
-                      status: nextStatus,
-                      syncSubscription: true,
-                      adminName: user?.displayName || user?.email || "Head Coach",
-                    })
-                    appToast.success(
-                      nextStatus === "active"
-                        ? locale === "ar"
-                          ? "تم إعادة تفعيل حساب المشترك"
-                          : "Subscriber account reactivated"
-                        : locale === "ar"
-                          ? "تم تعليق حساب المشترك"
-                          : "Subscriber account suspended",
-                    )
-                  },
-                })
-              }}
-              className={cn(
-                "inline-flex h-11 items-center rounded-full px-5 text-[13px] font-bold transition disabled:opacity-60",
-                subscriber.status === "active"
-                  ? "bg-[#FFE8E4] text-[#C44536] hover:bg-[#ffd6cf]"
-                  : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
-              )}
-            >
-              {subscriber.status === "active"
-                ? locale === "ar"
-                  ? "تعليق الحساب"
-                  : "Suspend account"
-                : locale === "ar"
-                  ? "تفعيل الحساب"
-                  : "Activate account"}
-            </button>
-            <button
-              type="button"
-              disabled={actionsBusy}
-              onClick={() => {
-                const name = subscriberDisplayName(subscriber, locale)
-                setConfirmDialog({
-                  open: true,
-                  title:
-                    locale === "ar"
-                      ? "حذف حساب المشترك نهائياً"
-                      : "Delete subscriber permanently",
-                  description:
-                    locale === "ar"
-                      ? `حذف نهائي لحساب "${name}"؟ لا يمكن التراجع.`
-                      : `Permanently delete "${name}"? This cannot be undone.`,
-                  confirmLabel:
-                    locale === "ar" ? "تأكيد الحذف النهائي" : "Delete permanently",
-                  tone: "danger",
-                  onConfirm: async () => {
-                    await deleteSubscriberMutation.mutateAsync(subscriber.id)
-                    appToast.success(
-                      locale === "ar"
-                        ? "تم حذف حساب المشترك نهائياً"
-                        : "Subscriber permanently deleted",
-                    )
-                    navigate(APP_ROUTES.admin.subscribers)
-                  },
-                })
-              }}
-              className="inline-flex h-11 items-center rounded-full bg-[#C44536] px-5 text-[13px] font-bold text-white transition hover:opacity-90 disabled:opacity-60"
-            >
-              {locale === "ar" ? "حذف الحساب" : "Delete account"}
-            </button>
-            <Link
-              to={`${APP_ROUTES.admin.progress}?subscriber=${subscriber.id}`}
-              className="inline-flex h-11 items-center rounded-full bg-[var(--gym-lime,#fb5001)] px-5 text-[13px] font-bold text-white"
-            >
-              {t("admin.subscribers.viewProgress")}
-            </Link>
-            <button
-              type="button"
-              onClick={() =>
-                setSubDialogState({
-                  mode: "assign",
-                  defaultSubscriberId: subscriber.id,
-                  defaultPackageId: current?.packageId,
-                })
-              }
-              className="inline-flex h-11 items-center rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white"
-            >
-              {t("admin.subscribers.assignPackage")}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (current) {
-                  setSubDialogState({
-                    mode: "manage",
-                    subscription: current,
-                    initialAction:
-                      current.status === "active" ? "renew" : "activate",
+            {canWrite ? (
+              <button
+                type="button"
+                disabled={actionsBusy || saveSubscriberMutation.isPending}
+                onClick={() => setEditProfileOpen(true)}
+                className="inline-flex h-11 items-center rounded-full bg-[#F4F4F4] px-5 text-[13px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/10 disabled:opacity-60"
+              >
+                {locale === "ar" ? "تعديل البيانات" : "Edit profile"}
+              </button>
+            ) : null}
+            {canWrite ? (
+              <button
+                type="button"
+                disabled={actionsBusy}
+                onClick={() => {
+                  const nextStatus =
+                    subscriber.status === "active" ? "suspended" : "active"
+                  const isSuspending = nextStatus === "suspended"
+                  const name = subscriberDisplayName(subscriber, locale)
+                  setConfirmDialog({
+                    open: true,
+                    title: isSuspending
+                      ? locale === "ar"
+                        ? "تعليق حساب المشترك"
+                        : "Suspend subscriber account"
+                      : locale === "ar"
+                        ? "تفعيل حساب المشترك"
+                        : "Activate subscriber account",
+                    description: isSuspending
+                      ? locale === "ar"
+                        ? `تعليق حساب "${name}"؟ سيتم منعه من الدخول فوراً.`
+                        : `Suspend "${name}"? They will be blocked from signing in immediately.`
+                      : locale === "ar"
+                        ? `تفعيل حساب "${name}" مجدداً؟`
+                        : `Reactivate "${name}" account?`,
+                    confirmLabel: isSuspending
+                      ? locale === "ar"
+                        ? "تعليق الحساب"
+                        : "Suspend"
+                      : locale === "ar"
+                        ? "تفعيل الحساب"
+                        : "Activate",
+                    tone: isSuspending ? "warning" : "primary",
+                    onConfirm: async () => {
+                      await updateStatusMutation.mutateAsync({
+                        subscriberId: subscriber.id,
+                        status: nextStatus,
+                        syncSubscription: true,
+                        adminName: user?.displayName || user?.email || "Head Coach",
+                      })
+                      appToast.success(
+                        nextStatus === "active"
+                          ? locale === "ar"
+                            ? "تم إعادة تفعيل حساب المشترك"
+                            : "Subscriber account reactivated"
+                          : locale === "ar"
+                            ? "تم تعليق حساب المشترك"
+                            : "Subscriber account suspended",
+                      )
+                    },
                   })
-                } else {
+                }}
+                className={cn(
+                  "inline-flex h-11 items-center rounded-full px-5 text-[13px] font-bold transition disabled:opacity-60",
+                  subscriber.status === "active"
+                    ? "bg-[#FFE8E4] text-[#C44536] hover:bg-[#ffd6cf]"
+                    : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
+                )}
+              >
+                {subscriber.status === "active"
+                  ? locale === "ar"
+                    ? "تعليق الحساب"
+                    : "Suspend account"
+                  : locale === "ar"
+                    ? "تفعيل الحساب"
+                    : "Activate account"}
+              </button>
+            ) : null}
+            {canWrite ? (
+              <button
+                type="button"
+                disabled={actionsBusy}
+                onClick={() => {
+                  const name = subscriberDisplayName(subscriber, locale)
+                  setConfirmDialog({
+                    open: true,
+                    title:
+                      locale === "ar"
+                        ? "حذف حساب المشترك نهائياً"
+                        : "Delete subscriber permanently",
+                    description:
+                      locale === "ar"
+                        ? `حذف نهائي لحساب "${name}"؟ لا يمكن التراجع.`
+                        : `Permanently delete "${name}"? This cannot be undone.`,
+                    confirmLabel:
+                      locale === "ar" ? "تأكيد الحذف النهائي" : "Delete permanently",
+                    tone: "danger",
+                    onConfirm: async () => {
+                      await deleteSubscriberMutation.mutateAsync(subscriber.id)
+                      appToast.success(
+                        locale === "ar"
+                          ? "تم حذف حساب المشترك نهائياً"
+                          : "Subscriber permanently deleted",
+                      )
+                      navigate(APP_ROUTES.admin.subscribers)
+                    },
+                  })
+                }}
+                className="inline-flex h-11 items-center rounded-full bg-[#C44536] px-5 text-[13px] font-bold text-white transition hover:opacity-90 disabled:opacity-60"
+              >
+                {locale === "ar" ? "حذف الحساب" : "Delete account"}
+              </button>
+            ) : null}
+            {canViewProgress ? (
+              <Link
+                to={`${APP_ROUTES.admin.progress}?subscriber=${subscriber.id}`}
+                className="inline-flex h-11 items-center rounded-full bg-[var(--gym-lime,#fb5001)] px-5 text-[13px] font-bold text-white"
+              >
+                {t("admin.subscribers.viewProgress")}
+              </Link>
+            ) : null}
+            {canManageSubs ? (
+              <button
+                type="button"
+                onClick={() =>
                   setSubDialogState({
                     mode: "assign",
                     defaultSubscriberId: subscriber.id,
+                    defaultPackageId: current?.packageId,
                   })
                 }
-              }}
-              className="inline-flex h-11 items-center rounded-full bg-[#F4F4F4] px-5 text-[13px] font-bold text-[var(--gym-ink,#111111)]"
-            >
-              {t("admin.subscribers.updateStatus")}
-            </button>
+                className="inline-flex h-11 items-center rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white"
+              >
+                {t("admin.subscribers.assignPackage")}
+              </button>
+            ) : null}
+            {canManageSubs ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (current) {
+                    setSubDialogState({
+                      mode: "manage",
+                      subscription: current,
+                      initialAction:
+                        current.status === "active" ? "renew" : "activate",
+                    })
+                  } else {
+                    setSubDialogState({
+                      mode: "assign",
+                      defaultSubscriberId: subscriber.id,
+                    })
+                  }
+                }}
+                className="inline-flex h-11 items-center rounded-full bg-[#F4F4F4] px-5 text-[13px] font-bold text-[var(--gym-ink,#111111)]"
+              >
+                {t("admin.subscribers.updateStatus")}
+              </button>
+            ) : null}
           </div>
         </div>
       </section>
@@ -494,13 +513,15 @@ export function SubscriberDetailPage() {
             <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
               {t("admin.subscribers.profile")}
             </h3>
-            <button
-              type="button"
-              onClick={() => setEditProfileOpen(true)}
-              className="text-[12px] font-bold text-[var(--gym-lime,#fb5001)] hover:underline"
-            >
-              {locale === "ar" ? "تعديل الملف" : "Edit"}
-            </button>
+            {canWrite ? (
+              <button
+                type="button"
+                onClick={() => setEditProfileOpen(true)}
+                className="text-[12px] font-bold text-[var(--gym-lime,#fb5001)] hover:underline"
+              >
+                {locale === "ar" ? "تعديل الملف" : "Edit"}
+              </button>
+            ) : null}
           </div>
           <p className="mt-2 text-[12px] leading-relaxed text-[#8c8c8c]">
             {locale === "ar"
@@ -569,7 +590,7 @@ export function SubscriberDetailPage() {
             <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
               {t("admin.subscribers.currentSubscription")}
             </h3>
-            {current ? (
+            {current && canManageSubs ? (
               <button
                 type="button"
                 onClick={() =>
@@ -658,7 +679,7 @@ export function SubscriberDetailPage() {
             <StickyNote className="size-4 text-[var(--gym-ink,#111111)]" strokeWidth={1.8} />
             {t("admin.subscribers.coachNotes")}
           </h3>
-          {!editingNotes ? (
+          {canWrite && !editingNotes ? (
             <button
               type="button"
               onClick={() => {
@@ -674,7 +695,7 @@ export function SubscriberDetailPage() {
           ) : null}
         </div>
 
-        {editingNotes ? (
+        {canWrite && editingNotes ? (
           <div className="mt-4 flex flex-col gap-3">
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
@@ -740,9 +761,13 @@ export function SubscriberDetailPage() {
           </p>
         ) : (
           <p className="mt-3 text-[13px] font-medium text-[#8c8c8c]">
-            {locale === "ar"
-              ? "لا توجد ملاحظات تدريبية مسجلة لهذا المشترك حتى الآن. اضغط \"+ إضافة ملاحظة\" لتدوين الملاحظات الفنية الخاصة."
-              : "No coach notes recorded for this subscriber yet. Click \"+ Add note\" to document technical cues, limits, or observations."}
+            {canWrite
+              ? locale === "ar"
+                ? "لا توجد ملاحظات تدريبية مسجلة لهذا المشترك حتى الآن. اضغط \"+ إضافة ملاحظة\" لتدوين الملاحظات الفنية الخاصة."
+                : "No coach notes recorded for this subscriber yet. Click \"+ Add note\" to document technical cues, limits, or observations."
+              : locale === "ar"
+                ? "لا توجد ملاحظات تدريبية مسجلة لهذا المشترك."
+                : "No coach notes recorded for this subscriber."}
           </p>
         )}
       </section>
@@ -751,7 +776,7 @@ export function SubscriberDetailPage() {
         <ProgramCard
           title={t("admin.subscribers.currentWorkout")}
           empty={t("admin.progress.noProgram")}
-          href={APP_ROUTES.admin.workouts}
+          href={canViewWorkouts ? APP_ROUTES.admin.workouts : undefined}
         >
           {activeWorkout ? (
             <WorkoutSummary
@@ -765,7 +790,7 @@ export function SubscriberDetailPage() {
         <ProgramCard
           title={t("admin.subscribers.currentNutrition")}
           empty={t("admin.progress.noProgram")}
-          href={APP_ROUTES.admin.nutrition}
+          href={canViewNutrition ? APP_ROUTES.admin.nutrition : undefined}
         >
           {activeNutrition ? (
             <NutritionSummary
@@ -784,18 +809,22 @@ export function SubscriberDetailPage() {
             {locale === "ar" ? "العلاج الطبيعي والتأهيل" : "Physical therapy & rehab"}
           </h3>
           <div className="flex flex-wrap items-center gap-3">
-            <Link
-              to={`${APP_ROUTES.admin.physicalTherapy}?subscriber=${subscriber.id}&new=1`}
-              className="text-[13px] font-bold text-[var(--gym-lime,#fb5001)]"
-            >
-              {locale === "ar" ? "تقييم جديد" : "New assessment"}
-            </Link>
-            <Link
-              to={`${APP_ROUTES.admin.physicalTherapy}?subscriber=${subscriber.id}`}
-              className="text-[13px] font-bold text-[var(--gym-ink,#111111)]"
-            >
-              {locale === "ar" ? "فتح الوحدة" : "Open module"}
-            </Link>
+            {canManagePt ? (
+              <Link
+                to={`${APP_ROUTES.admin.physicalTherapy}?subscriber=${subscriber.id}&new=1`}
+                className="text-[13px] font-bold text-[var(--gym-lime,#fb5001)]"
+              >
+                {locale === "ar" ? "تقييم جديد" : "New assessment"}
+              </Link>
+            ) : null}
+            {canViewPt ? (
+              <Link
+                to={`${APP_ROUTES.admin.physicalTherapy}?subscriber=${subscriber.id}`}
+                className="text-[13px] font-bold text-[var(--gym-ink,#111111)]"
+              >
+                {locale === "ar" ? "فتح الوحدة" : "Open module"}
+              </Link>
+            ) : null}
           </div>
         </div>
         {activePt ? (
@@ -1014,57 +1043,64 @@ export function SubscriberDetailPage() {
             className: "text-[#6B7280]",
           },
         ]}
-        actions={(row) => (
-          <>
-            <TableAction
-              label={
-                row.status === "active"
-                  ? t("admin.subscriptions.renew")
-                  : t("admin.subscriptions.activate")
-              }
-              tone="primary"
-              onClick={() =>
-                setSubDialogState({
-                  mode: "manage",
-                  subscription: row,
-                  initialAction: row.status === "active" ? "renew" : "activate",
-                })
-              }
-            />
-            <TableAction
-              label={locale === "ar" ? "تعديل" : "Edit"}
-              onClick={() =>
-                setSubDialogState({
-                  mode: "manage",
-                  subscription: row,
-                  initialAction: "edit",
-                })
-              }
-            />
-          </>
-        )}
+        actions={
+          canManageSubs
+            ? (row) => (
+                <>
+                  <TableAction
+                    label={
+                      row.status === "active"
+                        ? t("admin.subscriptions.renew")
+                        : t("admin.subscriptions.activate")
+                    }
+                    tone="primary"
+                    onClick={() =>
+                      setSubDialogState({
+                        mode: "manage",
+                        subscription: row,
+                        initialAction:
+                          row.status === "active" ? "renew" : "activate",
+                      })
+                    }
+                  />
+                  <TableAction
+                    label={locale === "ar" ? "تعديل" : "Edit"}
+                    onClick={() =>
+                      setSubDialogState({
+                        mode: "manage",
+                        subscription: row,
+                        initialAction: "edit",
+                      })
+                    }
+                  />
+                </>
+              )
+            : undefined
+        }
       />
 
-      <SubscriberFormDialog
-        open={editProfileOpen}
-        subscriber={subscriber}
-        packages={allPackages}
-        busy={saveSubscriberMutation.isPending}
-        adminName={user?.displayName || user?.email || "Head Coach"}
-        onClose={() => {
-          if (saveSubscriberMutation.isPending) return
-          setEditProfileOpen(false)
-        }}
-        onSave={async (payload) => {
-          await saveSubscriberMutation.mutateAsync(payload)
-          setEditProfileOpen(false)
-          appToast.success(
-            locale === "ar"
-              ? "تم تحديث بيانات المشترك بنجاح"
-              : "Subscriber profile updated successfully",
-          )
-        }}
-      />
+      {canWrite ? (
+        <SubscriberFormDialog
+          open={editProfileOpen}
+          subscriber={subscriber}
+          packages={allPackages}
+          busy={saveSubscriberMutation.isPending}
+          adminName={user?.displayName || user?.email || "Head Coach"}
+          onClose={() => {
+            if (saveSubscriberMutation.isPending) return
+            setEditProfileOpen(false)
+          }}
+          onSave={async (payload) => {
+            await saveSubscriberMutation.mutateAsync(payload)
+            setEditProfileOpen(false)
+            appToast.success(
+              locale === "ar"
+                ? "تم تحديث بيانات المشترك بنجاح"
+                : "Subscriber profile updated successfully",
+            )
+          }}
+        />
+      ) : null}
 
       <ConfirmActionDialog
         open={Boolean(confirmDialog?.open)}
@@ -1079,31 +1115,33 @@ export function SubscriberDetailPage() {
         }}
       />
 
-      <SubscriptionActionDialog
-        state={subDialogState}
-        packages={allPackages}
-        busy={assignMutation.isPending || lifecycleMutation.isPending}
-        adminName={user?.displayName || user?.email || "Head Coach"}
-        onClose={() => setSubDialogState(null)}
-        onAssign={async (payload) => {
-          await assignMutation.mutateAsync(payload)
-          setSubDialogState(null)
-          appToast.success(
-            locale === "ar"
-              ? "تم تعيين الاشتراك للمشترك بنجاح"
-              : "Subscription assigned successfully",
-          )
-        }}
-        onLifecycle={async (payload) => {
-          await lifecycleMutation.mutateAsync(payload)
-          setSubDialogState(null)
-          appToast.success(
-            locale === "ar"
-              ? "تم تحديث حالة الاشتراك بنجاح"
-              : "Subscription updated successfully",
-          )
-        }}
-      />
+      {canManageSubs ? (
+        <SubscriptionActionDialog
+          state={subDialogState}
+          packages={allPackages}
+          busy={assignMutation.isPending || lifecycleMutation.isPending}
+          adminName={user?.displayName || user?.email || "Head Coach"}
+          onClose={() => setSubDialogState(null)}
+          onAssign={async (payload) => {
+            await assignMutation.mutateAsync(payload)
+            setSubDialogState(null)
+            appToast.success(
+              locale === "ar"
+                ? "تم تعيين الاشتراك للمشترك بنجاح"
+                : "Subscription assigned successfully",
+            )
+          }}
+          onLifecycle={async (payload) => {
+            await lifecycleMutation.mutateAsync(payload)
+            setSubDialogState(null)
+            appToast.success(
+              locale === "ar"
+                ? "تم تحديث حالة الاشتراك بنجاح"
+                : "Subscription updated successfully",
+            )
+          }}
+        />
+      ) : null}
     </div>
   )
 }
@@ -1146,7 +1184,7 @@ function ProgramCard({
 }: {
   title: string
   empty: string
-  href: string
+  href?: string
   children: ReactNode
 }) {
   const { t } = useTranslation()
@@ -1154,9 +1192,11 @@ function ProgramCard({
     <section className="rounded-[24px] bg-white p-5 sm:p-7">
       <div className="flex items-center justify-between gap-3">
         <h3 className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">{title}</h3>
-        <Link to={href} className="text-[12px] font-bold text-[var(--gym-ink,#111111)]">
-          {t("admin.subscribers.openWorkspace")}
-        </Link>
+        {href ? (
+          <Link to={href} className="text-[12px] font-bold text-[var(--gym-ink,#111111)]">
+            {t("admin.subscribers.openWorkspace")}
+          </Link>
+        ) : null}
       </div>
       {children ?? <p className="mt-5 text-[14px] font-medium text-[#8c8c8c]">{empty}</p>}
     </section>

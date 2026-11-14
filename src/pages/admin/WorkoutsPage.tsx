@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { Link, useSearchParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import {
   Archive,
@@ -8,6 +9,7 @@ import {
   Dumbbell,
   FileText,
   History,
+  MessageSquareWarning,
   Pencil,
   Play,
   Plus,
@@ -18,6 +20,7 @@ import {
   UserPlus,
   Users,
 } from "lucide-react"
+import { APP_ROUTES } from "@/config/constants"
 import { ConfirmActionDialog } from "@/components/dashboard/ConfirmActionDialog"
 import { ContentPreviewDialog } from "@/components/dashboard/ContentPreviewDialog"
 import { ProgramHistoryDialog } from "@/components/dashboard/ProgramHistoryDialog"
@@ -28,6 +31,7 @@ import {
   WorkoutProgramFormDialog,
   type WorkoutDialogMode,
 } from "@/components/dashboard/WorkoutProgramFormDialog"
+import { useAuth } from "@/features/auth/auth-context"
 import { useContentAssetsQuery } from "@/features/content/hooks"
 import { useSubscribersQuery } from "@/features/subscribers/hooks"
 import {
@@ -39,6 +43,8 @@ import {
   useArchiveWorkoutMutation,
   useAssignWorkoutMutation,
   useDeleteWorkoutMutation,
+  usePendingExerciseChangeRequestsQuery,
+  useResolveExerciseChangeMutation,
   useRestoreWorkoutMutation,
   useSaveWorkoutProgramMutation,
   useWorkoutLogsQuery,
@@ -62,7 +68,16 @@ export function WorkoutsPage() {
   const { t } = useTranslation()
   const { locale } = useLocale()
   const isAr = locale === "ar"
+  const { hasPermission } = useAuth()
+  const canManage = hasPermission("workouts:manage")
+  const canRead = hasPermission("workouts:read") || canManage
   useDocumentTitle(t("nav.workouts"))
+
+  const [searchParams, setSearchParams] = useSearchParams()
+  const focusRequestId = searchParams.get("request") || ""
+  const focusSessionId = searchParams.get("session") || ""
+  const focusSubscriberId = searchParams.get("subscriber") || ""
+  const focusRequestRef = useRef<HTMLDivElement | null>(null)
 
   const [scope, setScope] = useState<Scope>("template")
   const [formatFilter, setFormatFilter] = useState<FormatFilter>("all")
@@ -85,7 +100,9 @@ export function WorkoutsPage() {
   const [logsModal, setLogsModal] = useState<{
     open: boolean
     subscriberId?: string
+    programId?: string
     subscriberName?: string
+    highlightLogId?: string
   }>({ open: false })
 
   const [previewAsset, setPreviewAsset] = useState<ContentAsset | null>(null)
@@ -107,6 +124,9 @@ export function WorkoutsPage() {
   const { data: subscribers = [] } = useSubscribersQuery()
   const { data: contentAssets = [] } = useContentAssetsQuery()
   const { data: allLogs = [] } = useWorkoutLogsQuery()
+  const { data: pendingExerciseRequests = [] } =
+    usePendingExerciseChangeRequestsQuery({ enabled: canRead })
+  const resolveExerciseMutation = useResolveExerciseChangeMutation()
 
   const saveMutation = useSaveWorkoutProgramMutation()
   const assignMutation = useAssignWorkoutMutation()
@@ -119,7 +139,8 @@ export function WorkoutsPage() {
     assignMutation.isPending ||
     archiveMutation.isPending ||
     restoreMutation.isPending ||
-    deleteMutation.isPending
+    deleteMutation.isPending ||
+    resolveExerciseMutation.isPending
 
   // Filtered List
   const list = useMemo(() => {
@@ -268,10 +289,27 @@ export function WorkoutsPage() {
   }, [allPrograms, selected])
 
   // Logs for the selected program document (history-safe across reassignment)
-  const subscriberLogs = useMemo(() => {
+  const programLogs = useMemo(() => {
     if (!selected?.id) return []
     return allLogs.filter((l) => l.programId === selected.id)
   }, [allLogs, selected])
+
+  const dialogLogs = useMemo(() => {
+    if (!logsModal.open) return []
+    if (logsModal.programId) {
+      return allLogs.filter((l) => l.programId === logsModal.programId)
+    }
+    if (logsModal.subscriberId) {
+      return allLogs
+        .filter((l) => l.subscriberId === logsModal.subscriberId)
+        .sort(
+          (a, b) =>
+            new Date(b.completedAt).getTime() -
+            new Date(a.completedAt).getTime(),
+        )
+    }
+    return programLogs
+  }, [logsModal, allLogs, programLogs])
 
   const selectedWeekSessionCount = useMemo(() => {
     const now = new Date()
@@ -281,10 +319,56 @@ export function WorkoutsPage() {
     )
     monday.setUTCDate(monday.getUTCDate() - (day - 1))
     const weekStart = monday.toISOString().slice(0, 10)
-    return subscriberLogs.filter(
+    return programLogs.filter(
       (l) => (l.date || l.completedAt).slice(0, 10) >= weekStart,
     ).length
-  }, [subscriberLogs])
+  }, [programLogs])
+
+  const recentSessions = useMemo(
+    () =>
+      [...allLogs]
+        .sort(
+          (a, b) =>
+            new Date(b.completedAt).getTime() -
+            new Date(a.completedAt).getTime(),
+        )
+        .slice(0, 8),
+    [allLogs],
+  )
+
+  useEffect(() => {
+    if (!focusRequestId || !pendingExerciseRequests.length) return
+    const t = window.setTimeout(() => {
+      focusRequestRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      })
+    }, 120)
+    return () => window.clearTimeout(t)
+  }, [focusRequestId, pendingExerciseRequests])
+
+  useEffect(() => {
+    if (!focusSessionId) return
+    const log = allLogs.find((l) => l.id === focusSessionId)
+    const subId = focusSubscriberId || log?.subscriberId
+    if (!subId) return
+    const sub = subscribers.find((s) => s.id === subId)
+    setLogsModal({
+      open: true,
+      subscriberId: subId,
+      subscriberName: sub?.displayName || log?.subscriberId,
+      highlightLogId: focusSessionId,
+    })
+  }, [focusSessionId, focusSubscriberId, allLogs, subscribers])
+
+  function clearFocusParams() {
+    if (!focusRequestId && !focusSessionId && !focusSubscriberId) return
+    const next = new URLSearchParams(searchParams)
+    next.delete("request")
+    next.delete("session")
+    next.delete("subscriber")
+    setSearchParams(next, { replace: true })
+  }
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
@@ -311,6 +395,224 @@ export function WorkoutsPage() {
           icon={<CalendarDays className="size-4" strokeWidth={1.8} />}
         />
       </div>
+
+      {/* Exercise substitute requests — clear coach inbox on Workouts */}
+      {pendingExerciseRequests.length > 0 ? (
+        <section className="rounded-[24px] border border-amber-200/80 bg-amber-50/70 p-4 sm:p-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="flex size-9 items-center justify-center rounded-xl bg-amber-500/15 text-amber-800">
+                <MessageSquareWarning className="size-4" strokeWidth={2.25} />
+              </span>
+              <div>
+                <h3 className="font-heading text-[15px] font-extrabold text-amber-950">
+                  {isAr
+                    ? `طلبات استبدال تمرين (${pendingExerciseRequests.length})`
+                    : `Exercise change requests (${pendingExerciseRequests.length})`}
+                </h3>
+                <p className="text-[12px] font-medium text-amber-900/70">
+                  {isAr
+                    ? "من صفحة التمارين لدى المشترك — راجع السبب والملاحظات ثم علّمها كمنتهية."
+                    : "From the subscriber workout page — review reason & notes, then mark handled."}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-2.5">
+            {pendingExerciseRequests.map((req) => {
+              const focused = focusRequestId === req.id
+              return (
+                <div
+                  key={req.id}
+                  ref={focused ? focusRequestRef : undefined}
+                  id={`exercise-request-${req.id}`}
+                  className={cn(
+                    "flex flex-col gap-3 rounded-2xl border bg-white p-3.5 sm:flex-row sm:items-start sm:justify-between",
+                    focused
+                      ? "border-[var(--gym-orange,#fb5001)] ring-2 ring-[var(--gym-orange,#fb5001)]/30 shadow-md"
+                      : "border-amber-200/70",
+                  )}
+                >
+                  <div className="min-w-0 space-y-1">
+                    <p className="truncate text-[13px] font-bold text-[var(--gym-ink,#111111)]">
+                      {req.subscriberName ||
+                        req.subscriberEmail ||
+                        req.subscriberId}
+                    </p>
+                    <p className="text-[12px] text-[#6B7280]">
+                      <strong className="text-[var(--gym-ink,#111111)]">
+                        {req.exerciseName}
+                      </strong>
+                      {" · "}
+                      {isAr ? "السبب: " : "Reason: "}
+                      {req.reason}
+                      {" · "}
+                      {formatDate(req.createdAt, locale)}
+                    </p>
+                    {req.programTitle || req.dayLabel ? (
+                      <p className="text-[11px] font-medium text-[#8c8c8c]">
+                        {[req.programTitle, req.dayLabel]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    ) : null}
+                    {req.notes ? (
+                      <p className="rounded-xl bg-[#F7F7F7] px-2.5 py-1.5 text-[12px] text-[#525252]">
+                        {req.notes}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <Link
+                      to={APP_ROUTES.admin.subscriberDetail(req.subscriberId)}
+                      className="rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-[12px] font-bold text-[#525252] hover:bg-black/[0.03]"
+                    >
+                      {isAr ? "ملف المشترك" : "Profile"}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setLogsModal({
+                          open: true,
+                          subscriberId: req.subscriberId,
+                          subscriberName:
+                            req.subscriberName || req.subscriberEmail,
+                        })
+                      }
+                      className="rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-[12px] font-bold text-[#525252] hover:bg-black/[0.03]"
+                    >
+                      {isAr ? "سجل الجلسات" : "Session logs"}
+                    </button>
+                    {canManage ? (
+                      <>
+                        <button
+                          type="button"
+                          disabled={actionsBusy}
+                          onClick={async () => {
+                            await resolveExerciseMutation.mutateAsync({
+                              requestId: req.id,
+                              decision: "reviewed",
+                            })
+                            if (focusRequestId === req.id) clearFocusParams()
+                            appToast.success(
+                              isAr
+                                ? "تم تعليم الطلب كـ مُراجع"
+                                : "Marked as reviewed",
+                            )
+                          }}
+                          className="rounded-full bg-[var(--gym-ink,#111111)] px-3.5 py-1.5 text-[12px] font-bold text-white disabled:opacity-50"
+                        >
+                          {isAr ? "تمت المراجعة" : "Mark reviewed"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={actionsBusy}
+                          onClick={async () => {
+                            await resolveExerciseMutation.mutateAsync({
+                              requestId: req.id,
+                              decision: "dismissed",
+                            })
+                            if (focusRequestId === req.id) clearFocusParams()
+                            appToast.success(
+                              isAr ? "تم إغلاق الطلب" : "Request dismissed",
+                            )
+                          }}
+                          className="rounded-full border border-black/10 px-3.5 py-1.5 text-[12px] font-bold text-[#8c8c8c] hover:bg-black/[0.03] disabled:opacity-50"
+                        >
+                          {isAr ? "تجاهل" : "Dismiss"}
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      {/* Recent completed sessions with feedback — easy to trace */}
+      {recentSessions.length > 0 ? (
+        <section className="rounded-[24px] border border-black/[0.06] bg-white p-4 sm:p-5">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h3 className="font-heading text-[15px] font-extrabold text-[var(--gym-ink,#111111)]">
+                {isAr ? "أحدث الجلسات المكتملة" : "Latest completed sessions"}
+              </h3>
+              <p className="text-[12px] font-medium text-[#8c8c8c]">
+                {isAr
+                  ? "ملخص التمرين والجهد والملاحظات — افتح السجل للتفاصيل."
+                  : "Session summary, RPE, energy & notes — open the log for details."}
+              </p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {recentSessions.map((log) => {
+              const sub = subscribers.find((s) => s.id === log.subscriberId)
+              const focused = focusSessionId === log.id
+              return (
+                <button
+                  key={log.id}
+                  type="button"
+                  id={`workout-session-row-${log.id}`}
+                  onClick={() =>
+                    setLogsModal({
+                      open: true,
+                      subscriberId: log.subscriberId,
+                      subscriberName: sub?.displayName,
+                      highlightLogId: log.id,
+                    })
+                  }
+                  className={cn(
+                    "flex w-full flex-col gap-2 rounded-2xl border px-3.5 py-3 text-start transition hover:bg-[#FAFAFA] sm:flex-row sm:items-center sm:justify-between",
+                    focused
+                      ? "border-[var(--gym-orange,#fb5001)] ring-2 ring-[var(--gym-orange,#fb5001)]/25 bg-[var(--gym-orange,#fb5001)]/[0.03]"
+                      : "border-black/[0.06]",
+                  )}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-bold text-[var(--gym-ink,#111111)]">
+                      {sub?.displayName || log.subscriberId}
+                      <span className="ms-2 font-medium text-[#8c8c8c]">
+                        · {log.workoutTitle || (isAr ? "جلسة" : "Session")}
+                      </span>
+                    </p>
+                    <p className="mt-0.5 text-[11px] font-medium text-[#8c8c8c]">
+                      {formatDate(log.completedAt || log.date, locale)}
+                      {log.durationMinutes
+                        ? ` · ${log.durationMinutes} ${isAr ? "د" : "min"}`
+                        : ""}
+                      {log.notes
+                        ? ` · ${isAr ? "فيه ملاحظات" : "Has notes"}`
+                        : ""}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {log.perceivedEffort ? (
+                      <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-bold text-amber-900">
+                        RPE {log.perceivedEffort}/10
+                      </span>
+                    ) : null}
+                    {log.energyLevel ? (
+                      <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-bold text-sky-900">
+                        {log.energyLevel}
+                      </span>
+                    ) : null}
+                    {(log.exercisesCompleted ?? []).some((e) => e.wasSubstituted) ? (
+                      <span className="rounded-full bg-[var(--gym-orange,#fb5001)]/10 px-2.5 py-0.5 text-[11px] font-bold text-[var(--gym-orange,#fb5001)]">
+                        {isAr ? "استبدال" : "Subs"}
+                      </span>
+                    ) : null}
+                    <span className="rounded-full bg-black/5 px-2.5 py-0.5 text-[11px] font-bold text-[#525252]">
+                      {isAr ? "فتح السجل" : "Open log"}
+                    </span>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </section>
+      ) : null}
 
       <section className="rounded-[24px] bg-white p-4 sm:p-6 lg:p-7">
         <div className="flex flex-col gap-3.5">
@@ -346,7 +648,7 @@ export function WorkoutsPage() {
                 <ChevronDown className="pointer-events-none absolute end-3 size-4 text-[#8c8c8c]" />
               </div>
 
-              {scope === "template" ? (
+              {canManage && scope === "template" ? (
                 <button
                   type="button"
                   disabled={actionsBusy}
@@ -362,7 +664,8 @@ export function WorkoutsPage() {
                   <Plus className="size-4" strokeWidth={2} />
                   {t("admin.workouts.newTemplate")}
                 </button>
-              ) : (
+              ) : null}
+              {canManage && scope !== "template" ? (
                 <button
                   type="button"
                   disabled={actionsBusy}
@@ -378,7 +681,7 @@ export function WorkoutsPage() {
                   <UserPlus className="size-4" strokeWidth={2} />
                   {t("admin.workouts.assign")}
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
 
@@ -520,6 +823,7 @@ export function WorkoutsPage() {
                         setLogsModal({
                           open: true,
                           subscriberId: selected.subscriberId,
+                          programId: selected.id,
                           subscriberName: selectedSubscriber?.displayName,
                         })
                       }
@@ -545,25 +849,26 @@ export function WorkoutsPage() {
                     </button>
                   ) : null}
 
-                  {/* Edit button */}
-                  <button
-                    type="button"
-                    disabled={actionsBusy}
-                    onClick={() => {
-                      if (actionsBusy) return
-                      setFormModal({
-                        open: true,
-                        mode:
-                          selected.status === "template"
-                            ? { type: "edit-template", program: selected }
-                            : { type: "edit-assignment", program: selected },
-                      })
-                    }}
-                    className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5 disabled:opacity-60"
-                    title={isAr ? "تعديل البرنامج" : "Edit program"}
-                  >
-                    <Pencil className="size-4" />
-                  </button>
+                  {canManage ? (
+                    <button
+                      type="button"
+                      disabled={actionsBusy}
+                      onClick={() => {
+                        if (actionsBusy) return
+                        setFormModal({
+                          open: true,
+                          mode:
+                            selected.status === "template"
+                              ? { type: "edit-template", program: selected }
+                              : { type: "edit-assignment", program: selected },
+                        })
+                      }}
+                      className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5 disabled:opacity-60"
+                      title={isAr ? "تعديل البرنامج" : "Edit program"}
+                    >
+                      <Pencil className="size-4" />
+                    </button>
+                  ) : null}
 
                   {/* Version history button (for assigned programs) */}
                   {selected.subscriberId ? (
@@ -583,39 +888,41 @@ export function WorkoutsPage() {
                     </button>
                   ) : null}
 
-                  {/* Archive / Restore button */}
-                  <button
-                    type="button"
-                    disabled={actionsBusy}
-                    onClick={() => handleArchiveToggle(selected)}
-                    className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5 disabled:opacity-60"
-                    title={
-                      selected.status === "archived"
-                        ? isAr
-                          ? "استعادة البرنامج"
-                          : "Restore program"
-                        : isAr
-                          ? "أرشفة البرنامج"
-                          : "Archive program"
-                    }
-                  >
-                    {selected.status === "archived" ? (
-                      <RotateCcw className="size-4 text-emerald-600" />
-                    ) : (
-                      <Archive className="size-4" />
-                    )}
-                  </button>
+                  {canManage ? (
+                    <button
+                      type="button"
+                      disabled={actionsBusy}
+                      onClick={() => handleArchiveToggle(selected)}
+                      className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5 disabled:opacity-60"
+                      title={
+                        selected.status === "archived"
+                          ? isAr
+                            ? "استعادة البرنامج"
+                            : "Restore program"
+                          : isAr
+                            ? "أرشفة البرنامج"
+                            : "Archive program"
+                      }
+                    >
+                      {selected.status === "archived" ? (
+                        <RotateCcw className="size-4 text-emerald-600" />
+                      ) : (
+                        <Archive className="size-4" />
+                      )}
+                    </button>
+                  ) : null}
 
-                  {/* Delete button */}
-                  <button
-                    type="button"
-                    disabled={actionsBusy}
-                    onClick={() => handleDelete(selected)}
-                    className="flex size-9 items-center justify-center rounded-full bg-white text-red-500 shadow-sm hover:bg-red-50 disabled:opacity-60"
-                    title={isAr ? "حذف نهائي" : "Delete permanently"}
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
+                  {canManage ? (
+                    <button
+                      type="button"
+                      disabled={actionsBusy}
+                      onClick={() => handleDelete(selected)}
+                      className="flex size-9 items-center justify-center rounded-full bg-white text-red-500 shadow-sm hover:bg-red-50 disabled:opacity-60"
+                      title={isAr ? "حذف نهائي" : "Delete permanently"}
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
@@ -850,7 +1157,7 @@ export function WorkoutsPage() {
       </section>
 
       {/* Program Create / Edit / Assign Dialog */}
-      {formModal.open && formModal.mode ? (
+      {canManage && formModal.open && formModal.mode ? (
         <WorkoutProgramFormDialog
           open={formModal.open}
           mode={formModal.mode}
@@ -894,7 +1201,7 @@ export function WorkoutsPage() {
         <ProgramLogsDialog
           open={logsModal.open}
           title={
-            selected
+            logsModal.programId && selected
               ? isAr
                 ? `سجل أداء: ${selected.title.ar || selected.title.en}`
                 : `Performance log: ${selected.title.en || selected.title.ar}`
@@ -903,9 +1210,13 @@ export function WorkoutsPage() {
                 : "Workout Completion & Performance"
           }
           subscriberName={logsModal.subscriberName}
-          workoutLogs={subscriberLogs}
+          workoutLogs={dialogLogs}
           type="workout"
-          onClose={() => setLogsModal({ open: false })}
+          highlightLogId={logsModal.highlightLogId}
+          onClose={() => {
+            setLogsModal({ open: false })
+            if (focusSessionId) clearFocusParams()
+          }}
         />
       ) : null}
 

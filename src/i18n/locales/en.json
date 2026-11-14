@@ -115,6 +115,11 @@
     "expand": "Expand",
     "searchPlaceholder": "Search anything..",
     "website": "Website",
+    "refresh": "Refresh",
+    "refreshTitle": "Fetch latest data for this page",
+    "refreshing": "Refreshing…",
+    "refreshSuccess": "Page data updated",
+    "refreshError": "Could not refresh this page",
     "logoutModal": {
       "title": "Log out?",
       "description": "You will need to sign in again to access the dashboard",
@@ -664,7 +669,11 @@
         "approval": "Approval",
         "activation": "Activation",
         "expiration": "Expiration",
-        "subscription_change": "Package change"
+        "subscription_change": "Package change",
+        "exercise_change": "Exercise change",
+        "workout_session": "Workout session",
+        "meal_change": "Meal change",
+        "nutrition_adherence": "Nutrition log"
       },
       "noticeStatus": {
         "queued": "Queued",
@@ -679,7 +688,7 @@
       },
       "inbox": {
         "title": "Operational emails",
-        "note": "Registration, approval, activation, expiration, and package-change requests. Send only the queued items — nothing is broadcast."
+        "note": "Registration, approval, activation, expiration, package changes, exercise substitute requests, and completed workout sessions. Send only the queued items — nothing is broadcast."
       },
       "activity": {
         "title": "Subscriber activity",
@@ -740,12 +749,12 @@
         "packages": "Package occupancy",
         "packagesHint": "Live packages with active, pending, and expiring seats.",
         "notices": "Email log",
-        "noticesHint": "Registration, approval, activation, expiration, and package-change notices.",
+        "noticesHint": "Registration, package changes, exercise requests, workout sessions, and lifecycle notices.",
         "roster": "Subscriber roster",
         "rosterHint": "Current accounts with package, dates, and last check-in. Rejected requests excluded."
       },
       "empty": {
-        "inbox": "No operational notices yet — they appear when registrations, approvals, activations, expirations, or package-change requests fire.",
+        "inbox": "No operational notices yet — they appear for registrations, package changes, exercise substitute requests, completed workouts, and lifecycle events.",
         "expiring": "No active subscriptions end in the next 21 days.",
         "activity": "No active subscribers to report on yet.",
         "packages": "No live packages to summarize.",

@@ -25,6 +25,7 @@ import { useContentAssetsQuery } from "@/features/content/hooks"
 import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
 import {
   useLogWorkoutSessionMutation,
+  useRequestExerciseChangeMutation,
   useWorkoutLogsQuery,
   useWorkoutProgramsQuery,
 } from "@/features/workouts/hooks"
@@ -89,6 +90,7 @@ export function WorkoutPlanPage() {
   })
   const { data: ptRecord } = useSubscriberPTQuery(subscriberId)
   const logMutation = useLogWorkoutSessionMutation()
+  const exerciseChangeMutation = useRequestExerciseChangeMutation()
 
   function resolveExerciseVideoUrl(exercise: WorkoutExercise): string | undefined {
     if (exercise.videoContentId) {
@@ -97,6 +99,26 @@ export function WorkoutPlanPage() {
       return asset?.streamUrl || asset?.fileUrl || undefined
     }
     return exercise.videoUrl || undefined
+  }
+
+  function resolveExerciseMedia(exercise: WorkoutExercise): {
+    playbackUrl?: string
+    posterUrl?: string
+  } {
+    if (exercise.videoContentId) {
+      const asset = entitledAssets.find((a) => a.id === exercise.videoContentId)
+      if (asset?.accessAllowed === false) {
+        return { posterUrl: exercise.thumbnailUrl || asset?.thumbnailUrl }
+      }
+      return {
+        playbackUrl: asset?.streamUrl || asset?.fileUrl || exercise.videoUrl || undefined,
+        posterUrl: exercise.thumbnailUrl || asset?.thumbnailUrl || undefined,
+      }
+    }
+    return {
+      playbackUrl: exercise.videoUrl || undefined,
+      posterUrl: exercise.thumbnailUrl || undefined,
+    }
   }
 
   const hasActivePTContraindications = Boolean(
@@ -193,7 +215,7 @@ export function WorkoutPlanPage() {
     )
   }, [activeProgram?.pdfContentId, entitledAssets])
 
-  // 1. Substitute Exercise Handler
+  // 1. Substitute Exercise Handler (session-local approved alt)
   function handleSwapExercise(substitute: ExerciseAlternative, _reason: string) {
     if (!changeModalExercise) return
     const updated: WorkoutExercise = {
@@ -202,11 +224,47 @@ export function WorkoutPlanPage() {
       equipment: substitute.equipment || changeModalExercise.equipment,
       notes: substitute.notes || changeModalExercise.notes,
       description: substitute.reason || changeModalExercise.description,
+      videoContentId:
+        substitute.videoContentId ?? changeModalExercise.videoContentId,
+      videoUrl: substitute.videoContentId
+        ? undefined
+        : changeModalExercise.videoUrl,
     }
     setExerciseOverrides((prev) => ({
       ...prev,
       [changeModalExercise.id]: updated,
     }))
+  }
+
+  // 1b. Coach-review request (no approved alt, or explicit request path)
+  async function handleRequestExerciseChange(reason: string, notes: string) {
+    if (!changeModalExercise) return
+    try {
+      await exerciseChangeMutation.mutateAsync({
+        exerciseId: changeModalExercise.id,
+        exerciseName: resolveBilingualText(changeModalExercise.name, locale),
+        reason,
+        notes: notes.trim() || undefined,
+        programId: activeProgram?.id,
+        dayId: selectedDay?.id,
+        programTitle: activeProgram?.title[locale],
+        dayLabel: resolveBilingualText(selectedDay?.label, locale) || undefined,
+      })
+      appToast.success(
+        isAr
+          ? "تم إرسال طلب استبدال التمرين إلى المدرب"
+          : "Exercise change request sent to your coach",
+      )
+      setChangeModalExercise(null)
+    } catch (err) {
+      appToast.error(
+        err instanceof Error
+          ? err.message
+          : isAr
+            ? "تعذر إرسال الطلب"
+            : "Could not send the request",
+      )
+    }
   }
 
   // 2. Complete Live Workout Handler
@@ -926,7 +984,38 @@ export function WorkoutPlanPage() {
           onClose={() => setIsLivePlayerOpen(false)}
           day={selectedDay}
           programTitle={activeProgram?.title[locale]}
+          programId={activeProgram?.id}
           resolveExerciseVideoUrl={resolveExerciseVideoUrl}
+          resolveExerciseMedia={resolveExerciseMedia}
+          onRequestExerciseChange={async (exercise, reason, notes) => {
+            try {
+              await exerciseChangeMutation.mutateAsync({
+                exerciseId: exercise.id,
+                exerciseName: resolveBilingualText(exercise.name, locale),
+                reason,
+                notes: notes.trim() || undefined,
+                programId: activeProgram?.id,
+                dayId: selectedDay?.id,
+                programTitle: activeProgram?.title[locale],
+                dayLabel:
+                  resolveBilingualText(selectedDay?.label, locale) || undefined,
+              })
+              appToast.success(
+                isAr
+                  ? "تم إرسال طلب استبدال التمرين إلى المدرب"
+                  : "Exercise change request sent to your coach",
+              )
+            } catch (err) {
+              appToast.error(
+                err instanceof Error
+                  ? err.message
+                  : isAr
+                    ? "تعذر إرسال الطلب"
+                    : "Could not send the request",
+              )
+              throw err
+            }
+          }}
           onCompleteWorkout={handleLiveWorkoutComplete}
         />
       ) : null}
@@ -968,6 +1057,7 @@ export function WorkoutPlanPage() {
         onClose={() => setChangeModalExercise(null)}
         exercise={changeModalExercise}
         onSwapExercise={handleSwapExercise}
+        onRequestChange={handleRequestExerciseChange}
       />
 
       {/* 8. Video Preview Dialog */}

@@ -12,7 +12,7 @@ interface ExerciseChangeModalProps {
   onClose: () => void
   exercise: WorkoutExercise | null
   onSwapExercise?: (substitute: ExerciseAlternative, reason: string) => void
-  onRequestChange?: (reason: string, notes: string) => void
+  onRequestChange?: (reason: string, notes: string) => void | Promise<void>
 }
 
 const COMMON_REASONS = [
@@ -36,13 +36,14 @@ export function ExerciseChangeModal({
   const [selectedReason, setSelectedReason] = useState<string>(COMMON_REASONS[0].id)
   const [customNotes, setCustomNotes] = useState("")
   const [selectedAlternativeId, setSelectedAlternativeId] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   if (!isOpen || !exercise) return null
 
   const exerciseName = resolveBilingualText(exercise.name, locale)
   const alternatives = exercise.alternatives ?? []
 
-  function handleSubmit() {
+  async function handleSubmit() {
     const reasonObj = COMMON_REASONS.find((r) => r.id === selectedReason)
     const reasonText = reasonObj ? (isAr ? reasonObj.ar : reasonObj.en) : selectedReason
 
@@ -61,16 +62,20 @@ export function ExerciseChangeModal({
     }
 
     if (onRequestChange) {
-      onRequestChange(reasonText, customNotes)
-      appToast.success(
-        isAr
-          ? "تم إرسال طلب استبدال التمرين إلى المدرب وسيتم مراجعته فوراً!"
-          : "Exercise change request submitted to coach successfully!",
-      )
-    } else {
-      appToast.success(isAr ? "تم حفظ الملاحظات بنجاح" : "Notes saved successfully")
+      setIsSubmitting(true)
+      try {
+        await onRequestChange(reasonText, customNotes)
+        // Parent shows success/error toast after persistence.
+        onClose()
+      } catch {
+        // Parent already toasted the error — keep modal open for retry.
+      } finally {
+        setIsSubmitting(false)
+      }
+      return
     }
 
+    appToast.success(isAr ? "تم حفظ الملاحظات بنجاح" : "Notes saved successfully")
     onClose()
   }
 
@@ -223,16 +228,21 @@ export function ExerciseChangeModal({
         <div className="mt-5 pt-3 border-t border-black/[0.06] flex items-center gap-3">
           <button
             type="button"
-            onClick={handleSubmit}
-            className="flex-1 inline-flex h-11 items-center justify-center rounded-full bg-[var(--gym-orange,#fb5001)] px-5 text-[14px] font-bold text-white shadow-sm transition hover:opacity-95 active:scale-[0.98]"
+            onClick={() => void handleSubmit()}
+            disabled={isSubmitting}
+            className="flex-1 inline-flex h-11 items-center justify-center rounded-full bg-[var(--gym-orange,#fb5001)] px-5 text-[14px] font-bold text-white shadow-sm transition hover:opacity-95 active:scale-[0.98] disabled:opacity-60"
           >
-            {selectedAlternativeId
+            {isSubmitting
               ? isAr
-                ? "تبديل التمرين بهذا البديل"
-                : "Substitute With This Option"
-              : isAr
-                ? "حفظ وإرسال الطلب للمدرب"
-                : "Save & Request Change"}
+                ? "جاري الإرسال…"
+                : "Sending…"
+              : selectedAlternativeId
+                ? isAr
+                  ? "تبديل التمرين بهذا البديل"
+                  : "Substitute With This Option"
+                : isAr
+                  ? "حفظ وإرسال الطلب للمدرب"
+                  : "Save & Request Change"}
           </button>
           <button
             type="button"

@@ -1,6 +1,7 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import {
+  Camera,
   CheckCircle2,
   ChevronDown,
   Clock,
@@ -22,6 +23,8 @@ type ProgramLogsDialogProps = {
   workoutLogs?: WorkoutSessionLog[]
   nutritionLogs?: NutritionAdherenceLog[]
   type: "workout" | "nutrition"
+  /** Auto-expand and highlight this session log (from Reports deep-link). */
+  highlightLogId?: string
   onClose: () => void
 }
 
@@ -32,11 +35,20 @@ export function ProgramLogsDialog({
   workoutLogs = [],
   nutritionLogs = [],
   type,
+  highlightLogId,
   onClose,
 }: ProgramLogsDialogProps) {
   const { locale } = useLocale()
   const isAr = locale === "ar"
-  const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(
+    highlightLogId ?? null,
+  )
+
+  useEffect(() => {
+    if (open && highlightLogId) {
+      setExpandedLogId(highlightLogId)
+    }
+  }, [open, highlightLogId])
 
   if (!open) return null
 
@@ -104,7 +116,13 @@ export function ProgramLogsDialog({
                   return (
                     <div
                       key={log.id}
-                      className="rounded-2xl border border-[#ECECEC] bg-[#FBFBFB] p-4 transition hover:bg-white space-y-2.5"
+                      id={`workout-log-${log.id}`}
+                      className={cn(
+                        "rounded-2xl border bg-[#FBFBFB] p-4 transition hover:bg-white space-y-2.5",
+                        highlightLogId === log.id
+                          ? "border-[var(--gym-orange,#fb5001)] ring-2 ring-[var(--gym-orange,#fb5001)]/25 shadow-md"
+                          : "border-[#ECECEC]",
+                      )}
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
@@ -139,6 +157,32 @@ export function ProgramLogsDialog({
                             </span>
                           ) : null}
 
+                          {log.energyLevel ? (
+                            <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-sky-900">
+                              {log.energyLevel === "great"
+                                ? isAr
+                                  ? "طاقة عالية"
+                                  : "Felt amazing"
+                                : log.energyLevel === "good"
+                                  ? isAr
+                                    ? "جيد"
+                                    : "Solid"
+                                  : log.energyLevel === "tired"
+                                    ? isAr
+                                      ? "متعب"
+                                      : "Tired"
+                                    : isAr
+                                      ? "مرهق"
+                                      : "Exhausted"}
+                            </span>
+                          ) : null}
+
+                          {exercises.some((ex) => ex.wasSubstituted) ? (
+                            <span className="rounded-full bg-[var(--gym-orange,#fb5001)]/10 px-2.5 py-0.5 text-[var(--gym-orange,#fb5001)]">
+                              {isAr ? "فيه استبدال" : "Had substitutes"}
+                            </span>
+                          ) : null}
+
                           {exercises.length > 0 ? (
                             <button
                               type="button"
@@ -154,7 +198,7 @@ export function ProgramLogsDialog({
 
                       {log.notes ? (
                         <p className="text-[12px] leading-relaxed text-[#6B7280] bg-white p-2.5 rounded-xl border border-black/[0.04]">
-                          💬 {log.notes}
+                          {log.notes}
                         </p>
                       ) : null}
 
@@ -168,15 +212,24 @@ export function ProgramLogsDialog({
                             {exercises.map((ex, i) => (
                               <div
                                 key={ex.exerciseId || i}
-                                className="flex items-center justify-between rounded-lg bg-white p-2 border border-black/[0.05] text-[11.5px]"
+                                className="flex flex-col gap-0.5 rounded-lg bg-white p-2 border border-black/[0.05] text-[11.5px]"
                               >
-                                <span className="font-bold text-[var(--gym-ink,#111111)] truncate">
-                                  {ex.name}
-                                </span>
-                                <span className="font-mono font-bold text-[#6B7280] shrink-0">
-                                  {ex.completedSets} {isAr ? "مج" : "sets"}{" "}
-                                  {ex.weightKg ? `• ${ex.weightKg} كجم` : ""}
-                                </span>
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-bold text-[var(--gym-ink,#111111)] truncate">
+                                    {ex.name}
+                                  </span>
+                                  <span className="font-mono font-bold text-[#6B7280] shrink-0">
+                                    {ex.completedSets} {isAr ? "مج" : "sets"}{" "}
+                                    {ex.weightKg ? `• ${ex.weightKg} كجم` : ""}
+                                  </span>
+                                </div>
+                                {ex.wasSubstituted && ex.substituteName ? (
+                                  <span className="text-[10px] font-semibold text-[var(--gym-orange,#fb5001)]">
+                                    {isAr
+                                      ? `بديل عن: ${ex.substituteName}`
+                                      : `Sub for: ${ex.substituteName}`}
+                                  </span>
+                                ) : null}
                               </div>
                             ))}
                           </div>
@@ -228,7 +281,13 @@ export function ProgramLogsDialog({
                 return (
                   <div
                     key={log.id}
-                    className="rounded-2xl border border-[#ECECEC] bg-[#FBFBFB] p-4 transition hover:bg-white space-y-2"
+                    id={`nutrition-log-${log.id}`}
+                    className={cn(
+                      "rounded-2xl border bg-[#FBFBFB] p-4 transition hover:bg-white space-y-2",
+                      highlightLogId === log.id
+                        ? "border-[var(--gym-orange,#fb5001)] ring-2 ring-[var(--gym-orange,#fb5001)]/25 shadow-md"
+                        : "border-[#ECECEC]",
+                    )}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-heading text-[14px] font-bold text-[var(--gym-ink,#111111)]">
@@ -253,6 +312,58 @@ export function ProgramLogsDialog({
                       <p className="text-[12px] leading-relaxed text-[#6B7280]">
                         {log.notes}
                       </p>
+                    ) : null}
+
+                    {log.mealChecks && log.mealChecks.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {log.mealChecks.map((check) => (
+                          <span
+                            key={check.slotId}
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold border",
+                              check.completed
+                                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                : "bg-neutral-100 text-[#6B7280] border-black/10",
+                            )}
+                          >
+                            {check.completed ? (
+                              <CheckCircle2 className="size-3" />
+                            ) : null}
+                            {check.slotTitle}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {log.mealPhotos && log.mealPhotos.length > 0 ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+                        {log.mealPhotos.map((photo) => (
+                          <a
+                            key={`${photo.slotId}-${photo.uploadedAt}`}
+                            href={photo.photoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="group overflow-hidden rounded-xl border border-black/10 bg-white"
+                          >
+                            <div className="relative aspect-[4/3] bg-neutral-100">
+                              <img
+                                src={photo.photoUrl}
+                                alt={photo.slotTitle}
+                                className="size-full object-cover"
+                              />
+                              <span className="absolute start-1.5 bottom-1.5 inline-flex items-center gap-1 rounded-full bg-black/65 px-2 py-0.5 text-[10px] font-bold text-white">
+                                <Camera className="size-3" />
+                                {photo.slotTitle}
+                              </span>
+                            </div>
+                            {photo.note ? (
+                              <p className="px-2 py-1.5 text-[10px] text-[#6B7280] line-clamp-2">
+                                {photo.note}
+                              </p>
+                            ) : null}
+                          </a>
+                        ))}
+                      </div>
                     ) : null}
                   </div>
                 )

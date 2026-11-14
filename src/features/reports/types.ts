@@ -30,6 +30,10 @@ export type NoticeKind =
   | "activation"
   | "expiration"
   | "subscription_change"
+  | "exercise_change"
+  | "workout_session"
+  | "meal_change"
+  | "nutrition_adherence"
 
 export type NoticeStatus = "queued" | "sent" | "failed"
 export type NoticeChannel = "email" | "push" | "email+push"

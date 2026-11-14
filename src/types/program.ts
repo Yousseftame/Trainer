@@ -193,6 +193,22 @@ export type WorkoutSessionLog = {
   completedAt: string
 }
 
+export type NutritionMealCheck = {
+  slotId: string
+  slotTitle: string
+  completed: boolean
+  updatedAt: string
+}
+
+export type NutritionMealPhoto = {
+  slotId: string
+  slotTitle: string
+  photoUrl: string
+  storagePath?: string
+  note?: string
+  uploadedAt: string
+}
+
 export type NutritionAdherenceLog = {
   id: string
   subscriberId: string
@@ -205,6 +221,10 @@ export type NutritionAdherenceLog = {
   caloriesActual?: number
   waterLitersActual?: number
   notes?: string
+  /** Per-meal eaten toggles for the day (coach-visible). */
+  mealChecks?: NutritionMealCheck[]
+  /** Meal verification photos for the day (coach-visible). */
+  mealPhotos?: NutritionMealPhoto[]
   loggedAt: string
 }
 

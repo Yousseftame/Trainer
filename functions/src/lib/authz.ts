@@ -1,11 +1,43 @@
 import {HttpsError} from "firebase-functions/v2/https";
 import type {CallerClaims} from "./types.js";
-import {STAFF_ROLES} from "./types.js";
+import {ALL_STAFF_PERMISSIONS, STAFF_ROLES} from "./types.js";
 
 type AuthContext = {
   uid: string;
   token: Record<string, unknown>;
 };
+
+const PERMISSION_REQUIRES: Record<string, readonly string[]> = {
+  "subscribers:write": ["subscribers:read"],
+  "subscribers:approve": ["subscribers:read"],
+  "workouts:manage": ["workouts:read"],
+  "nutrition:manage": ["nutrition:read"],
+  "content:manage": ["content:read"],
+  "progress:write": ["progress:read"],
+  "physicalTherapy:manage": ["physicalTherapy:read"],
+  "reports:export": ["reports:read"],
+  "subscriptions:manage": ["subscribers:read"],
+};
+
+function expandPermissions(permissions: readonly string[]): string[] {
+  const allowed = new Set<string>(ALL_STAFF_PERMISSIONS);
+  const next = new Set(permissions.filter((perm) => allowed.has(perm)));
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const perm of [...next]) {
+      const requires = PERMISSION_REQUIRES[perm];
+      if (!requires) continue;
+      for (const required of requires) {
+        if (allowed.has(required) && !next.has(required)) {
+          next.add(required);
+          changed = true;
+        }
+      }
+    }
+  }
+  return ALL_STAFF_PERMISSIONS.filter((perm) => next.has(perm));
+}
 
 function readClaims(token: Record<string, unknown>): CallerClaims {
   return {
@@ -37,7 +69,7 @@ export function assertStaffCaller(
   }
 
   if (permission && claims.role !== "head_coach") {
-    const perms = claims.permissions ?? [];
+    const perms = expandPermissions(claims.permissions ?? []);
     if (!perms.includes(permission)) {
       throw new HttpsError("permission-denied", `Missing permission: ${permission}`);
     }

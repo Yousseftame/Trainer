@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { Link, useSearchParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import {
   Archive,
@@ -10,6 +11,7 @@ import {
   Flame,
   History,
   Info,
+  MessageSquareWarning,
   Pencil,
   Plus,
   Repeat,
@@ -20,6 +22,7 @@ import {
   UserPlus,
   Users,
 } from "lucide-react"
+import { APP_ROUTES } from "@/config/constants"
 import {
   NutritionProgramFormDialog,
   type NutritionDialogMode,
@@ -35,6 +38,8 @@ import {
   useDeleteNutritionMutation,
   useNutritionLogsQuery,
   useNutritionProgramsQuery,
+  usePendingMealChangeRequestsQuery,
+  useResolveMealChangeMutation,
   useRestoreNutritionMutation,
   useSaveNutritionProgramMutation,
 } from "@/features/nutrition/hooks"
@@ -44,6 +49,7 @@ import {
   mealCount,
   resolveBilingualText,
 } from "@/lib/program-text"
+import { useAuth } from "@/features/auth/auth-context"
 import { useSubscribersQuery } from "@/features/subscribers/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
@@ -62,7 +68,16 @@ export function NutritionPage() {
   const { t } = useTranslation()
   const { locale } = useLocale()
   const isAr = locale === "ar"
+  const { hasPermission } = useAuth()
+  const canManage = hasPermission("nutrition:manage")
+  const canRead = hasPermission("nutrition:read") || canManage
   useDocumentTitle(t("nav.nutrition"))
+
+  const [searchParams, setSearchParams] = useSearchParams()
+  const focusRequestId = searchParams.get("request") || ""
+  const focusLogId = searchParams.get("log") || ""
+  const focusSubscriberId = searchParams.get("subscriber") || ""
+  const focusRequestRef = useRef<HTMLDivElement | null>(null)
 
   const [scope, setScope] = useState<Scope>("template")
   const [formatFilter, setFormatFilter] = useState<FormatFilter>("all")
@@ -85,7 +100,9 @@ export function NutritionPage() {
   const [logsModal, setLogsModal] = useState<{
     open: boolean
     subscriberId?: string
+    programId?: string
     subscriberName?: string
+    highlightLogId?: string
   }>({ open: false })
 
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -105,6 +122,10 @@ export function NutritionPage() {
   } = useNutritionProgramsQuery()
   const { data: subscribers = [] } = useSubscribersQuery()
   const { data: allLogs = [] } = useNutritionLogsQuery()
+  const { data: pendingMealRequests = [] } = usePendingMealChangeRequestsQuery({
+    enabled: canRead,
+  })
+  const resolveMealMutation = useResolveMealChangeMutation()
 
   const saveMutation = useSaveNutritionProgramMutation()
   const assignMutation = useAssignNutritionMutation()
@@ -117,7 +138,8 @@ export function NutritionPage() {
     assignMutation.isPending ||
     archiveMutation.isPending ||
     restoreMutation.isPending ||
-    deleteMutation.isPending
+    deleteMutation.isPending ||
+    resolveMealMutation.isPending
 
   // Filtered List
   const list = useMemo(() => {
@@ -261,10 +283,26 @@ export function NutritionPage() {
     return allPrograms.filter((p) => p.subscriberId === selected.subscriberId)
   }, [allPrograms, selected])
 
-  const subscriberLogs = useMemo(() => {
+  const programLogs = useMemo(() => {
     if (!selected?.id) return []
     return allLogs.filter((l) => l.programId === selected.id)
   }, [allLogs, selected])
+
+  const dialogLogs = useMemo(() => {
+    if (!logsModal.open) return []
+    if (logsModal.programId) {
+      return allLogs.filter((l) => l.programId === logsModal.programId)
+    }
+    if (logsModal.subscriberId) {
+      return allLogs
+        .filter((l) => l.subscriberId === logsModal.subscriberId)
+        .sort(
+          (a, b) =>
+            new Date(b.loggedAt).getTime() - new Date(a.loggedAt).getTime(),
+        )
+    }
+    return programLogs
+  }, [logsModal, allLogs, programLogs])
 
   const selectedWeekAdherenceCount = useMemo(() => {
     const now = new Date()
@@ -274,12 +312,57 @@ export function NutritionPage() {
     )
     monday.setUTCDate(monday.getUTCDate() - (day - 1))
     const weekStart = monday.toISOString().slice(0, 10)
-    return subscriberLogs.filter(
+    return programLogs.filter(
       (l) =>
         (l.date || l.loggedAt).slice(0, 10) >= weekStart &&
         (l.status === "adhered" || l.status === "mostly"),
     ).length
-  }, [subscriberLogs])
+  }, [programLogs])
+
+  const recentLogs = useMemo(
+    () =>
+      [...allLogs]
+        .sort(
+          (a, b) =>
+            new Date(b.loggedAt).getTime() - new Date(a.loggedAt).getTime(),
+        )
+        .slice(0, 8),
+    [allLogs],
+  )
+
+  useEffect(() => {
+    if (!focusRequestId || !pendingMealRequests.length) return
+    const timer = window.setTimeout(() => {
+      focusRequestRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      })
+    }, 120)
+    return () => window.clearTimeout(timer)
+  }, [focusRequestId, pendingMealRequests])
+
+  useEffect(() => {
+    if (!focusLogId) return
+    const log = allLogs.find((l) => l.id === focusLogId)
+    const subId = focusSubscriberId || log?.subscriberId
+    if (!subId) return
+    const sub = subscribers.find((s) => s.id === subId)
+    setLogsModal({
+      open: true,
+      subscriberId: subId,
+      subscriberName: sub?.displayName,
+      highlightLogId: focusLogId,
+    })
+  }, [focusLogId, focusSubscriberId, allLogs, subscribers])
+
+  function clearFocusParams() {
+    if (!focusRequestId && !focusLogId && !focusSubscriberId) return
+    const next = new URLSearchParams(searchParams)
+    next.delete("request")
+    next.delete("log")
+    next.delete("subscriber")
+    setSearchParams(next, { replace: true })
+  }
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
@@ -306,6 +389,186 @@ export function NutritionPage() {
           icon={<CalendarDays className="size-4" strokeWidth={1.8} />}
         />
       </div>
+
+      {pendingMealRequests.length > 0 ? (
+        <section className="rounded-[24px] border border-amber-200/80 bg-amber-50/70 p-4 sm:p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-amber-500/15 text-amber-800">
+              <MessageSquareWarning className="size-4" strokeWidth={2.25} />
+            </span>
+            <div>
+              <h3 className="font-heading text-[15px] font-extrabold text-amber-950">
+                {isAr
+                  ? `طلبات تغيير وجبة (${pendingMealRequests.length})`
+                  : `Meal change requests (${pendingMealRequests.length})`}
+              </h3>
+              <p className="text-[12px] font-medium text-amber-900/70">
+                {isAr
+                  ? "من صفحة التغذية لدى المشترك — راجع السبب ثم علّم كمُراجع."
+                  : "From the subscriber nutrition page — review reason, then mark handled."}
+              </p>
+            </div>
+          </div>
+          <div className="space-y-2.5">
+            {pendingMealRequests.map((req) => {
+              const focused = focusRequestId === req.id
+              return (
+                <div
+                  key={req.id}
+                  ref={focused ? focusRequestRef : undefined}
+                  id={`meal-request-${req.id}`}
+                  className={cn(
+                    "flex flex-col gap-3 rounded-2xl border bg-white p-3.5 sm:flex-row sm:items-start sm:justify-between",
+                    focused
+                      ? "border-[var(--gym-orange,#fb5001)] ring-2 ring-[var(--gym-orange,#fb5001)]/30 shadow-md"
+                      : "border-amber-200/70",
+                  )}
+                >
+                  <div className="min-w-0 space-y-1">
+                    <p className="truncate text-[13px] font-bold text-[var(--gym-ink,#111111)]">
+                      {req.subscriberName ||
+                        req.subscriberEmail ||
+                        req.subscriberId}
+                    </p>
+                    <p className="text-[12px] text-[#6B7280]">
+                      <strong className="text-[var(--gym-ink,#111111)]">
+                        {req.mealItemName}
+                      </strong>
+                      {req.mealSlotTitle ? ` · ${req.mealSlotTitle}` : ""}
+                      {" · "}
+                      {isAr ? "السبب: " : "Reason: "}
+                      {req.reason}
+                      {" · "}
+                      {formatDate(req.createdAt, locale)}
+                    </p>
+                    {req.notes ? (
+                      <p className="rounded-xl bg-[#F7F7F7] px-2.5 py-1.5 text-[12px] text-[#525252]">
+                        {req.notes}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <Link
+                      to={APP_ROUTES.admin.subscriberDetail(req.subscriberId)}
+                      className="rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-[12px] font-bold text-[#525252]"
+                    >
+                      {isAr ? "ملف المشترك" : "Profile"}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setLogsModal({
+                          open: true,
+                          subscriberId: req.subscriberId,
+                          subscriberName:
+                            req.subscriberName || req.subscriberEmail,
+                        })
+                      }
+                      className="rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-[12px] font-bold text-[#525252]"
+                    >
+                      {isAr ? "سجلات الالتزام" : "Adherence logs"}
+                    </button>
+                    {canManage ? (
+                      <>
+                        <button
+                          type="button"
+                          disabled={actionsBusy}
+                          onClick={async () => {
+                            await resolveMealMutation.mutateAsync({
+                              requestId: req.id,
+                              decision: "reviewed",
+                            })
+                            if (focusRequestId === req.id) clearFocusParams()
+                            appToast.success(
+                              isAr
+                                ? "تم تعليم الطلب كمُراجع"
+                                : "Marked as reviewed",
+                            )
+                          }}
+                          className="rounded-full bg-[var(--gym-ink,#111111)] px-3.5 py-1.5 text-[12px] font-bold text-white disabled:opacity-50"
+                        >
+                          {isAr ? "تمت المراجعة" : "Mark reviewed"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={actionsBusy}
+                          onClick={async () => {
+                            await resolveMealMutation.mutateAsync({
+                              requestId: req.id,
+                              decision: "dismissed",
+                            })
+                            if (focusRequestId === req.id) clearFocusParams()
+                            appToast.success(
+                              isAr ? "تم إغلاق الطلب" : "Request dismissed",
+                            )
+                          }}
+                          className="rounded-full border border-black/10 px-3.5 py-1.5 text-[12px] font-bold text-[#8c8c8c] disabled:opacity-50"
+                        >
+                          {isAr ? "تجاهل" : "Dismiss"}
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      {recentLogs.length > 0 ? (
+        <section className="rounded-[24px] border border-black/[0.06] bg-white p-4 sm:p-5">
+          <div className="mb-3">
+            <h3 className="font-heading text-[15px] font-extrabold text-[var(--gym-ink,#111111)]">
+              {isAr ? "أحدث سجلات الالتزام" : "Latest adherence logs"}
+            </h3>
+            <p className="text-[12px] font-medium text-[#8c8c8c]">
+              {isAr
+                ? "من صفحة التغذية — افتح السجل للتفاصيل."
+                : "From the nutrition page — open a log for details."}
+            </p>
+          </div>
+          <div className="space-y-2">
+            {recentLogs.map((log) => {
+              const sub = subscribers.find((s) => s.id === log.subscriberId)
+              const focused = focusLogId === log.id
+              return (
+                <button
+                  key={log.id}
+                  type="button"
+                  onClick={() =>
+                    setLogsModal({
+                      open: true,
+                      subscriberId: log.subscriberId,
+                      subscriberName: sub?.displayName,
+                      highlightLogId: log.id,
+                    })
+                  }
+                  className={cn(
+                    "flex w-full flex-col gap-2 rounded-2xl border px-3.5 py-3 text-start transition hover:bg-[#FAFAFA] sm:flex-row sm:items-center sm:justify-between",
+                    focused
+                      ? "border-[var(--gym-orange,#fb5001)] ring-2 ring-[var(--gym-orange,#fb5001)]/25"
+                      : "border-black/[0.06]",
+                  )}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-bold">
+                      {sub?.displayName || log.subscriberId}
+                    </p>
+                    <p className="text-[11px] font-medium text-[#8c8c8c]">
+                      {formatDate(log.date || log.loggedAt, locale)}
+                      {log.notes ? ` · ${isAr ? "فيه ملاحظات" : "Has notes"}` : ""}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-black/5 px-2.5 py-0.5 text-[11px] font-bold text-[#525252]">
+                    {log.status}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </section>
+      ) : null}
 
       <section className="rounded-[24px] bg-white p-4 sm:p-6 lg:p-7">
         <div className="flex flex-col gap-3.5">
@@ -341,7 +604,7 @@ export function NutritionPage() {
                 <ChevronDown className="pointer-events-none absolute end-3 size-4 text-[#8c8c8c]" />
               </div>
 
-              {scope === "template" ? (
+              {canManage && scope === "template" ? (
                 <button
                   type="button"
                   disabled={actionsBusy}
@@ -357,7 +620,8 @@ export function NutritionPage() {
                   <Plus className="size-4" strokeWidth={2} />
                   {t("admin.nutrition.newTemplate")}
                 </button>
-              ) : (
+              ) : null}
+              {canManage && scope !== "template" ? (
                 <button
                   type="button"
                   disabled={actionsBusy}
@@ -373,7 +637,7 @@ export function NutritionPage() {
                   <UserPlus className="size-4" strokeWidth={2} />
                   {t("admin.nutrition.assign")}
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
 
@@ -498,6 +762,7 @@ export function NutritionPage() {
                         setLogsModal({
                           open: true,
                           subscriberId: selected.subscriberId,
+                          programId: selected.id,
                           subscriberName: selectedSubscriber?.displayName,
                         })
                       }
@@ -520,25 +785,26 @@ export function NutritionPage() {
                     </button>
                   ) : null}
 
-                  {/* Edit button */}
-                  <button
-                    type="button"
-                    disabled={actionsBusy}
-                    onClick={() => {
-                      if (actionsBusy) return
-                      setFormModal({
-                        open: true,
-                        mode:
-                          selected.status === "template"
-                            ? { type: "edit-template", program: selected }
-                            : { type: "edit-assignment", program: selected },
-                      })
-                    }}
-                    className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5 disabled:opacity-60"
-                    title={isAr ? "تعديل الخطة" : "Edit plan"}
-                  >
-                    <Pencil className="size-4" />
-                  </button>
+                  {canManage ? (
+                    <button
+                      type="button"
+                      disabled={actionsBusy}
+                      onClick={() => {
+                        if (actionsBusy) return
+                        setFormModal({
+                          open: true,
+                          mode:
+                            selected.status === "template"
+                              ? { type: "edit-template", program: selected }
+                              : { type: "edit-assignment", program: selected },
+                        })
+                      }}
+                      className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5 disabled:opacity-60"
+                      title={isAr ? "تعديل الخطة" : "Edit plan"}
+                    >
+                      <Pencil className="size-4" />
+                    </button>
+                  ) : null}
 
                   {/* Version history button */}
                   {selected.subscriberId ? (
@@ -558,39 +824,41 @@ export function NutritionPage() {
                     </button>
                   ) : null}
 
-                  {/* Archive / Restore button */}
-                  <button
-                    type="button"
-                    disabled={actionsBusy}
-                    onClick={() => handleArchiveToggle(selected)}
-                    className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5 disabled:opacity-60"
-                    title={
-                      selected.status === "archived"
-                        ? isAr
-                          ? "استعادة الخطة"
-                          : "Restore plan"
-                        : isAr
-                          ? "أرشفة الخطة"
-                          : "Archive plan"
-                    }
-                  >
-                    {selected.status === "archived" ? (
-                      <RotateCcw className="size-4 text-[var(--gym-orange,#fb5001)]" />
-                    ) : (
-                      <Archive className="size-4" />
-                    )}
-                  </button>
+                  {canManage ? (
+                    <button
+                      type="button"
+                      disabled={actionsBusy}
+                      onClick={() => handleArchiveToggle(selected)}
+                      className="flex size-9 items-center justify-center rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-sm hover:bg-black/5 disabled:opacity-60"
+                      title={
+                        selected.status === "archived"
+                          ? isAr
+                            ? "استعادة الخطة"
+                            : "Restore plan"
+                          : isAr
+                            ? "أرشفة الخطة"
+                            : "Archive plan"
+                      }
+                    >
+                      {selected.status === "archived" ? (
+                        <RotateCcw className="size-4 text-[var(--gym-orange,#fb5001)]" />
+                      ) : (
+                        <Archive className="size-4" />
+                      )}
+                    </button>
+                  ) : null}
 
-                  {/* Delete button */}
-                  <button
-                    type="button"
-                    disabled={actionsBusy}
-                    onClick={() => handleDelete(selected)}
-                    className="flex size-9 items-center justify-center rounded-full bg-white text-red-500 shadow-sm hover:bg-red-50 disabled:opacity-60"
-                    title={isAr ? "حذف نهائي" : "Delete permanently"}
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
+                  {canManage ? (
+                    <button
+                      type="button"
+                      disabled={actionsBusy}
+                      onClick={() => handleDelete(selected)}
+                      className="flex size-9 items-center justify-center rounded-full bg-white text-red-500 shadow-sm hover:bg-red-50 disabled:opacity-60"
+                      title={isAr ? "حذف نهائي" : "Delete permanently"}
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
@@ -904,7 +1172,7 @@ export function NutritionPage() {
       </section>
 
       {/* Program Create / Edit / Assign Dialog */}
-      {formModal.open && formModal.mode ? (
+      {canManage && formModal.open && formModal.mode ? (
         <NutritionProgramFormDialog
           open={formModal.open}
           mode={formModal.mode}
@@ -948,7 +1216,7 @@ export function NutritionPage() {
         <ProgramLogsDialog
           open={logsModal.open}
           title={
-            selected
+            logsModal.programId && selected
               ? isAr
                 ? `سجل الالتزام: ${selected.title.ar || selected.title.en}`
                 : `Adherence log: ${selected.title.en || selected.title.ar}`
@@ -957,9 +1225,13 @@ export function NutritionPage() {
                 : "Nutrition Adherence Log"
           }
           subscriberName={logsModal.subscriberName}
-          nutritionLogs={subscriberLogs}
+          nutritionLogs={dialogLogs}
           type="nutrition"
-          onClose={() => setLogsModal({ open: false })}
+          highlightLogId={logsModal.highlightLogId}
+          onClose={() => {
+            setLogsModal({ open: false })
+            if (focusLogId) clearFocusParams()
+          }}
         />
       ) : null}
 

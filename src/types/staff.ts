@@ -50,6 +50,25 @@ export type PermissionModuleGroup = {
 
 export const PERMISSION_MODULES: PermissionModuleGroup[] = [
   {
+    moduleId: "overview",
+    title: { en: "Overview Dashboard", ar: "لوحة النظرة العامة" },
+    description: {
+      en: "Admin home at /admin — studio snapshot, attention queue, and quick actions.",
+      ar: "الصفحة الرئيسية للإدارة في /admin — ملخص الاستوديو وقائمة الانتباه والإجراءات السريعة.",
+    },
+    pageRoute: "/admin",
+    permissions: [
+      {
+        key: "overview:read",
+        label: { en: "View Overview", ar: "عرض النظرة العامة" },
+        description: {
+          en: "Show the Overview item in the sidebar and open the /admin home dashboard.",
+          ar: "إظهار عنصر النظرة العامة في الشريط الجانبي وفتح لوحة /admin الرئيسية.",
+        },
+      },
+    ],
+  },
+  {
     moduleId: "subscribers",
     title: { en: "Subscribers & Registrations", ar: "المشتركون وطلبات التسجيل" },
     description: {
@@ -60,26 +79,26 @@ export const PERMISSION_MODULES: PermissionModuleGroup[] = [
     permissions: [
       {
         key: "subscribers:read",
-        label: { en: "View Subscribers", ar: "عرض قائمة وملفات المشتركين" },
+        label: { en: "View only", ar: "عرض فقط" },
         description: {
-          en: "Browse the subscriber directory and view client details.",
-          ar: "تصفح دليل المشتركين والاطلاع على تفاصيل الحسابات.",
+          en: "Browse the directory and open profiles. No add, edit, suspend, or delete.",
+          ar: "تصفح الدليل وفتح الملفات فقط — بدون إضافة أو تعديل أو تعليق أو حذف.",
         },
       },
       {
         key: "subscribers:write",
-        label: { en: "Edit Subscribers", ar: "إضافة وتعديل بيانات المشتركين" },
+        label: { en: "Add & edit", ar: "إضافة وتعديل" },
         description: {
-          en: "Create, update profiles, and write private coach notes.",
-          ar: "إنشاء حسابات جديدة وتحديث البيانات وكتابة ملاحظات المدرب.",
+          en: "Add subscribers, edit profiles, coach notes, suspend/activate, and delete.",
+          ar: "إضافة مشتركين، تعديل الملفات والملاحظات، التعليق/التفعيل، والحذف.",
         },
       },
       {
         key: "subscribers:approve",
-        label: { en: "Approve Registrations", ar: "مراجعة واعتماد طلبات التسجيل" },
+        label: { en: "Approve registrations", ar: "اعتماد طلبات التسجيل" },
         description: {
-          en: "Approve or decline prospective subscriber requests.",
-          ar: "اتخاذ قرار القبول أو الرفض للطلبات الواردة.",
+          en: "Open Registration Requests and approve, reject, or create manual leads.",
+          ar: "فتح طلبات التسجيل واعتمادها أو رفضها أو إنشاء طلب يدوي.",
         },
       },
     ],
@@ -95,18 +114,18 @@ export const PERMISSION_MODULES: PermissionModuleGroup[] = [
     permissions: [
       {
         key: "packages:manage",
-        label: { en: "Manage Packages", ar: "إدارة وإنشاء الباقات" },
+        label: { en: "Manage packages", ar: "إدارة الباقات" },
         description: {
-          en: "Create, edit pricing, and archive subscription packages.",
-          ar: "إنشاء باقات جديدة وتعديل المزايا والأسعار والأرشفة.",
+          en: "Full package catalog control: create, edit pricing, and archive.",
+          ar: "تحكم كامل بالباقات: إنشاء وتعديل الأسعار والأرشفة.",
         },
       },
       {
         key: "subscriptions:manage",
-        label: { en: "Manage Subscriptions", ar: "إدارة اشتراكات العملاء" },
+        label: { en: "Manage subscriptions", ar: "إدارة الاشتراكات" },
         description: {
-          en: "Assign packages, renew expired seats, and handle cancellations.",
-          ar: "تعيين الباقات للعملاء وتجديد المقاعد المنتهية أو تعليقها.",
+          en: "Assign packages, renew/suspend seats, and resolve package-change requests.",
+          ar: "تعيين الباقات، تجديد/تعليق المقاعد، ومعالجة طلبات تغيير الباقة.",
         },
       },
     ],
@@ -121,11 +140,19 @@ export const PERMISSION_MODULES: PermissionModuleGroup[] = [
     pageRoute: "/admin/workouts",
     permissions: [
       {
-        key: "workouts:manage",
-        label: { en: "Manage Workout Programs", ar: "إدارة وتعيين برامج التمارين" },
+        key: "workouts:read",
+        label: { en: "View only", ar: "عرض فقط" },
         description: {
-          en: "Create workout templates, assign custom routines, and set alternatives.",
-          ar: "إنشاء قوالب التمارين، وتخصيص الجداول وإضافة بدائل التمارين.",
+          en: "Browse templates and assigned programs. No create, edit, assign, or delete.",
+          ar: "تصفح القوالب والبرامج المعيّنة — بدون إنشاء أو تعديل أو تعيين أو حذف.",
+        },
+      },
+      {
+        key: "workouts:manage",
+        label: { en: "Add & edit", ar: "إضافة وتعديل" },
+        description: {
+          en: "Create templates, assign programs, edit, archive, and delete.",
+          ar: "إنشاء القوالب، تعيين البرامج، التعديل، الأرشفة، والحذف.",
         },
       },
     ],
@@ -140,11 +167,19 @@ export const PERMISSION_MODULES: PermissionModuleGroup[] = [
     pageRoute: "/admin/nutrition",
     permissions: [
       {
-        key: "nutrition:manage",
-        label: { en: "Manage Nutrition Plans", ar: "إدارة وتعيين خطط التغذية" },
+        key: "nutrition:read",
+        label: { en: "View only", ar: "عرض فقط" },
         description: {
-          en: "Create meal templates, calculate macros, and assign food alternatives.",
-          ar: "تصميم قوالب الوجبات، توزيع الماكروز، وتحديد بدائل الأطعمة.",
+          en: "Browse meal templates and assigned plans. No create, edit, assign, or delete.",
+          ar: "تصفح قوالب الوجبات والخطط المعيّنة — بدون إنشاء أو تعديل أو تعيين أو حذف.",
+        },
+      },
+      {
+        key: "nutrition:manage",
+        label: { en: "Add & edit", ar: "إضافة وتعديل" },
+        description: {
+          en: "Create plans, assign to subscribers, edit, archive, and delete.",
+          ar: "إنشاء الخطط، تعيينها للمشتركين، التعديل، الأرشفة، والحذف.",
         },
       },
     ],
@@ -160,18 +195,18 @@ export const PERMISSION_MODULES: PermissionModuleGroup[] = [
     permissions: [
       {
         key: "physicalTherapy:read",
-        label: { en: "View PT & Injury Records", ar: "الاطلاع على ملفات التأهيل والإصابات" },
+        label: { en: "View only", ar: "عرض فقط" },
         description: {
-          en: "Review subscriber injury assessments and movement contraindications.",
-          ar: "الاطلاع على تشخيصات الإصابات وموانع الحركة للمشتركين.",
+          en: "Review injury assessments and restrictions. No create, edit, or delete.",
+          ar: "مراجعة تقييمات الإصابات والقيود — بدون إنشاء أو تعديل أو حذف.",
         },
       },
       {
         key: "physicalTherapy:manage",
-        label: { en: "Manage PT & Rehab Records", ar: "إدارة تقييمات وتمارين التأهيل" },
+        label: { en: "Add & edit", ar: "إضافة وتعديل" },
         description: {
-          en: "Create injury profiles, prescribe safe gym substitutes, and log rehab routines.",
-          ar: "تسجيل حالات جديدة، تحديد بدائل التمارين الآمنة، ووصف تمارين التأهيل.",
+          en: "Create assessments, edit rehab plans, mark cleared, and delete records.",
+          ar: "إنشاء تقييمات، تعديل خطط التأهيل، تسجيل التعافي، وحذف السجلات.",
         },
       },
     ],
@@ -186,11 +221,19 @@ export const PERMISSION_MODULES: PermissionModuleGroup[] = [
     pageRoute: "/admin/content",
     permissions: [
       {
-        key: "content:manage",
-        label: { en: "Manage Content Library", ar: "إدارة ورفع المحتوى التعليمي" },
+        key: "content:read",
+        label: { en: "View only", ar: "عرض فقط" },
         description: {
-          en: "Upload, associate videos with exercises, and assign documents.",
-          ar: "رفع وتصنيف الفيديوهات وربطها بالتمارين وتخصيص الكتيبات.",
+          en: "Browse and preview library assets. No upload, edit, or delete.",
+          ar: "تصفح ومعاينة أصول المكتبة — بدون رفع أو تعديل أو حذف.",
+        },
+      },
+      {
+        key: "content:manage",
+        label: { en: "Add & edit", ar: "إضافة وتعديل" },
+        description: {
+          en: "Upload, edit, link assets to exercises, and delete content.",
+          ar: "رفع المحتوى وتعديله وربطه بالتمارين وحذفه.",
         },
       },
     ],
@@ -206,18 +249,18 @@ export const PERMISSION_MODULES: PermissionModuleGroup[] = [
     permissions: [
       {
         key: "progress:read",
-        label: { en: "Access Subscriber Progress", ar: "الاطلاع على تقدم المشتركين" },
+        label: { en: "View only", ar: "عرض فقط" },
         description: {
-          en: "Inspect private weigh-in charts, photos, and compliance history.",
-          ar: "متابعة سجلات الوزن ونسب الالتزام والصور الشخصية للمشترك.",
+          en: "Review weigh-ins, photos, and adherence. No add or delete.",
+          ar: "مراجعة القياسات والصور والالتزام — بدون إضافة أو حذف.",
         },
       },
       {
         key: "progress:write",
-        label: { en: "Edit Subscriber Progress", ar: "تعديل تقدم المشتركين" },
+        label: { en: "Add & edit", ar: "إضافة وتعديل" },
         description: {
-          en: "Add or delete measurements, progress photos, and performance records for any subscriber.",
-          ar: "إضافة أو حذف القياسات وصور التطور وسجلات الأداء لأي مشترك.",
+          en: "Log check-ins, upload photos, add performance records, and delete entries.",
+          ar: "تسجيل القياسات، رفع الصور، إضافة سجلات الأداء، وحذف الإدخالات.",
         },
       },
     ],
@@ -233,18 +276,18 @@ export const PERMISSION_MODULES: PermissionModuleGroup[] = [
     permissions: [
       {
         key: "reports:read",
-        label: { en: "View Reports", ar: "الاطلاع على التقارير" },
+        label: { en: "View only", ar: "عرض فقط" },
         description: {
-          en: "Access weekly pulse, check-in summaries, and revenue metrics.",
-          ar: "قراءة نبض الاستوديو الأسبوعي وتقارير المتابعة والتجديدات.",
+          en: "Open Reports inbox and analytics tabs. Does not unlock Overview (use Overview Dashboard).",
+          ar: "فتح صندوق التقارير وتبويبات التحليلات. لا يفتح النظرة العامة (استخدم لوحة النظرة العامة).",
         },
       },
       {
         key: "reports:export",
-        label: { en: "Export Reports", ar: "تصدير البيانات والتقارير" },
+        label: { en: "Export data", ar: "تصدير البيانات" },
         description: {
-          en: "Export subscriber rosters, revenue figures, and adherence sheets.",
-          ar: "تنزيل وتصدير البيانات الإحصائية وسجلات المشتركين.",
+          en: "Download CSV exports for rosters, revenue, and adherence.",
+          ar: "تنزيل ملفات CSV للمشتركين والإيرادات والالتزام.",
         },
       },
     ],
@@ -272,17 +315,17 @@ export const PERMISSION_MODULES: PermissionModuleGroup[] = [
     moduleId: "notifications",
     title: { en: "Notifications & Messages", ar: "الإشعارات والرسائل" },
     description: {
-      en: "Broadcast announcements and transactional reminders to subscribers.",
-      ar: "إرسال التنبيهات المباشرة وتذكيرات التجديد والتمرين للعملاء.",
+      en: "Controls the Send / Retry buttons inside Reports — not a separate page.",
+      ar: "يتحكم في أزرار الإرسال/إعادة المحاولة داخل التقارير — وليست صفحة منفصلة.",
     },
-    pageRoute: "/admin/overview",
+    pageRoute: "/admin/reports",
     permissions: [
       {
         key: "notifications:send",
-        label: { en: "Send Notifications", ar: "إرسال الإشعارات والتعميمات" },
+        label: { en: "Send / retry notices", ar: "إرسال / إعادة محاولة الإشعارات" },
         description: {
-          en: "Dispatch push notifications and in-app system messages.",
-          ar: "إرسال رسائل التنبيه الفورية وإشعارات النظام إلى المشتركين.",
+          en: "From Reports inbox: manually send or retry email/push notices (registration, expiry, package-change, etc.). Viewing Reports still needs View Reports.",
+          ar: "من صندوق التقارير: إرسال أو إعادة محاولة إشعارات البريد/الدفع يدوياً (تسجيل، انتهاء، تغيير باقة…). عرض التقارير ما زال يحتاج صلاحية عرض التقارير.",
         },
       },
     ],

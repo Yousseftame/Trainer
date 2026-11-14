@@ -4,6 +4,8 @@ export const COLLECTIONS = {
   registrationRequests: "registration_requests",
   subscriptions: "subscriptions",
   subscriptionChangeRequests: "subscription_change_requests",
+  exerciseChangeRequests: "exercise_change_requests",
+  mealChangeRequests: "meal_change_requests",
   packages: "packages",
   staff: "staff",
   contentAssets: "content_assets",

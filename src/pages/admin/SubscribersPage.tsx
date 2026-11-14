@@ -53,7 +53,9 @@ const STATUS_FILTERS: Array<"all" | UserStatus> = [
 export function SubscribersPage() {
   const { t } = useTranslation()
   const { locale } = useLocale()
-  const { user } = useAuth()
+  const { user, hasPermission } = useAuth()
+  const canWrite = hasPermission("subscribers:write")
+  const canManageSubs = hasPermission("subscriptions:manage")
   const navigate = useNavigate()
   useDocumentTitle(t("nav.subscribers"))
 
@@ -396,7 +398,7 @@ export function SubscribersPage() {
                   <ChevronDown className="pointer-events-none absolute end-3 size-4 text-[#8c8c8c]" />
                 </div>
 
-                {user?.role === "head_coach" ? (
+                {canWrite && user?.role === "head_coach" ? (
                   <button
                     type="button"
                     disabled={actionsBusy}
@@ -407,15 +409,17 @@ export function SubscribersPage() {
                   </button>
                 ) : null}
 
-                <button
-                  type="button"
-                  disabled={actionsBusy || saveSubscriberMutation.isPending}
-                  onClick={() => setFormState({ open: true, subscriber: null })}
-                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-4 sm:px-5 text-[13px] font-bold text-white transition hover:opacity-95 disabled:opacity-60"
-                >
-                  <UserPlus className="size-4" strokeWidth={2} />
-                  <span className="whitespace-nowrap">{t("admin.subscribers.add")}</span>
-                </button>
+                {canWrite ? (
+                  <button
+                    type="button"
+                    disabled={actionsBusy || saveSubscriberMutation.isPending}
+                    onClick={() => setFormState({ open: true, subscriber: null })}
+                    className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-4 sm:px-5 text-[13px] font-bold text-white transition hover:opacity-95 disabled:opacity-60"
+                  >
+                    <UserPlus className="size-4" strokeWidth={2} />
+                    <span className="whitespace-nowrap">{t("admin.subscribers.add")}</span>
+                  </button>
+                ) : null}
               </div>
             </div>
 
@@ -518,108 +522,120 @@ export function SubscribersPage() {
               disabled={actionsBusy}
               onClick={() => navigate(APP_ROUTES.admin.subscriberDetail(row.id))}
             />
-            <TableAction
-              label={locale === "ar" ? "تعديل" : "Edit"}
-              disabled={actionsBusy}
-              onClick={() => setFormState({ open: true, subscriber: row })}
-            />
-            <TableAction
-              label={t("admin.common.manage")}
-              disabled={actionsBusy}
-              onClick={() => {
-                if (row.subscription) {
-                  setSubDialogState({
-                    mode: "manage",
-                    subscription: row.subscription,
-                    initialAction:
-                      row.subscription.status === "active"
-                        ? "renew"
-                        : "activate",
-                  })
-                } else {
-                  setSubDialogState({
-                    mode: "assign",
-                    defaultSubscriberId: row.id,
-                    defaultPackageId: row.preferredPackageId,
-                  })
+            {canWrite ? (
+              <TableAction
+                label={locale === "ar" ? "تعديل" : "Edit"}
+                disabled={actionsBusy}
+                onClick={() => setFormState({ open: true, subscriber: row })}
+              />
+            ) : null}
+            {canManageSubs ? (
+              <TableAction
+                label={t("admin.common.manage")}
+                disabled={actionsBusy}
+                onClick={() => {
+                  if (row.subscription) {
+                    setSubDialogState({
+                      mode: "manage",
+                      subscription: row.subscription,
+                      initialAction:
+                        row.subscription.status === "active"
+                          ? "renew"
+                          : "activate",
+                    })
+                  } else {
+                    setSubDialogState({
+                      mode: "assign",
+                      defaultSubscriberId: row.id,
+                      defaultPackageId: row.preferredPackageId,
+                    })
+                  }
+                }}
+              />
+            ) : null}
+            {canWrite ? (
+              <TableAction
+                label={
+                  row.status === "active"
+                    ? locale === "ar"
+                      ? "تعليق"
+                      : "Suspend"
+                    : locale === "ar"
+                      ? "تفعيل"
+                      : "Activate"
                 }
-              }}
-            />
-            <TableAction
-              label={
-                row.status === "active"
-                  ? locale === "ar"
-                    ? "تعليق"
-                    : "Suspend"
-                  : locale === "ar"
-                    ? "تفعيل"
-                    : "Activate"
-              }
-              tone={row.status === "active" ? "danger" : "default"}
-              disabled={actionsBusy}
-              onClick={() => handleQuickToggleStatus(row)}
-            />
-            <TableAction
-              label={locale === "ar" ? "حذف" : "Delete"}
-              tone="danger"
-              disabled={actionsBusy}
-              onClick={() => handleDelete(row)}
-            />
+                tone={row.status === "active" ? "danger" : "default"}
+                disabled={actionsBusy}
+                onClick={() => handleQuickToggleStatus(row)}
+              />
+            ) : null}
+            {canWrite ? (
+              <TableAction
+                label={locale === "ar" ? "حذف" : "Delete"}
+                tone="danger"
+                disabled={actionsBusy}
+                onClick={() => handleDelete(row)}
+              />
+            ) : null}
           </>
         )}
       />
 
-      <SubscriberFormDialog
-        open={formState.open}
-        subscriber={formState.subscriber}
-        packages={packages}
-        busy={saveSubscriberMutation.isPending}
-        adminName={user?.displayName || user?.email || "Head Coach"}
-        onClose={() => {
-          if (saveSubscriberMutation.isPending) return
-          setFormState({ open: false, subscriber: null })
-        }}
-        onSave={async (payload) => {
-          const isEdit = Boolean(payload.id)
-          await saveSubscriberMutation.mutateAsync(payload)
-          setFormState({ open: false, subscriber: null })
-          appToast.success(
-            isEdit
-              ? locale === "ar"
-                ? "تم تحديث بيانات المشترك بنجاح"
-                : "Subscriber updated successfully"
-              : locale === "ar"
-                ? "تم إنشاء حساب المشترك بنجاح"
-                : "Subscriber account created successfully",
-          )
-        }}
-      />
+      {canWrite ? (
+        <SubscriberFormDialog
+          open={formState.open}
+          subscriber={formState.subscriber}
+          packages={packages}
+          busy={saveSubscriberMutation.isPending}
+          adminName={user?.displayName || user?.email || "Head Coach"}
+          onClose={() => {
+            if (saveSubscriberMutation.isPending) return
+            setFormState({ open: false, subscriber: null })
+          }}
+          onSave={async (payload) => {
+            const isEdit = Boolean(payload.id)
+            await saveSubscriberMutation.mutateAsync(payload)
+            setFormState({ open: false, subscriber: null })
+            appToast.success(
+              isEdit
+                ? locale === "ar"
+                  ? "تم تحديث بيانات المشترك بنجاح"
+                  : "Subscriber updated successfully"
+                : locale === "ar"
+                  ? "تم إنشاء حساب المشترك بنجاح"
+                  : "Subscriber account created successfully",
+            )
+          }}
+        />
+      ) : null}
 
-      <SubscriptionActionDialog
-        state={subDialogState}
-        packages={packages}
-        busy={assignSubMutation.isPending || lifecycleSubMutation.isPending}
-        adminName={user?.displayName || user?.email || "Head Coach"}
-        onClose={() => setSubDialogState(null)}
-        onAssign={async (payload) => {
-          await assignSubMutation.mutateAsync(payload)
-          setSubDialogState(null)
-          appToast.success(
-            locale === "ar"
-              ? "تم تعيين الاشتراك للمشترك بنجاح"
-              : "Subscription assigned successfully",
-          )
-        }}
-        onLifecycle={async (payload) => {
-          await lifecycleSubMutation.mutateAsync(payload)
-          setSubDialogState(null)
-          appToast.success(
-            locale === "ar"
-              ? "تم تحديث حالة الاشتراك بنجاح"
-              : "Subscription updated successfully",
-          )
-        }}
-      />
+      {canManageSubs ? (
+        <SubscriptionActionDialog
+          state={subDialogState}
+          packages={packages}
+          busy={assignSubMutation.isPending || lifecycleSubMutation.isPending}
+          adminName={user?.displayName || user?.email || "Head Coach"}
+          onClose={() => setSubDialogState(null)}
+          onAssign={async (payload) => {
+            await assignSubMutation.mutateAsync(payload)
+            setSubDialogState(null)
+            appToast.success(
+              locale === "ar"
+                ? "تم تعيين الاشتراك للمشترك بنجاح"
+                : "Subscription assigned successfully",
+            )
+          }}
+          onLifecycle={async (payload) => {
+            await lifecycleSubMutation.mutateAsync(payload)
+            setSubDialogState(null)
+            appToast.success(
+              locale === "ar"
+                ? "تم تحديث حالة الاشتراك بنجاح"
+                : "Subscription updated successfully",
+            )
+          }}
+        />
+      ) : null}
 
       <ConfirmActionDialog
         open={Boolean(confirmDialog?.open)}

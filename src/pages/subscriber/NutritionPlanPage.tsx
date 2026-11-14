@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import {
@@ -20,13 +20,18 @@ import {
 import adminBanner from "@/assets/admin.webp"
 import { StatCard } from "@/components/dashboard/StatCard"
 import { MealChangeModal } from "@/components/subscriber/MealChangeModal"
+import { MealDetailSheet } from "@/components/subscriber/MealDetailSheet"
 import { MealPhotoUploadDialog } from "@/components/subscriber/MealPhotoUploadDialog"
+import { MealSlotSubstituteModal } from "@/components/subscriber/MealSlotSubstituteModal"
 import { useContentAssetsQuery } from "@/features/content/hooks"
 import {
   useLogNutritionAdherenceMutation,
   useNutritionLogsQuery,
   useNutritionProgramsQuery,
+  useRequestMealChangeMutation,
+  useUpsertNutritionMealProgressMutation,
 } from "@/features/nutrition/hooks"
+import { uploadMealVerificationPhoto } from "@/features/nutrition/service"
 import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
@@ -37,6 +42,7 @@ import { cn } from "@/lib/utils"
 import type {
   MealAlternative,
   MealItem,
+  MealSlot,
   NutritionDay,
 } from "@/types/program"
 
@@ -80,12 +86,20 @@ export function NutritionPlanPage() {
     enabled: Boolean(subscriberId),
   })
   const logMutation = useLogNutritionAdherenceMutation()
+  const mealChangeMutation = useRequestMealChangeMutation()
+  const mealProgressMutation = useUpsertNutritionMealProgressMutation()
 
   const [selectedDayIdx, setSelectedDayIdx] = useState(0)
   const [didAutoSelectToday, setDidAutoSelectToday] = useState(false)
+  const [hydratedLogKey, setHydratedLogKey] = useState<string | null>(null)
   const [logging, setLogging] = useState(false)
+  const toggleLockRef = useRef<string | null>(null)
+  const [detailSlot, setDetailSlot] = useState<{
+    slot: MealSlot
+    slotTitle: string
+  } | null>(null)
 
-  // Local UI-only meal tracking (session substitutes / photos — not program mutations)
+  // Local UI meal tracking (synced to coach nutrition logs)
   const [completedSlots, setCompletedSlots] = useState<Record<string, boolean>>({})
   const [swappedItems, setSwappedItems] = useState<
     Record<string, { substitute: MealAlternative; reason: string }>
@@ -100,6 +114,7 @@ export function NutritionPlanPage() {
     setSwappedItems({})
     setSlotPhotos({})
     setDidAutoSelectToday(false)
+    setHydratedLogKey(null)
     setSelectedDayIdx(0)
   }, [activePlan?.id])
 
@@ -114,6 +129,11 @@ export function NutritionPlanPage() {
   // Modal states
   const [changeModalItem, setChangeModalItem] = useState<{
     item: MealItem
+    slotTitle: string
+  } | null>(null)
+
+  const [substituteSlot, setSubstituteSlot] = useState<{
+    slot: MealSlot
     slotTitle: string
   } | null>(null)
 
@@ -189,15 +209,83 @@ export function NutritionPlanPage() {
       ),
   )
 
-  // Handlers
-  function toggleSlotCompleted(slotId: string) {
-    setCompletedSlots((prev) => {
-      const next = !prev[slotId]
-      if (next) {
-        appToast.success(isAr ? "تم تسجيل تناول الوجبة!" : "Meal marked as eaten!")
+  const todayLog = useMemo(() => {
+    if (!activePlan) return null
+    return (
+      logs.find(
+        (l) => l.programId === activePlan.id && l.date === todayIso,
+      ) ?? null
+    )
+  }, [logs, activePlan, todayIso])
+
+  useEffect(() => {
+    if (!activePlan || !todayLog) return
+    const key = `${activePlan.id}:${todayLog.id}:${todayLog.loggedAt}`
+    if (hydratedLogKey === key) return
+    if (todayLog.mealChecks?.length) {
+      const next: Record<string, boolean> = {}
+      for (const check of todayLog.mealChecks) {
+        next[check.slotId] = check.completed
       }
-      return { ...prev, [slotId]: next }
-    })
+      setCompletedSlots((prev) => ({ ...next, ...prev }))
+    }
+    if (todayLog.mealPhotos?.length) {
+      const next: Record<string, { photoUrl: string; note?: string }> = {}
+      for (const photo of todayLog.mealPhotos) {
+        next[photo.slotId] = {
+          photoUrl: photo.photoUrl,
+          note: photo.note,
+        }
+      }
+      setSlotPhotos((prev) => ({ ...next, ...prev }))
+    }
+    setHydratedLogKey(key)
+  }, [activePlan, todayLog, hydratedLogKey])
+
+  function resolveSlotTitle(slotId: string): string {
+    const slot = selectedDay?.meals.find((m) => m.id === slotId)
+    if (!slot) return slotId
+    return (
+      (typeof slot.label === "object"
+        ? resolveBilingualText(slot.label, locale)
+        : slot.label) || t(`admin.nutrition.slots.${slot.slot}`)
+    )
+  }
+
+  async function persistMealCheck(slotId: string, completed: boolean) {
+    if (!activePlan || !currentSubscriber) return
+    try {
+      await mealProgressMutation.mutateAsync({
+        programId: activePlan.id,
+        date: todayIso,
+        dayId: selectedDay?.id,
+        weekday: selectedDay?.weekday,
+        mealCheck: {
+          slotId,
+          slotTitle: resolveSlotTitle(slotId),
+          completed,
+        },
+      })
+    } catch {
+      // Local UI already updated; coach sync can retry on next toggle/log
+    }
+  }
+
+  // Handlers — toast outside setState (Strict Mode runs updaters twice in dev)
+  function toggleSlotCompleted(slotId: string) {
+    if (toggleLockRef.current === slotId) return
+    toggleLockRef.current = slotId
+    window.setTimeout(() => {
+      if (toggleLockRef.current === slotId) toggleLockRef.current = null
+    }, 350)
+
+    const currentlyDone = Boolean(completedSlots[slotId])
+    const nextDone = !currentlyDone
+    setCompletedSlots((prev) => ({ ...prev, [slotId]: nextDone }))
+    if (nextDone) {
+      appToast.success(isAr ? "تم تسجيل تناول الوجبة!" : "Meal marked as eaten!")
+    }
+    void persistMealCheck(slotId, nextDone)
   }
 
   function handleSwapMealItem(substitute: MealAlternative, reason: string) {
@@ -218,11 +306,92 @@ export function NutritionPlanPage() {
     appToast.success(isAr ? "تمت استعادة الصنف الأصلي" : "Original food item restored")
   }
 
-  function handlePhotoUploaded(slotId: string, photoUrl: string, note?: string) {
+  async function handlePhotoUploaded(payload: {
+    slotId: string
+    file: File
+    previewUrl: string
+    note?: string
+  }) {
+    if (!activePlan || !currentSubscriber) {
+      throw new Error(isAr ? "لا توجد خطة نشطة" : "No active plan")
+    }
+
     setSlotPhotos((prev) => ({
       ...prev,
-      [slotId]: { photoUrl, note },
+      [payload.slotId]: { photoUrl: payload.previewUrl, note: payload.note },
     }))
+
+    const uploaded = await uploadMealVerificationPhoto({
+      subscriberId: currentSubscriber.id,
+      programId: activePlan.id,
+      date: todayIso,
+      slotId: payload.slotId,
+      file: payload.file,
+    })
+
+    setSlotPhotos((prev) => ({
+      ...prev,
+      [payload.slotId]: { photoUrl: uploaded.photoUrl, note: payload.note },
+    }))
+
+    await mealProgressMutation.mutateAsync({
+      programId: activePlan.id,
+      date: todayIso,
+      dayId: selectedDay?.id,
+      weekday: selectedDay?.weekday,
+      mealPhoto: {
+        slotId: payload.slotId,
+        slotTitle: resolveSlotTitle(payload.slotId),
+        photoUrl: uploaded.photoUrl,
+        storagePath: uploaded.storagePath,
+        note: payload.note,
+      },
+      mealCheck: {
+        slotId: payload.slotId,
+        slotTitle: resolveSlotTitle(payload.slotId),
+        completed: true,
+      },
+    })
+
+    setCompletedSlots((prev) => ({ ...prev, [payload.slotId]: true }))
+    appToast.success(
+      isAr
+        ? "تم رفع صورة الوجبة وإرسالها للمدرب بنجاح!"
+        : "Meal verification photo sent to your coach!",
+    )
+  }
+
+  async function handleMealSlotCoachRequest(reason: string, notes: string) {
+    if (!substituteSlot || !activePlan) return
+    try {
+      await mealChangeMutation.mutateAsync({
+        mealItemId: `meal:${substituteSlot.slot.id}`,
+        mealItemName: substituteSlot.slotTitle,
+        reason,
+        notes: notes.trim() || undefined,
+        programId: activePlan.id,
+        dayId: selectedDay?.id,
+        programTitle: activePlan.title[locale],
+        dayLabel:
+          resolveBilingualText(selectedDay?.label, locale) || undefined,
+        mealSlotId: substituteSlot.slot.id,
+        mealSlotTitle: substituteSlot.slotTitle,
+      })
+      appToast.success(
+        isAr
+          ? "تم إرسال طلب استبدال الوجبة إلى المدرب"
+          : "Meal substitute request sent to your coach",
+      )
+    } catch (err) {
+      appToast.error(
+        err instanceof Error
+          ? err.message
+          : isAr
+            ? "تعذر إرسال الطلب"
+            : "Could not send the request",
+      )
+      throw err
+    }
   }
 
   function toggleNoteExpanded(slotId: string) {
@@ -271,11 +440,28 @@ export function NutritionPlanPage() {
               ? "التزام جزئي بمعظم الوجبات"
               : "Mostly followed meals",
       })
-      // Mark all slots complete locally after a successful day log
+      // Mark all slots complete locally + sync meal checks for coach panel
       if (selectedDay.meals.length) {
         const next: Record<string, boolean> = {}
         for (const slot of selectedDay.meals) next[slot.id] = true
         setCompletedSlots((prev) => ({ ...prev, ...next }))
+        await mealProgressMutation.mutateAsync({
+          programId: activePlan.id,
+          date: todayIso,
+          dayId: selectedDay.id,
+          weekday: selectedDay.weekday,
+          mealChecks: selectedDay.meals.map((slot) => {
+            const slotTitle =
+              (typeof slot.label === "object"
+                ? resolveBilingualText(slot.label, locale)
+                : slot.label) || t(`admin.nutrition.slots.${slot.slot}`)
+            return {
+              slotId: slot.id,
+              slotTitle,
+              completed: true,
+            }
+          }),
+        })
       }
       appToast.success(
         isAr ? "تم تسجيل الالتزام بنجاح في سجلك!" : "Today's nutrition adherence logged!",
@@ -662,16 +848,19 @@ export function NutritionPlanPage() {
                   <div
                     key={slot.id}
                     className={cn(
-                      "rounded-[28px] bg-white p-4 sm:p-6 shadow-xs border transition",
+                      "rounded-[24px] sm:rounded-[28px] bg-white p-3.5 sm:p-6 shadow-xs border transition",
                       isCompleted
                         ? "border-emerald-200/80 bg-neutral-50/30"
                         : "border-black/[0.06]",
                     )}
                   >
-                    {/* Meal Slot Header (Matches Reference Image) */}
-                    <div className="flex items-center justify-between pb-3.5 border-b border-black/[0.05]">
-                      {/* Slot Title & Calories */}
-                      <div>
+                    {/* Meal Slot Header — tap opens detail */}
+                    <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-black/[0.05]">
+                      <button
+                        type="button"
+                        onClick={() => setDetailSlot({ slot, slotTitle })}
+                        className="min-w-0 flex-1 text-start rounded-xl -ms-1 px-1 py-0.5 hover:bg-black/[0.02] active:scale-[0.99] transition"
+                      >
                         <div className="flex items-center gap-2">
                           <h3 className="font-heading text-[16px] sm:text-[18px] font-black text-[#111111]">
                             {slotTitle}
@@ -679,68 +868,90 @@ export function NutritionPlanPage() {
                           {isCompleted ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2.5 py-0.5 text-[10px] font-extrabold text-[#111111] border border-black/10">
                               <Check className="size-3 text-[#fb5001]" />
-                              {isAr ? "تم الإنجاز" : "Eaten"}
+                              {isAr ? "تم" : "Eaten"}
                             </span>
                           ) : null}
                         </div>
                         <p className="mt-0.5 text-[12px] font-bold text-[#8c8c8c]">
                           {slot.items.length} {isAr ? "عناصر" : "items"}
                           {slotCalories > 0 ? (
-                            <span> | {slotCalories} {isAr ? "سعرات حرارية" : "kcal"}</span>
+                            <span>
+                              {" "}
+                              · {slotCalories} {isAr ? "سعرة" : "kcal"}
+                            </span>
                           ) : null}
+                          <span className="ms-1.5 text-[var(--gym-orange,#fb5001)] font-extrabold">
+                            {isAr ? "· التفاصيل" : "· Details"}
+                          </span>
                         </p>
-                      </div>
+                      </button>
 
-                      {/* Header Actions: Meal Verification Photo Button & Checkmark */}
-                      <div className="flex items-center gap-2">
-                        {/* Dashed Add Photo Button */}
+                      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                         <button
                           type="button"
-                          onClick={() =>
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSubstituteSlot({ slot, slotTitle })
+                          }}
+                          className="inline-flex size-10 sm:h-10 sm:w-auto sm:px-3.5 items-center justify-center gap-1.5 rounded-xl border border-black/10 bg-neutral-50 text-[12px] font-extrabold text-[#111111] hover:border-[var(--gym-orange,#fb5001)]/50 hover:text-[var(--gym-orange,#fb5001)] transition select-none"
+                          title={isAr ? "استبدال الوجبة" : "Substitute meal"}
+                        >
+                          <RefreshCw className="size-4 shrink-0" />
+                          <span className="hidden sm:inline">
+                            {isAr ? "استبدال" : "Substitute"}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
                             setPhotoDialogSlot({
                               slotId: slot.id,
                               slotTitle,
                               existingPhotoUrl: photo,
                             })
-                          }
+                          }}
                           className={cn(
-                            "inline-flex h-9 sm:h-10 items-center gap-1.5 rounded-xl border-2 border-dashed px-3 sm:px-3.5 text-[12px] font-extrabold transition select-none",
+                            "inline-flex size-10 sm:h-10 sm:w-auto sm:px-3.5 items-center justify-center gap-1.5 rounded-xl border-2 border-dashed text-[12px] font-extrabold transition select-none",
                             photo
-                              ? "border-[#fb5001]/60 bg-orange-50/40 text-[#fb5001] hover:bg-orange-100/50"
-                              : "border-black/20 bg-neutral-50 text-[#111111] hover:border-[#fb5001] hover:text-[#fb5001] hover:bg-orange-50/20",
+                              ? "border-[#fb5001]/60 bg-orange-50/40 text-[#fb5001]"
+                              : "border-black/20 bg-neutral-50 text-[#111111]",
                           )}
-                          title={isAr ? "إرفاق صورة الوجبة للمدرب" : "Attach meal photo"}
+                          title={isAr ? "إرفاق صورة الوجبة" : "Attach meal photo"}
                         >
                           <Camera className="size-4 shrink-0" />
-                          <span>
+                          <span className="hidden sm:inline">
                             {photo
                               ? isAr
-                                ? "تعديل الصورة"
-                                : "Edit Photo"
+                                ? "تعديل"
+                                : "Edit"
                               : isAr
-                                ? "إضافة صورة"
-                                : "Add Photo"}
+                                ? "صورة"
+                                : "Photo"}
                           </span>
                         </button>
 
-                        {/* Mark Meal as Eaten Toggle */}
                         <button
                           type="button"
-                          onClick={() => toggleSlotCompleted(slot.id)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleSlotCompleted(slot.id)
+                          }}
                           className={cn(
-                            "flex size-9 sm:size-10 items-center justify-center rounded-xl transition shadow-2xs select-none",
+                            "flex size-10 items-center justify-center rounded-xl transition select-none",
                             isCompleted
-                              ? "bg-[var(--gym-orange,#fb5001)] text-white shadow-orange-500/20"
-                              : "bg-neutral-100 text-[#666] hover:bg-neutral-200/80 hover:text-black",
+                              ? "bg-[var(--gym-orange,#fb5001)] text-white"
+                              : "bg-neutral-100 text-[#666]",
                           )}
                           title={
                             isCompleted
                               ? isAr
-                                ? "إلغاء تحديد الوجبة"
+                                ? "إلغاء التحديد"
                                 : "Unmark meal"
                               : isAr
-                                ? "تحديد الوجبة كمنجزة"
-                                : "Mark meal as eaten"
+                                ? "تحديد كمنجزة"
+                                : "Mark as eaten"
                           }
                         >
                           <Check className="size-4.5" strokeWidth={2.5} />
@@ -831,10 +1042,12 @@ export function NutritionPlanPage() {
                         const isSwapped = !!swappedItems[item.id]
 
                         return (
-                          <div
+                          <button
                             key={item.id}
+                            type="button"
+                            onClick={() => setDetailSlot({ slot, slotTitle })}
                             className={cn(
-                              "relative flex items-center justify-between gap-3 rounded-2xl p-3 sm:p-3.5 transition border",
+                              "relative flex w-full items-center justify-between gap-3 rounded-2xl p-3 sm:p-3.5 transition border text-start active:scale-[0.99]",
                               isSwapped
                                 ? "bg-orange-50/20 border-[#fb5001]/30"
                                 : "bg-white border-black/[0.06] hover:border-black/15 shadow-2xs",
@@ -896,48 +1109,62 @@ export function NutritionPlanPage() {
 
                               {/* Revert link if swapped */}
                               {isSwapped ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRevertItem(item.id)}
+                                <span
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleRevertItem(item.id)
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.stopPropagation()
+                                      handleRevertItem(item.id)
+                                    }
+                                  }}
                                   className="text-[10px] font-bold text-[#8c8c8c] hover:text-[#fb5001] underline transition"
                                 >
-                                  {isAr ? "إلغاء الاستبدال واستعادة الأصلي" : "Restore original food"}
-                                </button>
+                                  {isAr
+                                    ? "إلغاء الاستبدال واستعادة الأصلي"
+                                    : "Restore original food"}
+                                </span>
                               ) : null}
                             </div>
 
-                            {/* Action Buttons & Food Image Cluster (Button right beside image) */}
-                            <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
-                              {/* Replace / Swap Button (Same style and color as Workout) */}
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setChangeModalItem({
-                                    item,
-                                    slotTitle,
-                                  })
-                                }
+                            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setChangeModalItem({ item, slotTitle })
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.stopPropagation()
+                                    setChangeModalItem({ item, slotTitle })
+                                  }
+                                }}
                                 className={cn(
-                                  "flex size-9 sm:size-10 items-center justify-center rounded-xl transition shadow-2xs select-none active:scale-95",
+                                  "flex size-9 sm:size-10 items-center justify-center rounded-xl transition select-none active:scale-95",
                                   isSwapped
-                                    ? "bg-[var(--gym-orange,#fb5001)] text-white shadow-orange-500/20"
-                                    : "bg-black/5 text-[var(--gym-ink,#111111)] hover:bg-[var(--gym-orange,#fb5001)] hover:text-white",
+                                    ? "bg-[var(--gym-orange,#fb5001)] text-white"
+                                    : "bg-black/5 text-[var(--gym-ink,#111111)]",
                                 )}
                                 title={
                                   altCount > 0
                                     ? isAr
-                                      ? "استبدال هذا الصنف ببديل معتمد"
-                                      : "Substitute this food item"
+                                      ? "استبدال"
+                                      : "Substitute"
                                     : isAr
-                                      ? "طلب تغيير الصنف من المدرب"
-                                      : "Request food change"
+                                      ? "طلب تغيير"
+                                      : "Request change"
                                 }
                               >
                                 <RefreshCw className="size-4" />
-                              </button>
+                              </span>
 
-                              {/* Food Image Thumbnail with Grams Badge Overlay (Restored exactly like it was) */}
-                              <div className="relative size-18 sm:size-20 shrink-0 overflow-hidden rounded-2xl border border-black/10 bg-neutral-100 shadow-2xs">
+                              <div className="relative size-14 sm:size-20 shrink-0 overflow-hidden rounded-2xl border border-black/10 bg-neutral-100">
                                 {item.thumbnailUrl ? (
                                   <img
                                     src={item.thumbnailUrl}
@@ -947,18 +1174,17 @@ export function NutritionPlanPage() {
                                   />
                                 ) : (
                                   <div className="flex size-full items-center justify-center text-[#fb5001]">
-                                    <Utensils className="size-7" />
+                                    <Utensils className="size-6 sm:size-7" />
                                   </div>
                                 )}
-                                {/* Grams Badge Overlay at bottom of thumbnail */}
                                 {qty ? (
-                                  <div className="absolute inset-x-0 bottom-0 bg-black/85 py-0.5 text-center text-[10px] font-black text-white tracking-tight backdrop-blur-2xs">
+                                  <div className="absolute inset-x-0 bottom-0 bg-black/85 py-0.5 text-center text-[9px] sm:text-[10px] font-black text-white tracking-tight">
                                     {qty}
                                   </div>
                                 ) : null}
                               </div>
                             </div>
-                          </div>
+                          </button>
                         )
                       })}
                     </div>
@@ -1013,19 +1239,129 @@ export function NutritionPlanPage() {
         </div>
       )}
 
-      {/* Food Substitute / Change Modal */}
+      <MealDetailSheet
+        isOpen={Boolean(detailSlot)}
+        slot={
+          detailSlot
+            ? (selectedDay?.meals.find((m) => m.id === detailSlot.slot.id) ??
+              detailSlot.slot)
+            : null
+        }
+        slotTitle={detailSlot?.slotTitle ?? ""}
+        isCompleted={
+          detailSlot
+            ? Boolean(
+                completedSlots[detailSlot.slot.id] ??
+                  detailSlot.slot.completed,
+              )
+            : false
+        }
+        photoUrl={
+          detailSlot
+            ? slotPhotos[detailSlot.slot.id]?.photoUrl ||
+              detailSlot.slot.photoUrl
+            : undefined
+        }
+        photoNote={
+          detailSlot ? slotPhotos[detailSlot.slot.id]?.note : undefined
+        }
+        swappedItemIds={new Set(Object.keys(swappedItems))}
+        onClose={() => setDetailSlot(null)}
+        onToggleCompleted={() => {
+          if (detailSlot) toggleSlotCompleted(detailSlot.slot.id)
+        }}
+        onAddPhoto={() => {
+          if (!detailSlot) return
+          setPhotoDialogSlot({
+            slotId: detailSlot.slot.id,
+            slotTitle: detailSlot.slotTitle,
+            existingPhotoUrl:
+              slotPhotos[detailSlot.slot.id]?.photoUrl ||
+              detailSlot.slot.photoUrl,
+          })
+        }}
+        onSubstituteMeal={() => {
+          if (!detailSlot) return
+          const liveSlot =
+            selectedDay?.meals.find((m) => m.id === detailSlot.slot.id) ??
+            detailSlot.slot
+          setDetailSlot(null)
+          setSubstituteSlot({
+            slot: liveSlot,
+            slotTitle: detailSlot.slotTitle,
+          })
+        }}
+        onSwapItem={(item) => {
+          if (!detailSlot) return
+          setChangeModalItem({
+            item,
+            slotTitle: detailSlot.slotTitle,
+          })
+        }}
+        onRevertItem={handleRevertItem}
+      />
+
+      <MealSlotSubstituteModal
+        isOpen={Boolean(substituteSlot)}
+        onClose={() => setSubstituteSlot(null)}
+        slot={substituteSlot?.slot ?? null}
+        slotTitle={substituteSlot?.slotTitle ?? ""}
+        onPickItem={(item) => {
+          if (!substituteSlot) return
+          setChangeModalItem({
+            item,
+            slotTitle: substituteSlot.slotTitle,
+          })
+        }}
+        onRequestCoachChange={handleMealSlotCoachRequest}
+      />
+
       <MealChangeModal
         isOpen={!!changeModalItem}
         onClose={() => setChangeModalItem(null)}
         mealItem={changeModalItem?.item ?? null}
         mealSlotTitle={changeModalItem?.slotTitle}
         onSwapItem={handleSwapMealItem}
-        onRequestCoachChange={(_reason, _notes) => {
-          // Handled via toast in modal
+        onRequestCoachChange={async (reason, notes) => {
+          if (!changeModalItem) return
+          try {
+            await mealChangeMutation.mutateAsync({
+              mealItemId: changeModalItem.item.id,
+              mealItemName: resolveBilingualText(
+                changeModalItem.item.name,
+                locale,
+              ),
+              reason,
+              notes: notes.trim() || undefined,
+              programId: activePlan?.id,
+              dayId: selectedDay?.id,
+              programTitle: activePlan?.title[locale],
+              dayLabel:
+                resolveBilingualText(selectedDay?.label, locale) || undefined,
+              mealSlotId:
+                selectedDay?.meals.find((m) =>
+                  m.items.some((i) => i.id === changeModalItem.item.id),
+                )?.id,
+              mealSlotTitle: changeModalItem.slotTitle,
+            })
+            appToast.success(
+              isAr
+                ? "تم إرسال طلب تغيير الوجبة إلى المدرب"
+                : "Meal change request sent to your coach",
+            )
+          } catch (err) {
+            appToast.error(
+              err instanceof Error
+                ? err.message
+                : isAr
+                  ? "تعذر إرسال الطلب"
+                  : "Could not send the request",
+            )
+            throw err
+          }
         }}
       />
 
-      {/* Meal Photo Upload Dialog */}
       <MealPhotoUploadDialog
         isOpen={!!photoDialogSlot}
         onClose={() => setPhotoDialogSlot(null)}

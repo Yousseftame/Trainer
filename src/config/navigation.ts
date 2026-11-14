@@ -35,7 +35,7 @@ export const adminNav: NavItem[] = [
     labelKey: "nav.overview",
     to: APP_ROUTES.admin.overview,
     icon: LayoutDashboard,
-    permission: "reports:read",
+    permission: "overview:read",
   },
   {
     labelKey: "nav.peopleSection",
@@ -79,19 +79,19 @@ export const adminNav: NavItem[] = [
     labelKey: "nav.workouts",
     to: APP_ROUTES.admin.workouts,
     icon: Dumbbell,
-    permission: "workouts:manage",
+    permission: "workouts:read",
   },
   {
     labelKey: "nav.nutrition",
     to: APP_ROUTES.admin.nutrition,
     icon: Apple,
-    permission: "nutrition:manage",
+    permission: "nutrition:read",
   },
   {
     labelKey: "nav.content",
     to: APP_ROUTES.admin.content,
     icon: Library,
-    permission: "content:manage",
+    permission: "content:read",
   },
   {
     labelKey: "nav.progress",

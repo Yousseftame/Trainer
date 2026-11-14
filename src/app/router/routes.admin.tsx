@@ -83,15 +83,15 @@ export const adminRoutes: RouteObject[] = [
                 children: [{ path: "subscriptions", element: <SubscriptionsPage /> }],
               },
               {
-                element: <RequirePermission permission="workouts:manage" />,
+                element: <RequirePermission permission="workouts:read" />,
                 children: [{ path: "workouts", element: <WorkoutsPage /> }],
               },
               {
-                element: <RequirePermission permission="nutrition:manage" />,
+                element: <RequirePermission permission="nutrition:read" />,
                 children: [{ path: "nutrition", element: <NutritionPage /> }],
               },
               {
-                element: <RequirePermission permission="content:manage" />,
+                element: <RequirePermission permission="content:read" />,
                 children: [{ path: "content", element: <ContentLibraryPage /> }],
               },
               {

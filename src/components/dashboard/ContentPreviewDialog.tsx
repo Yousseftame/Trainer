@@ -4,7 +4,6 @@ import {
   Check,
   Clapperboard,
   Copy,
-  Download,
   ExternalLink,
   FileText,
   FolderTree,
@@ -25,47 +24,13 @@ import {
 import { useLocale } from "@/hooks/useLocale"
 import type { ContentAsset } from "@/types/content"
 import { formatDuration } from "@/lib/format"
+import { toEmbedUrl } from "@/lib/media/embed-url"
 import { appToast } from "@/lib/toast"
 
 type ContentPreviewDialogProps = {
   asset: ContentAsset | null
   onClose: () => void
   onEdit?: (asset: ContentAsset) => void
-}
-
-function toEmbedUrl(rawUrl: string): { type: "iframe" | "video"; url: string } {
-  const trimmed = rawUrl.trim()
-  if (
-    trimmed.includes("youtube.com/watch?v=") ||
-    trimmed.includes("youtu.be/")
-  ) {
-    const match =
-      trimmed.match(/[?&]v=([^&]+)/)?.[1] ||
-      trimmed.match(/youtu\.be\/([^?&]+)/)?.[1]
-    if (match) {
-      return {
-        type: "iframe",
-        url: `https://www.youtube.com/embed/${match}`,
-      }
-    }
-  }
-  if (trimmed.includes("vimeo.com/") && !trimmed.includes("player.vimeo.com")) {
-    const id = trimmed.split("vimeo.com/")[1]?.split(/[?&/]/)[0]
-    if (id && /^\d+$/.test(id)) {
-      return {
-        type: "iframe",
-        url: `https://player.vimeo.com/video/${id}`,
-      }
-    }
-  }
-  if (
-    trimmed.includes("iframe.mediadelivery.net") ||
-    trimmed.includes("customer-") ||
-    trimmed.includes("/embed/")
-  ) {
-    return { type: "iframe", url: trimmed }
-  }
-  return { type: "video", url: trimmed }
 }
 
 export function ContentPreviewDialog({
@@ -256,6 +221,10 @@ export function ContentPreviewDialog({
                       <video
                         src={parsed.url}
                         controls
+                        controlsList="nodownload noremoteplayback"
+                        disablePictureInPicture
+                        playsInline
+                        onContextMenu={(e) => e.preventDefault()}
                         className="aspect-video w-full rounded-2xl bg-black object-contain"
                       />
                     )
@@ -431,46 +400,38 @@ export function ContentPreviewDialog({
           )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-black/8 px-6 py-4 sm:px-7">
-          <div className="flex flex-wrap gap-2">
-            {access.allowed && mediaUrl ? (
-              <a
-                href={mediaUrl}
-                target="_blank"
-                rel="noreferrer"
-                download={asset.fileName}
-                className="inline-flex h-10 items-center gap-1.5 rounded-full bg-[#F4F4F4] px-4 text-[12px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/10"
-              >
-                {mediaUrl.startsWith("data:") || mediaUrl.startsWith("blob:") ? (
-                  <Download className="size-3.5" />
-                ) : (
-                  <ExternalLink className="size-3.5" />
-                )}
-                {isAr ? "فتح / تحميل الملف" : "Open / download file"}
-              </a>
-            ) : null}
-          </div>
-          <div className="flex items-center gap-2">
-            {isAdmin && onEdit ? (
-              <button
-                type="button"
-                onClick={() => {
-                  onClose()
-                  onEdit(asset)
-                }}
-                className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[12px] font-bold text-white transition hover:opacity-95"
-              >
-                {isAr ? "تعديل بيانات أو رفع ملف" : "Edit / upload file"}
-              </button>
-            ) : null}
+        <div className="flex flex-wrap items-center justify-end gap-2.5 border-t border-black/8 px-6 py-4 sm:px-7">
+          {/* Videos are stream-only — no open/download for subscribers or staff preview */}
+          {access.allowed && mediaUrl && asset.kind !== "video" ? (
+            <a
+              href={mediaUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="me-auto inline-flex h-10 items-center gap-1.5 rounded-full bg-[#F4F4F4] px-4 text-[12px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/10"
+            >
+              <ExternalLink className="size-3.5" />
+              {isAr ? "فتح الملف" : "Open file"}
+            </a>
+          ) : null}
+          {isAdmin && onEdit ? (
             <button
               type="button"
-              onClick={onClose}
-              className="inline-flex h-10 items-center justify-center rounded-full bg-[#F4F4F4] px-5 text-[12px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/10"
+              onClick={() => {
+                onClose()
+                onEdit(asset)
+              }}
+              className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[12px] font-bold text-white transition hover:opacity-95"
             >
-              {isAr ? "إغلاق" : "Close"}
+              {isAr ? "تعديل بيانات أو رفع ملف" : "Edit / upload file"}
             </button>
-          </div>
+          ) : null}
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 items-center justify-center rounded-full bg-[#F4F4F4] px-5 text-[12px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/10"
+          >
+            {isAr ? "إغلاق" : "Close"}
+          </button>
         </div>
       </div>
     </div>,

@@ -67,7 +67,8 @@ const ENTITLEMENT_BADGE_LABELS: Record<
 export function PackagesPage() {
   const { t } = useTranslation()
   const { locale, isRtl } = useLocale()
-  const { user } = useAuth()
+  const { user, hasPermission } = useAuth()
+  const canAssignSubs = hasPermission("subscriptions:manage")
   useDocumentTitle(t("nav.packages"))
 
   const {
@@ -315,13 +316,17 @@ export function PackagesPage() {
                   setEditingPackage(pkg)
                   setFormOpen(true)
                 }}
-                onAssign={() => {
-                  if (actionsBusy) return
-                  setSubDialogState({
-                    mode: "assign",
-                    defaultPackageId: pkg.id,
-                  })
-                }}
+                onAssign={
+                  canAssignSubs
+                    ? () => {
+                        if (actionsBusy) return
+                        setSubDialogState({
+                          mode: "assign",
+                          defaultPackageId: pkg.id,
+                        })
+                      }
+                    : undefined
+                }
                 onToggleArchive={() => handleToggleArchive(pkg)}
               />
             ))}
@@ -341,34 +346,36 @@ export function PackagesPage() {
         onSubmit={handleSavePackage}
       />
 
-      <SubscriptionActionDialog
-        state={subDialogState}
-        packages={allPackages}
-        busy={assignMutation.isPending || lifecycleMutation.isPending}
-        adminName={user?.displayName || user?.email || "Head Coach"}
-        onClose={() => {
-          if (assignMutation.isPending || lifecycleMutation.isPending) return
-          setSubDialogState(null)
-        }}
-        onAssign={async (payload) => {
-          await assignMutation.mutateAsync(payload)
-          setSubDialogState(null)
-          appToast.success(
-            locale === "ar"
-              ? "تم تعيين الاشتراك للمشترك بنجاح"
-              : "Subscription assigned successfully",
-          )
-        }}
-        onLifecycle={async (payload) => {
-          await lifecycleMutation.mutateAsync(payload)
-          setSubDialogState(null)
-          appToast.success(
-            locale === "ar"
-              ? "تم تحديث حالة الاشتراك بنجاح"
-              : "Subscription updated successfully",
-          )
-        }}
-      />
+      {canAssignSubs ? (
+        <SubscriptionActionDialog
+          state={subDialogState}
+          packages={allPackages}
+          busy={assignMutation.isPending || lifecycleMutation.isPending}
+          adminName={user?.displayName || user?.email || "Head Coach"}
+          onClose={() => {
+            if (assignMutation.isPending || lifecycleMutation.isPending) return
+            setSubDialogState(null)
+          }}
+          onAssign={async (payload) => {
+            await assignMutation.mutateAsync(payload)
+            setSubDialogState(null)
+            appToast.success(
+              locale === "ar"
+                ? "تم تعيين الاشتراك للمشترك بنجاح"
+                : "Subscription assigned successfully",
+            )
+          }}
+          onLifecycle={async (payload) => {
+            await lifecycleMutation.mutateAsync(payload)
+            setSubDialogState(null)
+            appToast.success(
+              locale === "ar"
+                ? "تم تحديث حالة الاشتراك بنجاح"
+                : "Subscription updated successfully",
+            )
+          }}
+        />
+      ) : null}
 
       <ConfirmActionDialog
         open={Boolean(confirmDialog?.open)}
@@ -402,7 +409,7 @@ function PackageCard({
   locale: "en" | "ar"
   actionsBusy: boolean
   onEdit: () => void
-  onAssign: () => void
+  onAssign?: () => void
   onToggleArchive: () => void
 }) {
   const { t } = useTranslation()
@@ -569,7 +576,7 @@ function PackageCard({
         >
           {t("admin.packages.edit")}
         </button>
-        {pkg.isActive ? (
+        {pkg.isActive && onAssign ? (
           <button
             type="button"
             disabled={actionsBusy}

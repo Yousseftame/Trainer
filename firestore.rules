@@ -108,6 +108,7 @@ service cloud.firestore {
     // -------------------------------------------------------------
     match /subscribers/{subscriberId} {
       allow read: if hasPermission('subscribers:read') ||
+        hasPermission('overview:read') ||
         hasPermission('reports:read') ||
         isSelf(subscriberId);
 
@@ -139,6 +140,7 @@ service cloud.firestore {
 
       allow read: if hasPermission('subscribers:read') ||
         hasPermission('subscribers:approve') ||
+        hasPermission('overview:read') ||
         hasPermission('reports:read');
 
       // DevTools cannot approve/reject — Functions use Admin SDK
@@ -152,6 +154,7 @@ service cloud.firestore {
     match /subscriptions/{subscriptionId} {
       allow read: if hasPermission('subscriptions:manage') ||
         hasPermission('subscribers:read') ||
+        hasPermission('overview:read') ||
         hasPermission('reports:read') ||
         (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
 
@@ -169,14 +172,48 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // Subscriber meal / food substitute coach-review requests.
+    match /meal_change_requests/{requestId} {
+      allow read: if hasPermission('nutrition:read') ||
+        hasPermission('nutrition:manage') ||
+        hasPermission('subscribers:read') ||
+        hasPermission('reports:read') ||
+        (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
+
+      allow create, delete: if false;
+      allow update: if hasPermission('nutrition:manage') &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'resolutionNote', 'resolvedAt', 'updatedAt']) &&
+        request.resource.data.status in ['reviewed', 'dismissed'];
+    }
+
+    // Subscriber exercise substitute / coach-review requests.
+    match /exercise_change_requests/{requestId} {
+      allow read: if hasPermission('workouts:read') ||
+        hasPermission('workouts:manage') ||
+        hasPermission('subscribers:read') ||
+        hasPermission('reports:read') ||
+        (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
+
+      // Creates go through requestExerciseChange callable (Admin SDK).
+      allow create, delete: if false;
+      // Staff mark reviewed / dismissed after handling in Workouts.
+      allow update: if hasPermission('workouts:manage') &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'resolutionNote', 'resolvedAt', 'updatedAt']) &&
+        request.resource.data.status in ['reviewed', 'dismissed'];
+    }
+
     // -------------------------------------------------------------
     // Programs & progress (permission-scoped; no open catch-all)
     // -------------------------------------------------------------
     // Templates have no subscriberId; assigned programs are subscriber-scoped.
     // Template edits must never silently rewrite assigned copies (app clones on assign).
     match /workout_programs/{id} {
-      allow read: if hasPermission('workouts:manage') ||
+      allow read: if hasPermission('workouts:read') ||
+        hasPermission('workouts:manage') ||
         hasPermission('subscribers:read') ||
+        hasPermission('overview:read') ||
         hasPermission('reports:read') ||
         (isActiveAccount() &&
           resource.data.keys().hasAny(['subscriberId']) &&
@@ -204,8 +241,10 @@ service cloud.firestore {
     }
 
     match /nutrition_programs/{id} {
-      allow read: if hasPermission('nutrition:manage') ||
+      allow read: if hasPermission('nutrition:read') ||
+        hasPermission('nutrition:manage') ||
         hasPermission('subscribers:read') ||
+        hasPermission('overview:read') ||
         hasPermission('reports:read') ||
         (isActiveAccount() &&
           resource.data.keys().hasAny(['subscriberId']) &&
@@ -263,6 +302,7 @@ service cloud.firestore {
     // (entitlement-checked). Staff with progress:write may manage via client SDK.
     match /progress_measurements/{id} {
       allow read: if hasPermission('progress:read') ||
+        hasPermission('overview:read') ||
         hasPermission('reports:read') ||
         (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
       allow create: if hasPermission('progress:write') &&
@@ -278,6 +318,7 @@ service cloud.firestore {
 
     match /progress_photos/{id} {
       allow read: if hasPermission('progress:read') ||
+        hasPermission('overview:read') ||
         hasPermission('reports:read') ||
         (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
       allow create: if hasPermission('progress:write') &&
@@ -294,6 +335,7 @@ service cloud.firestore {
 
     match /progress_performance/{id} {
       allow read: if hasPermission('progress:read') ||
+        hasPermission('overview:read') ||
         hasPermission('reports:read') ||
         (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
       allow create: if hasPermission('progress:write') &&
@@ -310,7 +352,8 @@ service cloud.firestore {
     // Content metadata holds fileUrl/streamUrl/storagePath — never open to all signed-in users.
     // Staff manage/preview via client SDK; subscribers receive entitled payloads via Cloud Functions.
     match /content_assets/{id} {
-      allow read: if hasPermission('content:manage') ||
+      allow read: if hasPermission('content:read') ||
+        hasPermission('content:manage') ||
         hasPermission('subscribers:read') ||
         hasPermission('reports:read');
       allow create, update, delete: if hasPermission('content:manage');
@@ -347,8 +390,10 @@ service cloud.firestore {
     // Subscriber creates go through logWorkoutSession callable (Admin SDK).
     // Client create is staff-only so DevTools cannot forge performance logs.
     match /workout_logs/{id} {
-      allow read: if hasPermission('workouts:manage') ||
+      allow read: if hasPermission('workouts:read') ||
+        hasPermission('workouts:manage') ||
         hasPermission('progress:read') ||
+        hasPermission('overview:read') ||
         hasPermission('reports:read') ||
         (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
 
@@ -370,8 +415,10 @@ service cloud.firestore {
 
     // Subscriber creates/updates go through logNutritionAdherence callable.
     match /nutrition_logs/{id} {
-      allow read: if hasPermission('nutrition:manage') ||
+      allow read: if hasPermission('nutrition:read') ||
+        hasPermission('nutrition:manage') ||
         hasPermission('progress:read') ||
+        hasPermission('overview:read') ||
         hasPermission('reports:read') ||
         (isActiveAccount() && resource.data.subscriberId == request.auth.uid);
 

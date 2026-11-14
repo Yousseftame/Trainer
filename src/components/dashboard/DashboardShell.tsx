@@ -1,6 +1,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
+import { useQueryClient } from "@tanstack/react-query"
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar"
 import { DashboardTopbar } from "@/components/dashboard/DashboardTopbar"
 import { LogoutConfirmDialog } from "@/components/dashboard/LogoutConfirmDialog"
@@ -10,6 +11,7 @@ import { useAuth } from "@/features/auth/auth-context"
 import { firebaseAuthErrorKey } from "@/features/auth/errors"
 import { APP_ROUTES } from "@/config/constants"
 import { env } from "@/config/env"
+import { refreshAdminPageData } from "@/lib/query/admin-page-refresh"
 import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 
@@ -47,11 +49,14 @@ export function DashboardShell({
   const { t } = useTranslation()
   const location = useLocation()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { signOut } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const mainRef = useRef<HTMLElement>(null)
+  const refreshLockRef = useRef(false)
 
   useEffect(() => {
     if (mainRef.current) {
@@ -71,6 +76,8 @@ export function DashboardShell({
 
   useEffect(() => {
     setMobileOpen(false)
+    setIsRefreshing(false)
+    refreshLockRef.current = false
   }, [location.pathname])
 
   useEffect(() => {
@@ -117,6 +124,21 @@ export function DashboardShell({
     }
   }
 
+  async function handleAdminRefresh() {
+    if (area !== "admin" || refreshLockRef.current) return
+    refreshLockRef.current = true
+    setIsRefreshing(true)
+    try {
+      await refreshAdminPageData(queryClient, location.pathname)
+      appToast.success(t("dashboard.refreshSuccess"))
+    } catch {
+      appToast.error(t("dashboard.refreshError"))
+    } finally {
+      setIsRefreshing(false)
+      refreshLockRef.current = false
+    }
+  }
+
   const areaLabel =
     area === "admin" ? t("dashboard.adminArea") : t("dashboard.subscriberArea")
 
@@ -140,6 +162,8 @@ export function DashboardShell({
           title={t(titleKey)}
           areaLabel={areaLabel}
           onSignOut={requestSignOut}
+          onRefresh={area === "admin" ? handleAdminRefresh : undefined}
+          isRefreshing={isRefreshing}
           onSidebarToggle={() => {
             if (window.matchMedia("(min-width: 1024px)").matches) {
               toggleCollapsed()

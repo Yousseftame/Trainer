@@ -27,6 +27,50 @@ export function resolveNoticeActionUrl(notice: OpsNotice): string {
     return APP_ROUTES.admin.registrationRequests
   }
 
+  if (notice.kind === "exercise_change") {
+    if (notice.requestId) {
+      return `${APP_ROUTES.admin.workouts}?request=${encodeURIComponent(notice.requestId)}`
+    }
+    if (notice.actionUrl && !isReportsSelfLink(notice.actionUrl)) {
+      return notice.actionUrl
+    }
+    return APP_ROUTES.admin.workouts
+  }
+
+  if (notice.kind === "workout_session") {
+    if (notice.requestId) {
+      const params = new URLSearchParams({ session: notice.requestId })
+      if (notice.subscriberId) params.set("subscriber", notice.subscriberId)
+      return `${APP_ROUTES.admin.workouts}?${params.toString()}`
+    }
+    if (notice.actionUrl && !isReportsSelfLink(notice.actionUrl)) {
+      return notice.actionUrl
+    }
+    return APP_ROUTES.admin.workouts
+  }
+
+  if (notice.kind === "meal_change") {
+    if (notice.requestId) {
+      return `${APP_ROUTES.admin.nutrition}?request=${encodeURIComponent(notice.requestId)}`
+    }
+    if (notice.actionUrl && !isReportsSelfLink(notice.actionUrl)) {
+      return notice.actionUrl
+    }
+    return APP_ROUTES.admin.nutrition
+  }
+
+  if (notice.kind === "nutrition_adherence") {
+    if (notice.requestId) {
+      const params = new URLSearchParams({ log: notice.requestId })
+      if (notice.subscriberId) params.set("subscriber", notice.subscriberId)
+      return `${APP_ROUTES.admin.nutrition}?${params.toString()}`
+    }
+    if (notice.actionUrl && !isReportsSelfLink(notice.actionUrl)) {
+      return notice.actionUrl
+    }
+    return APP_ROUTES.admin.nutrition
+  }
+
   if (notice.actionUrl && !isReportsSelfLink(notice.actionUrl)) {
     return notice.actionUrl
   }
@@ -39,5 +83,10 @@ export function resolveNoticeActionUrl(notice: OpsNotice): string {
 }
 
 export function noticeActionIsReview(notice: OpsNotice) {
-  return notice.kind === "subscription_change" || notice.kind === "registration"
+  return (
+    notice.kind === "subscription_change" ||
+    notice.kind === "registration" ||
+    notice.kind === "exercise_change" ||
+    notice.kind === "meal_change"
+  )
 }

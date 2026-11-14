@@ -51,7 +51,9 @@ service firebase.storage {
     }
 
     function canReadContentObject() {
-      return hasPermission('content:manage') || hasPermission('subscribers:read');
+      return hasPermission('content:read') ||
+        hasPermission('content:manage') ||
+        hasPermission('subscribers:read');
     }
 
     match /content/pdfs/{allPaths=**} {
@@ -87,6 +89,30 @@ service firebase.storage {
         && underLimit(80 * 1024 * 1024)
         && request.resource.contentType.matches('video/.*');
       allow delete: if hasPermission('content:manage');
+    }
+
+    // Meal verification photos — private per subscriber.
+    match /nutrition/meal-photos/{subscriberId}/{allPaths=**} {
+      allow read: if isActiveAccount() && (
+        hasPermission('nutrition:read') ||
+        hasPermission('nutrition:manage') ||
+        hasPermission('subscribers:read') ||
+        (request.auth.uid == subscriberId &&
+          request.auth.token.role == 'subscriber')
+      );
+      allow create, update: if isActiveAccount()
+        && underLimit(8 * 1024 * 1024)
+        && request.resource.contentType.matches('image/.*')
+        && (
+          hasPermission('nutrition:manage') ||
+          (request.auth.uid == subscriberId &&
+            request.auth.token.role == 'subscriber')
+        );
+      allow delete: if isActiveAccount() && (
+        hasPermission('nutrition:manage') ||
+        (request.auth.uid == subscriberId &&
+          request.auth.token.role == 'subscriber')
+      );
     }
 
     // Progress photos — private per subscriber.

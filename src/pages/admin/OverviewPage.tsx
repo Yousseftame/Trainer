@@ -586,10 +586,10 @@ export function OverviewPage() {
                 </span>
               </Link>
             ))}
-            {hasPermission("workouts:manage") ||
-            hasPermission("nutrition:manage") ? (
+            {hasPermission("workouts:read") ||
+            hasPermission("nutrition:read") ? (
               <div className="mt-1 grid grid-cols-2 gap-2">
-                {hasPermission("workouts:manage") ? (
+                {hasPermission("workouts:read") ? (
                   <Link
                     to={APP_ROUTES.admin.workouts}
                     className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#F4F4F4] text-[12px] font-bold text-[var(--gym-ink,#111111)]"
@@ -600,7 +600,7 @@ export function OverviewPage() {
                 ) : (
                   <span />
                 )}
-                {hasPermission("nutrition:manage") ? (
+                {hasPermission("nutrition:read") ? (
                   <Link
                     to={APP_ROUTES.admin.nutrition}
                     className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#F4F4F4] text-[12px] font-bold text-[var(--gym-ink,#111111)]"

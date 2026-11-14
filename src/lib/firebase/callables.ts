@@ -154,6 +154,27 @@ export async function callLogNutritionAdherence(
   }
 }
 
+export async function callUpsertNutritionMealProgress(
+  input: Record<string, unknown>,
+) {
+  const fn = httpsCallable(
+    getFirebaseFunctions(),
+    "upsertNutritionMealProgress",
+  )
+  const result = await fn(input)
+  return result.data as {
+    ok: boolean
+    log: Record<string, unknown> & {
+      id: string
+      subscriberId: string
+      programId: string
+      date: string
+      status: string
+      loggedAt: string
+    }
+  }
+}
+
 export async function callLogProgressMeasurement(
   input: Record<string, unknown>,
 ) {
@@ -250,6 +271,26 @@ export async function callRequestSubscriptionChange(
   input: Record<string, unknown>,
 ) {
   const fn = httpsCallable(getFirebaseFunctions(), "requestSubscriptionChange")
+  const result = await fn(input)
+  return result.data as {
+    ok: boolean
+    request: Record<string, unknown> & { id: string; subscriberId: string }
+  }
+}
+
+export async function callRequestExerciseChange(
+  input: Record<string, unknown>,
+) {
+  const fn = httpsCallable(getFirebaseFunctions(), "requestExerciseChange")
+  const result = await fn(input)
+  return result.data as {
+    ok: boolean
+    request: Record<string, unknown> & { id: string; subscriberId: string }
+  }
+}
+
+export async function callRequestMealChange(input: Record<string, unknown>) {
+  const fn = httpsCallable(getFirebaseFunctions(), "requestMealChange")
   const result = await fn(input)
   return result.data as {
     ok: boolean

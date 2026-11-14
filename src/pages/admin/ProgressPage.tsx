@@ -35,6 +35,7 @@ import { ProgressPhotoImage } from "@/components/dashboard/ProgressPhotoImage"
 import { FilterChip, StatCard } from "@/components/dashboard/StatCard"
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
 import { APP_ROUTES } from "@/config/constants"
+import { useAuth } from "@/features/auth/auth-context"
 import {
   adherenceScoreFromWeeks,
   computeAdherenceWeeks,
@@ -116,6 +117,8 @@ export function ProgressPage() {
   const { t } = useTranslation()
   const { locale } = useLocale()
   const isAr = locale === "ar"
+  const { hasPermission } = useAuth()
+  const canWrite = hasPermission("progress:write")
   useDocumentTitle(t("nav.progress"))
 
   // Real-time Queries & Mutations
@@ -454,23 +457,27 @@ export function ProgressPage() {
 
             {/* Quick action buttons */}
             <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-              <button
-                type="button"
-                onClick={() => setMeasurementModalOpen(true)}
-                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
-              >
-                <Plus className="size-4" strokeWidth={2} />
-                <span>{isAr ? "تسجيل قياسات" : "Log Check-in"}</span>
-              </button>
+              {canWrite ? (
+                <button
+                  type="button"
+                  onClick={() => setMeasurementModalOpen(true)}
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--gym-ink,#111111)] px-5 text-[13px] font-bold text-white transition hover:opacity-95"
+                >
+                  <Plus className="size-4" strokeWidth={2} />
+                  <span>{isAr ? "تسجيل قياسات" : "Log Check-in"}</span>
+                </button>
+              ) : null}
 
-              <button
-                type="button"
-                onClick={() => setPhotoModalOpen(true)}
-                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[#F4F4F4] px-4 text-[13px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/5"
-              >
-                <Camera className="size-4" />
-                <span>{isAr ? "إضافة صورة" : "Add Photo"}</span>
-              </button>
+              {canWrite ? (
+                <button
+                  type="button"
+                  onClick={() => setPhotoModalOpen(true)}
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[#F4F4F4] px-4 text-[13px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/5"
+                >
+                  <Camera className="size-4" />
+                  <span>{isAr ? "إضافة صورة" : "Add Photo"}</span>
+                </button>
+              ) : null}
 
               {selectedPhotos.length >= 2 ? (
                 <button
@@ -529,13 +536,21 @@ export function ProgressPage() {
               liveSubscription={
                 subscriptionsBySubscriber.get(selected.subscriber.id) ?? null
               }
-              onOpenMeasurementModal={() => setMeasurementModalOpen(true)}
-              onOpenPhotoModal={() => setPhotoModalOpen(true)}
-              onOpenPerformanceModal={() => setPerformanceModalOpen(true)}
+              onOpenMeasurementModal={
+                canWrite ? () => setMeasurementModalOpen(true) : undefined
+              }
+              onOpenPhotoModal={
+                canWrite ? () => setPhotoModalOpen(true) : undefined
+              }
+              onOpenPerformanceModal={
+                canWrite ? () => setPerformanceModalOpen(true) : undefined
+              }
               onOpenCompareModal={() => setCompareModalOpen(true)}
-              onDeleteMeasurement={handleDeleteMeasurement}
-              onDeletePhoto={handleDeletePhoto}
-              onDeleteLift={handleDeleteLift}
+              onDeleteMeasurement={
+                canWrite ? handleDeleteMeasurement : undefined
+              }
+              onDeletePhoto={canWrite ? handleDeletePhoto : undefined}
+              onDeleteLift={canWrite ? handleDeleteLift : undefined}
             />
           </div>
         )}
@@ -544,35 +559,39 @@ export function ProgressPage() {
       {/* Dialog Modals */}
       {selected ? (
         <>
-          <LogMeasurementDialog
-            open={measurementModalOpen}
-            subscriberId={selected.subscriber.id}
-            subscriberName={selected.subscriber.displayName}
-            onClose={() => setMeasurementModalOpen(false)}
-            onSave={async (input) => {
-              await saveMeasurementMutation.mutateAsync(input)
-            }}
-          />
+          {canWrite ? (
+            <>
+              <LogMeasurementDialog
+                open={measurementModalOpen}
+                subscriberId={selected.subscriber.id}
+                subscriberName={selected.subscriber.displayName}
+                onClose={() => setMeasurementModalOpen(false)}
+                onSave={async (input) => {
+                  await saveMeasurementMutation.mutateAsync(input)
+                }}
+              />
 
-          <AddProgressPhotoDialog
-            open={photoModalOpen}
-            subscriberId={selected.subscriber.id}
-            subscriberName={selected.subscriber.displayName}
-            onClose={() => setPhotoModalOpen(false)}
-            onSave={async (input) => {
-              await savePhotoMutation.mutateAsync(input)
-            }}
-          />
+              <AddProgressPhotoDialog
+                open={photoModalOpen}
+                subscriberId={selected.subscriber.id}
+                subscriberName={selected.subscriber.displayName}
+                onClose={() => setPhotoModalOpen(false)}
+                onSave={async (input) => {
+                  await savePhotoMutation.mutateAsync(input)
+                }}
+              />
 
-          <LogPerformanceDialog
-            open={performanceModalOpen}
-            subscriberId={selected.subscriber.id}
-            subscriberName={selected.subscriber.displayName}
-            onClose={() => setPerformanceModalOpen(false)}
-            onSave={async (input) => {
-              await savePerformanceMutation.mutateAsync(input)
-            }}
-          />
+              <LogPerformanceDialog
+                open={performanceModalOpen}
+                subscriberId={selected.subscriber.id}
+                subscriberName={selected.subscriber.displayName}
+                onClose={() => setPerformanceModalOpen(false)}
+                onSave={async (input) => {
+                  await savePerformanceMutation.mutateAsync(input)
+                }}
+              />
+            </>
+          ) : null}
 
           <PhotoComparisonDialog
             open={compareModalOpen}
@@ -759,10 +778,10 @@ function ReviewPanel({
   adherenceWeeks?: AdherenceWeek[]
   programs?: { workouts: WorkoutProgram[]; nutrition: NutritionProgram[] }
   liveSubscription?: SubscriberSubscription | null
-  onOpenMeasurementModal: () => void
-  onOpenPhotoModal: () => void
-  onOpenPerformanceModal: () => void
-  onOpenCompareModal: () => void
+  onOpenMeasurementModal?: () => void
+  onOpenPhotoModal?: () => void
+  onOpenPerformanceModal?: () => void
+  onOpenCompareModal?: () => void
   onDeleteMeasurement?: (row: BodyMeasurement) => void
   onDeletePhoto?: (photo: ProgressPhoto) => void
   onDeleteLift?: (row: PerformanceRecord) => void

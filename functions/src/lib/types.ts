@@ -9,13 +9,17 @@ export type CallerClaims = {
 };
 
 export const ALL_STAFF_PERMISSIONS = [
+  "overview:read",
   "subscribers:read",
   "subscribers:write",
   "subscribers:approve",
   "packages:manage",
   "subscriptions:manage",
+  "workouts:read",
   "workouts:manage",
+  "nutrition:read",
   "nutrition:manage",
+  "content:read",
   "content:manage",
   "progress:read",
   "progress:write",

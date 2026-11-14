@@ -653,3 +653,32 @@ export async function logWorkoutSession(
   const raw = result.log
   return normalizeWorkoutLog(raw.id, raw as Record<string, unknown>)
 }
+
+/** Subscriber requests coach review for an exercise substitute / change. */
+export async function requestExerciseChange(input: {
+  exerciseId: string
+  exerciseName: string
+  reason: string
+  notes?: string
+  programId?: string
+  dayId?: string
+  programTitle?: string
+  dayLabel?: string
+  substituteId?: string
+  substituteName?: string
+}): Promise<{ id: string }> {
+  const { callRequestExerciseChange } = await import("@/lib/firebase/callables")
+  const result = await callRequestExerciseChange({
+    exerciseId: input.exerciseId,
+    exerciseName: input.exerciseName,
+    reason: input.reason,
+    notes: input.notes,
+    programId: input.programId,
+    dayId: input.dayId,
+    programTitle: input.programTitle,
+    dayLabel: input.dayLabel,
+    substituteId: input.substituteId,
+    substituteName: input.substituteName,
+  })
+  return { id: String(result.request.id) }
+}

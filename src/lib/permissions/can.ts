@@ -1,6 +1,9 @@
 import type { AppUser } from "@/types/user"
 import type { Permission } from "@/lib/permissions/permissions"
-import { ROLE_PERMISSIONS } from "@/lib/permissions/permissions"
+import {
+  ROLE_PERMISSIONS,
+  withRequiredPermissions,
+} from "@/lib/permissions/permissions"
 import type { Role } from "@/lib/permissions/roles"
 import { adminNav, flattenNavItems } from "@/config/navigation"
 import { APP_ROUTES } from "@/config/constants"
@@ -16,8 +19,11 @@ function resolvePermissions(subject: PermissionSubject): readonly Permission[] {
   if (!subject) return []
   // Explicit array (including empty) wins — never invent role defaults for
   // staff who were intentionally granted zero module permissions.
-  if (Array.isArray(subject.permissions)) return subject.permissions
-  return ROLE_PERMISSIONS[subject.role as Role] ?? []
+  const raw = Array.isArray(subject.permissions)
+    ? subject.permissions
+    : (ROLE_PERMISSIONS[subject.role as Role] ?? [])
+  // Expand write/manage/approve so prerequisites like *:read always resolve.
+  return withRequiredPermissions(raw)
 }
 
 export function can(subject: PermissionSubject, permission: Permission): boolean {

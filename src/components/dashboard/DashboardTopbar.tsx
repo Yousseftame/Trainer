@@ -2,7 +2,7 @@ import { useState } from "react"
 import { Link } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { AnimatePresence, motion } from "motion/react"
-import { PanelLeft, Search } from "lucide-react"
+import { PanelLeft, RefreshCw, Search } from "lucide-react"
 import { ProfileMenu } from "@/components/dashboard/ProfileMenu"
 import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher"
 import { APP_ROUTES } from "@/config/constants"
@@ -14,6 +14,9 @@ type DashboardTopbarProps = {
   areaLabel: string
   onSidebarToggle: () => void
   onSignOut?: () => void
+  /** Admin-only: refetch active queries for the current page. */
+  onRefresh?: () => void | Promise<void>
+  isRefreshing?: boolean
   className?: string
 }
 
@@ -22,6 +25,8 @@ export function DashboardTopbar({
   areaLabel,
   onSidebarToggle,
   onSignOut,
+  onRefresh,
+  isRefreshing = false,
   className,
 }: DashboardTopbarProps) {
   const { t } = useTranslation()
@@ -91,8 +96,44 @@ export function DashboardTopbar({
           />
         </label>
 
-        {/* Trailing Side: website + language switcher + profile */}
+        {/* Trailing Side: refresh + website + language switcher + profile */}
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
+          {onRefresh ? (
+            <button
+              type="button"
+              onClick={() => void onRefresh()}
+              disabled={isRefreshing}
+              title={t("dashboard.refreshTitle")}
+              aria-label={
+                isRefreshing
+                  ? t("dashboard.refreshing")
+                  : t("dashboard.refreshTitle")
+              }
+              className={cn(
+                "inline-flex h-9 sm:h-11 shrink-0 items-center justify-center gap-1.5 rounded-full bg-white text-[var(--gym-ink,#111111)] shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-transform active:scale-[0.97] disabled:opacity-70",
+                "size-9 sm:w-auto sm:px-3.5",
+              )}
+            >
+              <RefreshCw
+                className={cn(
+                  "size-4 sm:size-[18px] shrink-0",
+                  isRefreshing && "animate-spin",
+                )}
+                strokeWidth={1.8}
+              />
+              <span
+                className={cn(
+                  "hidden sm:inline text-[12.5px] lg:text-[13px] font-bold",
+                  isRtl ? "font-arabic" : "font-heading",
+                )}
+              >
+                {isRefreshing
+                  ? t("dashboard.refreshing")
+                  : t("dashboard.refresh")}
+              </span>
+            </button>
+          ) : null}
+
           <Link
             to={APP_ROUTES.public.home}
             className="hidden h-10 lg:h-11 items-center justify-center rounded-full bg-[var(--gym-ink,#111111)] px-4 lg:px-5 text-[12.5px] lg:text-[13px] font-bold text-white transition-opacity hover:opacity-90 xl:inline-flex"

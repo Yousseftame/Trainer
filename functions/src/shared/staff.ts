@@ -24,6 +24,9 @@ const PERMISSION_SET = new Set<string>(ALL_STAFF_PERMISSIONS);
 const PERMISSION_REQUIRES: Record<string, readonly string[]> = {
   "subscribers:write": ["subscribers:read"],
   "subscribers:approve": ["subscribers:read"],
+  "workouts:manage": ["workouts:read"],
+  "nutrition:manage": ["nutrition:read"],
+  "content:manage": ["content:read"],
   "progress:write": ["progress:read"],
   "physicalTherapy:manage": ["physicalTherapy:read"],
   "reports:export": ["reports:read"],
@@ -89,7 +92,9 @@ function callerPermissionSet(claims: CallerClaims): Set<string> {
   if (claims.role === "head_coach") {
     return new Set(ALL_STAFF_PERMISSIONS);
   }
-  return new Set(claims.permissions ?? []);
+  // Expand manage/write → read so callers who only stored ":manage" can
+  // still assign the matching ":read" checkbox for view-only staff.
+  return new Set(withRequiredPermissions(claims.permissions ?? []));
 }
 
 /** Only a head coach may mint staff:manage or another head_coach. */

@@ -99,13 +99,14 @@ export function PhysicalTherapyPage() {
     if (!prefillSubscriberId) return
     setDefaultSubscriberId(prefillSubscriberId)
     if (searchParams.get("new") === "1") {
-      setEditingRecord(null)
-      setFormOpen(true)
       const next = new URLSearchParams(searchParams)
       next.delete("new")
       setSearchParams(next, { replace: true })
+      if (!canManage) return
+      setEditingRecord(null)
+      setFormOpen(true)
     }
-  }, [prefillSubscriberId, searchParams, setSearchParams])
+  }, [canManage, prefillSubscriberId, searchParams, setSearchParams])
 
   const saveMutation = useSavePTRecordMutation()
   const deleteMutation = useDeletePTRecordMutation()

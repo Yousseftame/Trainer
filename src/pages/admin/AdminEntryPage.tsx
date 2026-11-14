@@ -9,7 +9,7 @@ import { APP_ROUTES } from "@/config/constants"
 
 /**
  * `/admin` entry:
- * - reports:read → overview dashboard
+ * - overview:read → overview dashboard
  * - otherwise → first permitted module
  * - zero permissions → stay in the admin shell with an empty-state panel
  */
@@ -21,7 +21,7 @@ export function AdminEntryPage() {
     return <FullPageSpinner />
   }
 
-  if (hasPermission("reports:read")) {
+  if (hasPermission("overview:read")) {
     return <OverviewPage />
   }
 

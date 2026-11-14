@@ -108,8 +108,27 @@ export const bootstrapStaffClaims = onCall(async (request) => {
     );
   }
 
-  // Claims mirror the staff document exactly (head coach → full set via sanitize).
+  // Claims mirror the staff document (head coach → full set via sanitize).
+  // Expanding manage/write → required :read keeps view-only sidebar links working
+  // for older profiles that only stored ":manage".
   permissions = sanitizePermissions(permissions, role);
+
+  if (staffSnap.exists) {
+    const raw = staffSnap.data()?.permissions;
+    const previous = Array.isArray(raw)
+      ? raw.map((item: unknown) => String(item)).sort().join("\0")
+      : "";
+    const next = [...permissions].sort().join("\0");
+    if (previous !== next) {
+      await db.collection(COLLECTIONS.staff).doc(uid).set(
+        {
+          permissions,
+          updatedAt: new Date().toISOString(),
+        },
+        {merge: true},
+      );
+    }
+  }
 
   await auth.setCustomUserClaims(uid, {role, status, permissions});
   return {ok: true, role, status, permissions};

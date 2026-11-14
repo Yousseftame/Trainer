@@ -8,6 +8,7 @@ import {
   resolveEffectiveSubscriptionStatus,
   type PackageEntitlements,
 } from "../shared/contentAccess.js";
+import {enqueueNotice} from "../shared/notices.js";
 
 type EnergyLevel = "great" | "good" | "tired" | "exhausted";
 
@@ -267,6 +268,102 @@ export const logWorkoutSession = onCall(async (request) => {
   }
 
   await batch.commit();
+
+  // Staff inbox: surface completed sessions + feedback so coaches notice them.
+  try {
+    const subData = (subscriberSnap.data() ?? {}) as Record<string, unknown>;
+    const subscriberName =
+      asOptionalString(subData.displayName) ||
+      (typeof request.auth?.token?.name === "string"
+        ? request.auth.token.name
+        : undefined) ||
+      (typeof request.auth?.token?.email === "string"
+        ? request.auth.token.email
+        : undefined) ||
+      uid;
+    const subscriberEmail =
+      asOptionalString(subData.email) ||
+      (typeof request.auth?.token?.email === "string"
+        ? request.auth.token.email
+        : undefined);
+
+    const exercises = Array.isArray(record.exercisesCompleted)
+      ? (record.exercisesCompleted as Record<string, unknown>[])
+      : [];
+    const substituted = exercises.filter((ex) => Boolean(ex.wasSubstituted));
+    const title =
+      asOptionalString(record.workoutTitle) || "Workout session";
+    const rpe =
+      typeof record.perceivedEffort === "number"
+        ? record.perceivedEffort
+        : undefined;
+    const energy =
+      typeof record.energyLevel === "string" ? record.energyLevel : undefined;
+    const notes = asOptionalString(record.notes);
+    const duration =
+      typeof record.durationMinutes === "number"
+        ? record.durationMinutes
+        : undefined;
+
+    const staffBitsEn: string[] = [
+      `${subscriberName} completed "${title}".`,
+    ];
+    if (duration != null) staffBitsEn.push(`${duration} min.`);
+    if (rpe != null) staffBitsEn.push(`RPE ${rpe}/10.`);
+    if (energy) staffBitsEn.push(`Energy: ${energy}.`);
+    if (substituted.length) {
+      staffBitsEn.push(
+        `${substituted.length} substituted exercise(s).`,
+      );
+    }
+    if (notes) staffBitsEn.push(`Notes: ${notes}`);
+    staffBitsEn.push("Open the subscriber profile to review the full log.");
+
+    const staffBitsAr: string[] = [
+      `${subscriberName} أكمل جلسة "${title}".`,
+    ];
+    if (duration != null) staffBitsAr.push(`${duration} دقيقة.`);
+    if (rpe != null) staffBitsAr.push(`الجهد ${rpe}/10.`);
+    if (energy) staffBitsAr.push(`الطاقة: ${energy}.`);
+    if (substituted.length) {
+      staffBitsAr.push(`${substituted.length} تمرين(ات) مستبدلة.`);
+    }
+    if (notes) staffBitsAr.push(`ملاحظات: ${notes}`);
+    staffBitsAr.push("افتح ملف المشترك لمراجعة السجل الكامل.");
+
+    await enqueueNotice({
+      kind: "workout_session",
+      toEmail: subscriberEmail || "ops@local",
+      toName: subscriberName,
+      subscriberId: uid,
+      requestId: logRef.id,
+      dedupeKey: `workout_session:${logRef.id}`,
+      channel: "push",
+      alarmStaff: true,
+      actionUrl: `/admin/workouts?session=${encodeURIComponent(logRef.id)}&subscriber=${encodeURIComponent(uid)}`,
+      subject: {
+        en: `Session logged — ${title}`,
+        ar: `تم تسجيل الجلسة — ${title}`,
+      },
+      detail: {
+        en: `Your workout "${title}" was saved successfully.`,
+        ar: `تم حفظ تمرينك "${title}" بنجاح.`,
+      },
+      staffSubject: {
+        en: `Workout logged — ${subscriberName}`,
+        ar: `جلسة تمارين — ${subscriberName}`,
+      },
+      staffDetail: {
+        en: staffBitsEn.join(" "),
+        ar: staffBitsAr.join(" "),
+      },
+    });
+  } catch (err) {
+    console.warn(
+      "[logWorkoutSession] Failed to enqueue staff notice:",
+      err,
+    );
+  }
 
   return {ok: true, log: record};
 });

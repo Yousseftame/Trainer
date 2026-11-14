@@ -32,6 +32,7 @@ export {
   listSubscriberContentLibrary,
   logWorkoutSession,
   logNutritionAdherence,
+  upsertNutritionMealProgress,
   logProgressMeasurement,
   deleteProgressMeasurement,
   logProgressPerformance,
@@ -39,6 +40,8 @@ export {
   saveProgressPhotoMeta,
   deleteProgressPhoto,
   requestSubscriptionChange,
+  requestExerciseChange,
+  requestMealChange,
   updateMySubscriberProfile,
 } from "./subscriber/index.js";
 

@@ -169,6 +169,62 @@ function normalizeNutritionProgram(
   }
 }
 
+function normalizeMealChecks(
+  raw: unknown,
+): NutritionAdherenceLog["mealChecks"] {
+  if (!Array.isArray(raw)) return undefined
+  const checks = raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null
+      const row = item as Record<string, unknown>
+      const slotId = typeof row.slotId === "string" ? row.slotId : ""
+      const slotTitle =
+        typeof row.slotTitle === "string" ? row.slotTitle : slotId
+      if (!slotId) return null
+      return {
+        slotId,
+        slotTitle,
+        completed: Boolean(row.completed),
+        updatedAt:
+          typeof row.updatedAt === "string"
+            ? row.updatedAt
+            : new Date().toISOString(),
+      }
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+  return checks.length ? checks : undefined
+}
+
+function normalizeMealPhotos(
+  raw: unknown,
+): NutritionAdherenceLog["mealPhotos"] {
+  if (!Array.isArray(raw)) return undefined
+  const photos = raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null
+      const row = item as Record<string, unknown>
+      const slotId = typeof row.slotId === "string" ? row.slotId : ""
+      const slotTitle =
+        typeof row.slotTitle === "string" ? row.slotTitle : slotId
+      const photoUrl = typeof row.photoUrl === "string" ? row.photoUrl : ""
+      if (!slotId || !photoUrl) return null
+      return {
+        slotId,
+        slotTitle,
+        photoUrl,
+        storagePath:
+          typeof row.storagePath === "string" ? row.storagePath : undefined,
+        note: typeof row.note === "string" ? row.note : undefined,
+        uploadedAt:
+          typeof row.uploadedAt === "string"
+            ? row.uploadedAt
+            : new Date().toISOString(),
+      }
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+  return photos.length ? photos : undefined
+}
+
 function normalizeNutritionLog(
   id: string,
   raw: Record<string, unknown>,
@@ -190,6 +246,8 @@ function normalizeNutritionLog(
       raw.status === "skipped"
         ? raw.status
         : "adhered",
+    mealChecks: normalizeMealChecks(raw.mealChecks),
+    mealPhotos: normalizeMealPhotos(raw.mealPhotos),
     loggedAt:
       typeof raw.loggedAt === "string"
         ? raw.loggedAt
@@ -700,4 +758,109 @@ export async function logNutritionAdherence(
 
   const raw = result.log
   return normalizeNutritionLog(raw.id, raw as Record<string, unknown>)
+}
+
+const MEAL_PHOTO_MAX_BYTES = 8 * 1024 * 1024
+
+function mealPhotoExtension(mimeType?: string | null): string {
+  const mime = (mimeType || "").toLowerCase()
+  if (mime.includes("png")) return "png"
+  if (mime.includes("webp")) return "webp"
+  return "jpg"
+}
+
+export async function uploadMealVerificationPhoto(input: {
+  subscriberId: string
+  programId: string
+  date: string
+  slotId: string
+  file: File
+  onProgress?: (percent: number) => void
+}): Promise<{ photoUrl: string; storagePath: string }> {
+  if (!input.file.type.startsWith("image/")) {
+    throw new Error("Please select a valid image file")
+  }
+  if (input.file.size > MEAL_PHOTO_MAX_BYTES) {
+    throw new Error("Meal photo must be under 8 MB")
+  }
+
+  const { getDownloadURL, ref, uploadBytesResumable } = await import(
+    "firebase/storage"
+  )
+  const { getFirebaseStorage } = await import("@/lib/firebase/storage")
+
+  const safe = (value: string) =>
+    value.replace(/[^a-zA-Z0-9._\-\u0600-\u06FF]/g, "_").slice(0, 64) || "x"
+  const ext = mealPhotoExtension(input.file.type)
+  const storagePath = `nutrition/meal-photos/${safe(input.subscriberId)}/${safe(input.programId)}/${safe(input.date)}/${safe(input.slotId)}/${Date.now()}.${ext}`
+  const storageRef = ref(getFirebaseStorage(), storagePath)
+  const task = uploadBytesResumable(storageRef, input.file, {
+    contentType: input.file.type || "image/jpeg",
+    customMetadata: {
+      uploadedAt: new Date().toISOString(),
+      slotId: input.slotId,
+    },
+  })
+
+  await new Promise<void>((resolve, reject) => {
+    task.on(
+      "state_changed",
+      (snap) => {
+        if (!input.onProgress || snap.totalBytes <= 0) return
+        input.onProgress(
+          Math.round((snap.bytesTransferred / snap.totalBytes) * 100),
+        )
+      },
+      reject,
+      () => resolve(),
+    )
+  })
+
+  const photoUrl = await getDownloadURL(task.snapshot.ref)
+  return { photoUrl, storagePath }
+}
+
+export type UpsertNutritionMealProgressInput = {
+  programId: string
+  date?: string
+  dayId?: string
+  weekday?: number
+  mealCheck?: {
+    slotId: string
+    slotTitle: string
+    completed: boolean
+  }
+  mealChecks?: Array<{
+    slotId: string
+    slotTitle: string
+    completed: boolean
+  }>
+  mealPhoto?: {
+    slotId: string
+    slotTitle: string
+    photoUrl: string
+    storagePath?: string
+    note?: string
+  }
+}
+
+export async function upsertNutritionMealProgress(
+  input: UpsertNutritionMealProgressInput,
+): Promise<NutritionAdherenceLog> {
+  const { callUpsertNutritionMealProgress } = await import(
+    "@/lib/firebase/callables"
+  )
+  const result = await callUpsertNutritionMealProgress({
+    programId: input.programId,
+    date: input.date,
+    dayId: input.dayId,
+    weekday: input.weekday,
+    mealCheck: input.mealCheck,
+    mealChecks: input.mealChecks,
+    mealPhoto: input.mealPhoto,
+  })
+  return normalizeNutritionLog(
+    result.log.id,
+    result.log as Record<string, unknown>,
+  )
 }

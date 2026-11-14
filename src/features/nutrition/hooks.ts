@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_STALE_TIMES } from "@/config/constants"
 import {
+  fetchPendingMealChangeRequests,
+  requestMealChange,
+  resolveMealChangeRequest,
+} from "@/features/nutrition/meal-change-requests"
+import {
   archiveNutritionProgram,
   assignNutritionProgram,
   deleteNutritionProgram,
@@ -9,8 +14,10 @@ import {
   logNutritionAdherence,
   restoreNutritionProgram,
   saveNutritionProgram,
+  upsertNutritionMealProgress,
   type AssignNutritionInput,
   type SaveNutritionProgramInput,
+  type UpsertNutritionMealProgressInput,
 } from "@/features/nutrition/service"
 import type { NutritionAdherenceLog, NutritionProgram } from "@/types/program"
 
@@ -153,6 +160,57 @@ export function useLogNutritionAdherenceMutation() {
       void queryClient.invalidateQueries({ queryKey: nutritionKeys.all })
       void queryClient.invalidateQueries({ queryKey: ["subscribers"] })
       void queryClient.invalidateQueries({ queryKey: ["overview"] })
+      void queryClient.invalidateQueries({ queryKey: ["reports"] })
+    },
+  })
+}
+
+export function useRequestMealChangeMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: requestMealChange,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["reports"] })
+      void queryClient.invalidateQueries({
+        queryKey: [...nutritionKeys.all, "meal-change-requests"],
+      })
+    },
+  })
+}
+
+export function useUpsertNutritionMealProgressMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: UpsertNutritionMealProgressInput) =>
+      upsertNutritionMealProgress(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: nutritionKeys.all })
+      void queryClient.invalidateQueries({ queryKey: ["reports"] })
+      void queryClient.invalidateQueries({ queryKey: ["overview"] })
+    },
+  })
+}
+
+export function usePendingMealChangeRequestsQuery(options?: {
+  enabled?: boolean
+}) {
+  return useQuery({
+    queryKey: [...nutritionKeys.all, "meal-change-requests", "pending"],
+    queryFn: fetchPendingMealChangeRequests,
+    staleTime: QUERY_STALE_TIMES.adminList,
+    enabled: options?.enabled !== false,
+  })
+}
+
+export function useResolveMealChangeMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: resolveMealChangeRequest,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: [...nutritionKeys.all, "meal-change-requests"],
+      })
+      void queryClient.invalidateQueries({ queryKey: ["reports"] })
     },
   })
 }
