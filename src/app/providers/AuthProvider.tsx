@@ -96,15 +96,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [])
 
   const signOut = useCallback(async () => {
+    // Mark unauthenticated immediately so login/guards do not bounce
+    // against a stale "authenticated" React state after Firebase clears.
     setLocalSession(null)
-    await firebaseSignOut(getFirebaseAuth()).catch(() => undefined)
-    queryClient.clear()
     setState({
       status: "unauthenticated",
       user: null,
       subscriptionStatus: null,
       error: null,
     })
+    await firebaseSignOut(getFirebaseAuth()).catch(() => undefined)
+    queryClient.clear()
   }, [queryClient])
 
   const updateAccount = useCallback(async (patch: { displayName?: string; phone?: string }) => {
@@ -268,16 +270,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
         ? state.user
         : state.user ?? activeIdentity
 
-    const user = rawUser
+    // Never expose an authenticated identity without a live Firebase session.
+    // Stale state.user after signOut caused login ↔ panel redirect flicker.
+    const user = live ? rawUser : null
 
     const status =
       state.status === "loading" || state.status === "idle"
         ? state.status
         : live && user
           ? "authenticated"
-          : state.status === "authenticated" && user
-            ? "authenticated"
-            : "unauthenticated"
+          : "unauthenticated"
 
     const liveSubs = (liveSubscriptionsQuery.data ?? []) as SubscriberSubscription[]
     const currentSub = pickCurrentSubscription(liveSubs)

@@ -852,6 +852,17 @@
       }
     }
   },
+  "whatsappBanner": {
+    "eyebrow": "WhatsApp",
+    "title": "Achieve your fitness goals now",
+    "subtitle": "The Military Workout Package. Built for young athletes — message us to begin.",
+    "cta": "Join us today",
+    "secondary": "Get started",
+    "hint": "Opens WhatsApp with a ready message — reply anytime.",
+    "imageAlt": "Derby Fit Military Workout Package banner for ages 7 to 14",
+    "phoneRaw": "+201000000000",
+    "prefill": "Hi Derby Fit — I’m interested in the Military Workout Package (ages 7–14)."
+  },
   "contact": {
     "badge": "Contact",
     "title": "Have questions or want to join?",

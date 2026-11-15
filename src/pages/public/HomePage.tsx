@@ -10,6 +10,7 @@ import { SecondHeroSection } from "@/components/public/SecondHeroSection"
 import { TestimonialsSection } from "@/components/public/TestimonialsSection"
 import { TransformationsSection } from "@/components/public/TransformationsSection"
 import { TrustSection } from "@/components/public/TrustSection"
+import { WhatsAppBannerSection } from "@/components/public/WhatsAppBannerSection"
 import { WhoIAmSection } from "@/components/public/WhoIAmSection"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 
@@ -29,6 +30,7 @@ export function HomePage() {
       <PackagesSection />
       <GoalsBannerSection />
       <ContactSection />
+      <WhatsAppBannerSection />
       <TransformationsSection />
       <FaqSection />
     </>

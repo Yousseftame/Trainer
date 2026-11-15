@@ -13,6 +13,7 @@ import {
 } from "@/components/auth/styles"
 import { useAuth } from "@/features/auth/auth-context"
 import { firebaseAuthErrorKey } from "@/features/auth/errors"
+import { hasLiveFirebaseSession } from "@/features/auth/session"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { can, resolveAdminLandingPath } from "@/lib/permissions/can"
@@ -42,7 +43,9 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    if (status !== "authenticated" || !user) return
+    // Require a live Firebase session — avoids logout redirect flicker when
+    // React auth state briefly lags behind firebaseSignOut().
+    if (status !== "authenticated" || !user || !hasLiveFirebaseSession()) return
 
     // 1. Check if user is suspended/blocked
     if (user.status === "suspended") {
