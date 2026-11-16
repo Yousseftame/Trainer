@@ -3,6 +3,7 @@ import { Outlet, useLocation } from "react-router-dom"
 import { AnnouncementBar } from "@/components/public/AnnouncementBar"
 import { PublicFooter } from "@/components/public/PublicFooter"
 import { PublicNavbar } from "@/components/public/PublicNavbar"
+import { WhatsAppFloatingButton } from "@/components/public/WhatsAppFloatingButton"
 
 export function PublicLayout() {
   const location = useLocation()
@@ -30,6 +31,7 @@ export function PublicLayout() {
         <Outlet />
       </main>
       <PublicFooter />
+      <WhatsAppFloatingButton />
     </div>
   )
 }

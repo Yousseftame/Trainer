@@ -1,25 +1,28 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { AnimatePresence, motion } from "motion/react"
 import { ArrowRight } from "lucide-react"
 import { APP_ROUTES } from "@/config/constants"
+import { GOALS_BANNER_TAB_IDS } from "@/features/website/goalsBanner"
+import { useGoalsBannerContentQuery } from "@/features/website/hooks"
+import { isRenderableImageSrc } from "@/features/website/paths"
 import { useLocale } from "@/hooks/useLocale"
+import { resolveBilingualText } from "@/lib/program-text"
 import { cn } from "@/lib/utils"
+import type { GoalsBannerTabId } from "@/types/website"
 import bannerTest from "@/assets/banner-test.svg"
 import feature1 from "@/assets/1.png"
 import feature2 from "@/assets/2.png"
 import feature3 from "@/assets/3.png"
 import feature4 from "@/assets/4.png"
 
-const TABS = [
-  { id: "logging", image: feature1 },
-  { id: "videos", image: feature2 },
-  { id: "messaging", image: feature3 },
-  { id: "metrics", image: feature4 },
-] as const
-
-type TabId = (typeof TABS)[number]["id"]
+const STATIC_IMAGES: Record<GoalsBannerTabId, string> = {
+  logging: feature1,
+  videos: feature2,
+  messaging: feature3,
+  metrics: feature4,
+}
 
 const softEase = [0.16, 1, 0.3, 1] as const
 
@@ -33,18 +36,97 @@ const imageTransition = {
   ease: softEase,
 }
 
+type TabView = {
+  id: GoalsBannerTabId
+  tabLabel: string
+  title: string
+  description: string
+  cta: string
+  image: string
+  imageAlt: string
+}
+
 export function GoalsBannerSection() {
   const { t } = useTranslation()
-  const { isRtl } = useLocale()
-  const [active, setActive] = useState<TabId>("logging")
-  const current = TABS.find((tab) => tab.id === active) ?? TABS[0]
+  const { locale, isRtl } = useLocale()
+  const { data: content, isPending, isError } = useGoalsBannerContentQuery({
+    audience: "public",
+  })
+
+  const hasCms = Boolean(content)
+  const awaitingCms = isPending && !hasCms && !isError
+
+  const tabs = useMemo<TabView[]>(() => {
+    return GOALS_BANNER_TAB_IDS.map((id) => {
+      const cmsTab = content?.tabs.find((tab) => tab.id === id)
+      const image =
+        cmsTab && isRenderableImageSrc(cmsTab.imageUrl)
+          ? cmsTab.imageUrl
+          : STATIC_IMAGES[id]
+
+      if (cmsTab && hasCms) {
+        return {
+          id,
+          tabLabel: resolveBilingualText(
+            cmsTab.tabLabel,
+            locale,
+            t(`goalsBanner.tabs.${id}`),
+          ),
+          title: resolveBilingualText(
+            cmsTab.title,
+            locale,
+            t(`goalsBanner.items.${id}.title`),
+          ),
+          description: resolveBilingualText(
+            cmsTab.description,
+            locale,
+            t(`goalsBanner.items.${id}.desc`),
+          ),
+          cta: resolveBilingualText(cmsTab.cta, locale, t("goalsBanner.cta")),
+          image,
+          imageAlt: resolveBilingualText(
+            cmsTab.imageAlt,
+            locale,
+            t(`goalsBanner.items.${id}.imageAlt`),
+          ),
+        }
+      }
+
+      return {
+        id,
+        tabLabel: t(`goalsBanner.tabs.${id}`),
+        title: t(`goalsBanner.items.${id}.title`),
+        description: t(`goalsBanner.items.${id}.desc`),
+        cta: t("goalsBanner.cta"),
+        image: STATIC_IMAGES[id],
+        imageAlt: t(`goalsBanner.items.${id}.imageAlt`),
+      }
+    })
+  }, [content, hasCms, locale, t])
+
+  const sectionTitle = hasCms && content
+    ? resolveBilingualText(
+        content.title,
+        locale,
+        t("goalsBanner.title"),
+      )
+    : t("goalsBanner.title")
+
+  const [active, setActive] = useState<GoalsBannerTabId>("logging")
+  const current = tabs.find((tab) => tab.id === active) ?? tabs[0]
 
   useEffect(() => {
-    for (const tab of TABS) {
+    for (const tab of tabs) {
       const img = new Image()
       img.src = tab.image
     }
-  }, [])
+  }, [tabs])
+
+  useEffect(() => {
+    if (!tabs.some((tab) => tab.id === active)) {
+      setActive(tabs[0]?.id ?? "logging")
+    }
+  }, [active, tabs])
 
   return (
     <section className="relative w-full overflow-hidden px-6 py-14 md:px-10 md:py-20 lg:px-14 lg:py-24">
@@ -61,17 +143,20 @@ export function GoalsBannerSection() {
       />
 
       <div className="relative z-[1] mx-auto w-full max-w-[1300px]">
-        <h2 className="mx-auto max-w-[22ch] text-center font-heading text-[32px] font-extrabold leading-[1.15] tracking-tight text-white sm:text-[38px] md:max-w-[28ch] md:text-[44px] lg:text-[48px]">
-          {t("goalsBanner.title")}
-        </h2>
+        {awaitingCms ? (
+          <div className="mx-auto h-[48px] max-w-[28ch] animate-pulse rounded-lg bg-white/10" />
+        ) : (
+          <h2 className="mx-auto max-w-[22ch] text-center font-heading text-[32px] font-extrabold leading-[1.15] tracking-tight text-white sm:text-[38px] md:max-w-[28ch] md:text-[44px] lg:text-[48px]">
+            {sectionTitle}
+          </h2>
+        )}
 
-        {/* Tabs — 2×2 on mobile so all are visible; wrap/center on larger screens */}
         <div
           role="tablist"
           aria-label={t("goalsBanner.tabsLabel")}
           className="mx-auto mt-8 grid w-full max-w-md grid-cols-2 gap-2 sm:mt-10 sm:flex sm:max-w-none sm:flex-wrap sm:items-center sm:justify-center sm:gap-3"
         >
-          {TABS.map((tab) => {
+          {tabs.map((tab) => {
             const selected = tab.id === active
             return (
               <button
@@ -82,13 +167,15 @@ export function GoalsBannerSection() {
                 aria-selected={selected}
                 aria-controls="goals-panel"
                 tabIndex={selected ? 0 : -1}
+                disabled={awaitingCms}
                 onClick={() => setActive(tab.id)}
                 className={cn(
                   "relative w-full rounded-full px-2.5 py-2.5 text-center font-heading text-[12px] font-semibold leading-tight transition-colors duration-300",
                   "sm:w-auto sm:shrink-0 sm:px-5 sm:py-3 sm:text-[15px] sm:leading-normal md:text-[16px]",
                   selected
                     ? "text-[var(--gym-lime)]"
-                    : "text-white/70 hover:text-white"
+                    : "text-white/70 hover:text-white",
+                  awaitingCms && "pointer-events-none opacity-50",
                 )}
               >
                 {selected ? (
@@ -98,13 +185,12 @@ export function GoalsBannerSection() {
                     transition={{ type: "spring", stiffness: 420, damping: 36 }}
                   />
                 ) : null}
-                <span className="relative z-10">{t(`goalsBanner.tabs.${tab.id}`)}</span>
+                <span className="relative z-10">{tab.tabLabel}</span>
               </button>
             )
           })}
         </div>
 
-        {/* Stable shell — layout never remounts */}
         <div
           id="goals-panel"
           role="tabpanel"
@@ -113,41 +199,48 @@ export function GoalsBannerSection() {
         >
           <div className="order-2 flex flex-col gap-6 sm:gap-7 lg:order-1 lg:gap-8 lg:pe-2 xl:pe-6">
             <div className="relative min-h-[11rem] sm:min-h-[12rem] md:min-h-[13rem]">
-              <AnimatePresence initial={false}>
-                <motion.div
-                  key={current.id}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={textTransition}
-                  className="absolute inset-x-0 top-0 flex flex-col gap-6 sm:gap-7 lg:gap-8"
-                >
-                  <motion.h3
-                    initial={{ opacity: 0, y: 10 }}
+              {awaitingCms ? (
+                <div className="flex flex-col gap-4" aria-hidden>
+                  <div className="h-10 w-[80%] animate-pulse rounded-lg bg-white/10" />
+                  <div className="h-24 w-full max-w-[36em] animate-pulse rounded-lg bg-white/10" />
+                </div>
+              ) : (
+                <AnimatePresence initial={false}>
+                  <motion.div
+                    key={current.id}
+                    initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ ...textTransition, delay: 0.04 }}
-                    className="w-full font-heading text-[30px] font-extrabold leading-[1.15] tracking-tight text-white sm:text-[34px] md:text-[38px] lg:text-[42px]"
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={textTransition}
+                    className="absolute inset-x-0 top-0 flex flex-col gap-6 sm:gap-7 lg:gap-8"
                   >
-                    {t(`goalsBanner.items.${current.id}.title`)}
-                  </motion.h3>
-                  <motion.p
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ ...textTransition, delay: 0.1 }}
-                    className="w-full max-w-[36em] text-[16px] leading-relaxed text-white/72 sm:text-[17px] md:text-[18px] lg:text-[19px]"
-                  >
-                    {t(`goalsBanner.items.${current.id}.desc`)}
-                  </motion.p>
-                </motion.div>
-              </AnimatePresence>
+                    <motion.h3
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ ...textTransition, delay: 0.04 }}
+                      className="w-full font-heading text-[30px] font-extrabold leading-[1.15] tracking-tight text-white sm:text-[34px] md:text-[38px] lg:text-[42px]"
+                    >
+                      {current.title}
+                    </motion.h3>
+                    <motion.p
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ ...textTransition, delay: 0.1 }}
+                      className="w-full max-w-[36em] text-[16px] leading-relaxed text-white/72 sm:text-[17px] md:text-[18px] lg:text-[19px]"
+                    >
+                      {current.description}
+                    </motion.p>
+                  </motion.div>
+                </AnimatePresence>
+              )}
             </div>
 
             <Link
-              to={APP_ROUTES.public.login}
+              to={APP_ROUTES.public.contact}
               className="group mt-1 inline-flex h-[48px] w-fit items-center gap-3 rounded-full bg-[var(--gym-lime)] pe-1.5 ps-6 text-white sm:mt-2 sm:h-[52px] sm:gap-3.5 sm:pe-2 sm:ps-7"
             >
               <span className="font-heading text-[13px] font-extrabold uppercase tracking-[0.04em] sm:text-[14px]">
-                {t("goalsBanner.cta")}
+                {awaitingCms ? t("goalsBanner.cta") : current.cta}
               </span>
               <span className="inline-flex size-[36px] shrink-0 items-center justify-center rounded-full bg-white text-[#111111] sm:size-[40px]">
                 <ArrowRight
@@ -155,7 +248,7 @@ export function GoalsBannerSection() {
                     "size-[17px] transition-transform duration-300 ease-out sm:size-[18px]",
                     isRtl
                       ? "-rotate-[135deg] group-hover:-rotate-180"
-                      : "-rotate-45 group-hover:rotate-0"
+                      : "-rotate-45 group-hover:rotate-0",
                   )}
                   strokeWidth={2}
                 />
@@ -164,22 +257,21 @@ export function GoalsBannerSection() {
           </div>
 
           <div className="relative order-1 lg:order-2">
-            {/* Size lock so the frame never jumps */}
             <img
-              src={TABS[0].image}
+              src={tabs[0]?.image ?? STATIC_IMAGES.logging}
               alt=""
               aria-hidden
               className="block h-auto w-full opacity-0"
               draggable={false}
             />
 
-            {TABS.map((tab) => {
+            {tabs.map((tab) => {
               const isActive = tab.id === active
               return (
                 <motion.img
                   key={tab.id}
                   src={tab.image}
-                  alt={t(`goalsBanner.items.${tab.id}.imageAlt`)}
+                  alt={tab.imageAlt}
                   initial={false}
                   animate={{
                     opacity: isActive ? 1 : 0,
@@ -188,7 +280,8 @@ export function GoalsBannerSection() {
                   transition={imageTransition}
                   className={cn(
                     "absolute inset-0 size-full origin-center object-contain object-center will-change-transform",
-                    isActive ? "z-[1]" : "z-0 pointer-events-none"
+                    isActive ? "z-[1]" : "z-0 pointer-events-none",
+                    awaitingCms && "opacity-40",
                   )}
                   loading="eager"
                   decoding="async"

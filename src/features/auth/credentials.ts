@@ -1,26 +1,15 @@
+/**
+ * Legacy plaintext password cache — NEVER write here again.
+ * Kept only to wipe any leftover DevTools-visible secrets from older builds.
+ */
 const CREDENTIALS_KEY = "derpyfit_credentials_v1"
 
-export function getStoredPasswords(): Record<string, string> {
-  if (typeof window === "undefined" || !window.localStorage) return {}
-  try {
-    const raw = window.localStorage.getItem(CREDENTIALS_KEY)
-    if (!raw) return {}
-    return JSON.parse(raw) as Record<string, string>
-  } catch {
-    return {}
-  }
-}
-
-export function saveStoredPassword(email: string, password: string): void {
+/** Removes any historically stored email→password map from localStorage. */
+export function purgeStoredPasswords(): void {
   if (typeof window === "undefined" || !window.localStorage) return
-  const cleanEmail = email.trim().toLowerCase()
-  if (!cleanEmail) return
   try {
-    const current = getStoredPasswords()
-    current[cleanEmail] = password.trim()
-    window.localStorage.setItem(CREDENTIALS_KEY, JSON.stringify(current))
+    window.localStorage.removeItem(CREDENTIALS_KEY)
   } catch {
-    // Ignore quota errors
+    // ignore quota / private mode
   }
 }
-

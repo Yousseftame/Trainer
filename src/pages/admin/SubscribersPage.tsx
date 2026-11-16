@@ -24,7 +24,6 @@ import {
 } from "@/features/subscribers"
 import {
   useDeleteSubscriberMutation,
-  usePurgeDemoSubscribersMutation,
   useSaveSubscriberMutation,
   useSubscribersQuery,
   useUpdateSubscriberStatusMutation,
@@ -66,7 +65,6 @@ export function SubscribersPage() {
   const saveSubscriberMutation = useSaveSubscriberMutation()
   const updateStatusMutation = useUpdateSubscriberStatusMutation()
   const deleteSubscriberMutation = useDeleteSubscriberMutation()
-  const purgeDemoMutation = usePurgeDemoSubscribersMutation()
   const assignSubMutation = useAssignSubscriptionMutation()
   const lifecycleSubMutation = useUpdateSubscriptionLifecycleMutation()
 
@@ -89,9 +87,7 @@ export function SubscribersPage() {
   } | null>(null)
 
   const actionsBusy =
-    updateStatusMutation.isPending ||
-    deleteSubscriberMutation.isPending ||
-    purgeDemoMutation.isPending
+    updateStatusMutation.isPending || deleteSubscriberMutation.isPending
 
   const packageMap = useMemo(
     () => new Map(packages.map((p) => [p.id, p])),
@@ -206,28 +202,6 @@ export function SubscribersPage() {
           locale === "ar"
             ? "تم حذف حساب المشترك نهائياً"
             : "Subscriber permanently deleted",
-        )
-      },
-    })
-  }
-
-  function handlePurgeDemo() {
-    if (actionsBusy) return
-    setConfirmDialog({
-      open: true,
-      title: locale === "ar" ? "مسح بيانات التجريب" : "Purge demo data",
-      description:
-        locale === "ar"
-          ? "مسح بيانات التجريب القديمة (معرفات وهمية) من المشتركين وطلبات التسجيل؟"
-          : "Purge legacy demo subscriber/request docs with fake IDs?",
-      confirmLabel: locale === "ar" ? "تأكيد المسح" : "Purge now",
-      tone: "warning",
-      onConfirm: async () => {
-        const result = await purgeDemoMutation.mutateAsync()
-        appToast.success(
-          locale === "ar"
-            ? `تم المسح: ${result.deletedSubscribers} مشترك، ${result.deletedRequests} طلب`
-            : `Purged ${result.deletedSubscribers} subscribers, ${result.deletedRequests} requests`,
         )
       },
     })
@@ -397,17 +371,6 @@ export function SubscribersPage() {
                   </select>
                   <ChevronDown className="pointer-events-none absolute end-3 size-4 text-[#8c8c8c]" />
                 </div>
-
-                {canWrite && user?.role === "head_coach" ? (
-                  <button
-                    type="button"
-                    disabled={actionsBusy}
-                    onClick={() => handlePurgeDemo()}
-                    className="inline-flex h-11 shrink-0 items-center justify-center rounded-full bg-[#F4F4F4] px-3 sm:px-4 text-[12px] font-bold text-[#6B7280] transition hover:bg-black/5 disabled:opacity-60"
-                  >
-                    {locale === "ar" ? "مسح التجريب" : "Purge demo"}
-                  </button>
-                ) : null}
 
                 {canWrite ? (
                   <button

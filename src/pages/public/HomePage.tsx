@@ -22,9 +22,10 @@ export function HomePage() {
     <>
       <HeroSection />
       <TrustSection />
+      <WhoIAmSection />
+
       <FitnessDreamSection />
       <SecondHeroSection />
-      <WhoIAmSection />
       <MissionBannerSection />
       <TestimonialsSection />
       <PackagesSection />

@@ -1,11 +1,16 @@
-import { useEffect, useEffectEvent, useId, useRef, useState } from "react"
+import { useEffect, useEffectEvent, useId, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { Link } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { AnimatePresence, motion } from "motion/react"
 import { ArrowLeft, ArrowRight, X } from "lucide-react"
+import {
+  pickTransformationsForLoop,
+  useTransformationItemsQuery,
+} from "@/features/website"
 import { APP_ROUTES } from "@/config/constants"
 import { useLocale } from "@/hooks/useLocale"
+import { resolveBilingualText } from "@/lib/program-text"
 import { cn } from "@/lib/utils"
 import hoverIcon from "@/assets/gallery/hover-icon.svg"
 import gallery02 from "@/assets/gallery/6757f6685db1adece749f71a_cc286e43a2f9cd6232b2f6e5c6ed4be6_gallery-image-02.avif"
@@ -16,8 +21,17 @@ import gallery06 from "@/assets/gallery/6757f668750b42ca3dcd9555_gallery-image-0
 import gallery07 from "@/assets/gallery/6757f668f59653b165679b74_60ba3c56e36cf1be0f42a51b5a288205_gallery-image-07.avif"
 import gallery08 from "@/assets/gallery/6757f668f68e568a0d457849_aabff8eafa3a9dc8fc8245ff8d3db1c8_gallery-image-08.avif"
 
+type GallerySlide = {
+  id: string
+  imageUrl: string
+  name: string
+  description: string
+  date: string
+  alt: string
+}
+
 /** GymTrainer gallery assets — native 800×600 before/after composites */
-const GALLERY_IMAGES = [
+const STATIC_GALLERY_URLS = [
   gallery02,
   gallery03,
   gallery04,
@@ -27,30 +41,79 @@ const GALLERY_IMAGES = [
   gallery08,
 ] as const
 
-const TOP_ROW = GALLERY_IMAGES
-const BOTTOM_ROW = [...GALLERY_IMAGES].reverse()
+/** Static reference: 7 cards ≈ 80s / 90s — keep the same px/s for short CMS rows */
+const MARQUEE_REF_COUNT = 7
+const MARQUEE_DURATION_LEFT_SEC = 80
+const MARQUEE_DURATION_RIGHT_SEC = 90
+/** Enough copies so one set usually covers the viewport; still keeps CMS order. */
+const MARQUEE_MIN_SET_COUNT = 4
+
+function buildStaticSlides(
+  imageAlt: (n: number) => string,
+): GallerySlide[] {
+  return STATIC_GALLERY_URLS.map((url, index) => ({
+    id: `static-${index}`,
+    imageUrl: url,
+    name: "",
+    description: "",
+    date: "",
+    alt: imageAlt(index + 1),
+  }))
+}
+
+/**
+ * Repeat unique slides until the set is wide enough for a seamless -50% loop.
+ * Keeps original ids so lightbox open still resolves correctly.
+ */
+function padSlidesForMarquee(slides: GallerySlide[]): GallerySlide[] {
+  if (slides.length === 0 || slides.length >= MARQUEE_MIN_SET_COUNT) {
+    return slides
+  }
+  const out: GallerySlide[] = []
+  let i = 0
+  while (out.length < MARQUEE_MIN_SET_COUNT) {
+    out.push(slides[i % slides.length]!)
+    i += 1
+  }
+  return out
+}
+
+function marqueeDurationSec(
+  slideCount: number,
+  direction: "left" | "right",
+): number {
+  const base =
+    direction === "right"
+      ? MARQUEE_DURATION_RIGHT_SEC
+      : MARQUEE_DURATION_LEFT_SEC
+  const count = Math.max(slideCount, 1)
+  return Math.max(12, (count / MARQUEE_REF_COUNT) * base)
+}
 
 function GalleryCard({
-  src,
-  alt,
+  slide,
   onOpen,
 }: {
-  src: string
-  alt: string
+  slide: GallerySlide
   onOpen: () => void
 }) {
+  const name = slide.name.trim()
+  const date = slide.date.trim()
+  const description = slide.description.trim()
+  const hasCopy = Boolean(name || description || date)
+
   return (
     <button
       type="button"
       onClick={onOpen}
       className="gallery-card group relative shrink-0 cursor-zoom-in overflow-hidden rounded-[30px] text-start outline-none focus-visible:ring-2 focus-visible:ring-[var(--gym-lime)] focus-visible:ring-offset-2"
-      aria-label={alt}
+      aria-label={slide.alt}
     >
       <img
-        src={src}
+        src={slide.imageUrl}
         alt=""
         className="gallery-card__image pointer-events-none block size-full object-cover"
-        loading="lazy"
+        loading="eager"
         decoding="async"
         draggable={false}
       />
@@ -58,40 +121,54 @@ function GalleryCard({
         aria-hidden
         className="pointer-events-none absolute inset-0 rounded-[30px] bg-[var(--gym-dark)] opacity-0 transition-opacity duration-300 group-hover:opacity-50 group-focus-visible:opacity-50"
       />
-      <img
-        src={hoverIcon}
-        alt=""
-        aria-hidden
-        className="pointer-events-none absolute left-1/2 top-1/2 size-10 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100 sm:size-[50px]"
-      />
+      <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-4 opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100 sm:gap-2 sm:px-5">
+        {hasCopy && name ? (
+          <span className="line-clamp-2 max-w-[90%] break-words text-center font-heading text-[15px] font-bold leading-snug text-white sm:text-[17px] md:text-[18px]">
+            {name}
+          </span>
+        ) : null}
+        {hasCopy && date ? (
+          <span className="max-w-[90%] break-words text-center text-[11px] font-semibold tracking-[0.06em] text-[var(--gym-lime,#fb5001)] sm:text-[12px]">
+            {date}
+          </span>
+        ) : null}
+        <img
+          src={hoverIcon}
+          alt=""
+          aria-hidden
+          className="mt-0.5 size-10 shrink-0 sm:mt-1 sm:size-[50px]"
+        />
+        {hasCopy && description ? (
+          <span className="line-clamp-2 max-w-[92%] break-words text-center text-[12px] font-medium leading-snug text-white/85 sm:text-[13px] md:text-[14px]">
+            {description}
+          </span>
+        ) : null}
+      </span>
     </button>
   )
 }
 
 function GallerySet({
-  images,
+  slides,
   ariaHidden = false,
   onOpen,
+  setKey,
 }: {
-  images: readonly string[]
+  slides: GallerySlide[]
   ariaHidden?: boolean
-  onOpen: (src: string) => void
+  onOpen: (id: string) => void
+  setKey: string
 }) {
-  const { t } = useTranslation()
-
   return (
     <div
       className="gallery-marquee__set flex shrink-0 items-stretch"
       aria-hidden={ariaHidden || undefined}
     >
-      {images.map((src, index) => (
+      {slides.map((slide, index) => (
         <GalleryCard
-          key={`${ariaHidden ? "b" : "a"}-${index}`}
-          src={src}
-          alt={t("transformations.openImage", {
-            n: GALLERY_IMAGES.indexOf(src as (typeof GALLERY_IMAGES)[number]) + 1,
-          })}
-          onOpen={() => onOpen(src)}
+          key={`${setKey}-${slide.id}-${index}`}
+          slide={slide}
+          onOpen={() => onOpen(slide.id)}
         />
       ))}
     </div>
@@ -99,44 +176,64 @@ function GallerySet({
 }
 
 function GalleryRow({
-  images,
+  slides,
   direction,
   onOpen,
   trackKey,
   isRtl,
 }: {
-  images: readonly string[]
+  slides: GallerySlide[]
   direction: "left" | "right"
-  onOpen: (src: string) => void
+  onOpen: (id: string) => void
   trackKey: string
   isRtl: boolean
 }) {
+  if (slides.length === 0) return null
+
+  const padded = padSlidesForMarquee(slides)
+  const durationSec = marqueeDurationSec(padded.length, direction)
+
   return (
     <div
       dir="ltr"
       className={cn(
         "gallery-marquee",
         direction === "right" && "gallery-marquee--reverse",
-        isRtl && "gallery-marquee--rtl"
+        isRtl && "gallery-marquee--rtl",
       )}
     >
-      {/*
-        Overflow box is dir=ltr so both rows are visible at t=0 in Arabic.
-        Two identical sets + physical padding-right keep -50% wrap math equal.
-      */}
-      <div key={trackKey} className="gallery-marquee__track">
-        <GallerySet images={images} onOpen={onOpen} />
-        <GallerySet images={images} ariaHidden onOpen={onOpen} />
+      <div
+        key={trackKey}
+        className="gallery-marquee__track"
+        style={
+          {
+            "--gallery-marquee-duration": `${durationSec}s`,
+          } as React.CSSProperties
+        }
+      >
+        <GallerySet
+          slides={padded}
+          onOpen={onOpen}
+          setKey={`${trackKey}-a`}
+        />
+        <GallerySet
+          slides={padded}
+          ariaHidden
+          onOpen={onOpen}
+          setKey={`${trackKey}-b`}
+        />
       </div>
     </div>
   )
 }
 
 function GalleryLightbox({
+  slides,
   index,
   onClose,
   onIndexChange,
 }: {
+  slides: GallerySlide[]
   index: number
   onClose: () => void
   onIndexChange: (next: number) => void
@@ -146,8 +243,8 @@ function GalleryLightbox({
   const titleId = useId()
   const dialogRef = useRef<HTMLDivElement>(null)
   const touchStartX = useRef<number | null>(null)
-  const total = GALLERY_IMAGES.length
-  const src = GALLERY_IMAGES[index]
+  const total = slides.length
+  const slide = slides[index]
 
   const goPrev = useEffectEvent(() => {
     onIndexChange((index - 1 + total) % total)
@@ -200,7 +297,6 @@ function GalleryLightbox({
     if (start == null || end == null) return
     const delta = end - start
     if (Math.abs(delta) < 48) return
-    // Swipe follows content direction: LTR swipe-left = next; RTL swipe-left = prev
     if (delta < 0) {
       if (isRtl) goPrev()
       else goNext()
@@ -208,8 +304,14 @@ function GalleryLightbox({
     else goPrev()
   }
 
+  if (!slide) return null
+
   const PrevIcon = isRtl ? ArrowRight : ArrowLeft
   const NextIcon = isRtl ? ArrowLeft : ArrowRight
+  const hasDetails = Boolean(
+    slide.name.trim() || slide.description.trim() || slide.date.trim(),
+  )
+  const showNav = total > 1
 
   return createPortal(
     <motion.div
@@ -220,7 +322,7 @@ function GalleryLightbox({
       ref={dialogRef}
       tabIndex={-1}
       dir={isRtl ? "rtl" : "ltr"}
-      className="fixed inset-0 z-[10000] flex flex-col bg-black/92 outline-none backdrop-blur-[2px]"
+      className="fixed inset-0 z-[10000] flex flex-col bg-[#0a0a0a] outline-none"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -229,79 +331,166 @@ function GalleryLightbox({
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
-        <h2 id={titleId} className="sr-only">
-          {t("transformations.lightboxTitle")}
-        </h2>
+      <h2 id={titleId} className="sr-only">
+        {t("transformations.lightboxTitle")}
+      </h2>
 
-        <div className="relative z-20 flex items-center justify-between gap-3 px-4 pb-2 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:pt-5">
-          <p className="font-heading text-[14px] font-semibold tabular-nums text-white/80 sm:text-[15px]">
-            {t("transformations.counter", { current: index + 1, total })}
-          </p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex size-11 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gym-lime)] sm:size-12"
-            aria-label={t("transformations.close")}
-          >
-            <X className="size-5 sm:size-6" strokeWidth={2.25} />
-          </button>
-        </div>
-
-        <div
-          className="relative flex min-h-0 flex-1 items-center justify-center px-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-16 md:px-20"
-          onClick={(event) => event.stopPropagation()}
+      <div className="relative z-20 flex shrink-0 items-center justify-between gap-3 px-4 pb-1 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:pt-4">
+        <p
+          dir="ltr"
+          className="font-heading text-[14px] font-semibold tabular-nums text-white/75 sm:text-[15px]"
         >
-          <button
-            type="button"
-            onClick={goPrev}
-            className={cn(
-              "absolute top-1/2 z-20 inline-flex size-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gym-lime)] sm:size-12",
-              isRtl ? "right-2 sm:right-4" : "left-2 sm:left-4"
-            )}
-            aria-label={t("transformations.prev")}
-          >
-            <PrevIcon className="size-5 sm:size-6" strokeWidth={2.25} />
-          </button>
+          {t("transformations.counter", { current: index + 1, total })}
+        </p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex size-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gym-lime)] sm:size-11"
+          aria-label={t("transformations.close")}
+        >
+          <X className="size-5" strokeWidth={2.25} />
+        </button>
+      </div>
 
+      <div
+        className="relative flex min-h-0 flex-1 flex-col"
+        onClick={(event) => event.stopPropagation()}
+      >
+        {showNav ? (
+          <>
+            <button
+              type="button"
+              onClick={goPrev}
+              className={cn(
+                "absolute top-[38%] z-20 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gym-lime)] sm:size-12",
+                isRtl ? "right-3 sm:right-5" : "left-3 sm:left-5",
+              )}
+              aria-label={t("transformations.prev")}
+            >
+              <PrevIcon className="size-5 sm:size-6" strokeWidth={2.25} />
+            </button>
+            <button
+              type="button"
+              onClick={goNext}
+              className={cn(
+                "absolute top-[38%] z-20 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gym-lime)] sm:size-12",
+                isRtl ? "left-3 sm:left-5" : "right-3 sm:right-5",
+              )}
+              aria-label={t("transformations.next")}
+            >
+              <NextIcon className="size-5 sm:size-6" strokeWidth={2.25} />
+            </button>
+          </>
+        ) : null}
+
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:gap-4 sm:px-16 md:px-20">
           <AnimatePresence mode="wait">
-            <motion.img
-              key={src}
-              src={src}
-              alt={t("transformations.imageAlt", { n: index + 1 })}
-              className="max-h-[min(78dvh,820px)] w-auto max-w-[min(100%,1100px)] rounded-[16px] object-contain sm:rounded-[24px] md:rounded-[30px]"
-              draggable={false}
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
+            <motion.div
+              key={slide.id}
+              className="flex w-full max-w-[920px] flex-col items-center"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.2 }}
-            />
-          </AnimatePresence>
+            >
+              <img
+                src={slide.imageUrl}
+                alt={slide.alt}
+                className={cn(
+                  "mx-auto block h-auto w-auto max-w-full rounded-[14px] object-contain shadow-[0_20px_60px_rgba(0,0,0,0.45)] sm:rounded-[20px] md:rounded-[24px]",
+                  hasDetails
+                    ? "max-h-[min(56dvh,640px)] sm:max-h-[min(60dvh,700px)]"
+                    : "max-h-[min(78dvh,820px)]",
+                )}
+                draggable={false}
+              />
 
-          <button
-            type="button"
-            onClick={goNext}
-            className={cn(
-              "absolute top-1/2 z-20 inline-flex size-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gym-lime)] sm:size-12",
-              isRtl ? "left-2 sm:left-4" : "right-2 sm:right-4"
-            )}
-            aria-label={t("transformations.next")}
-          >
-            <NextIcon className="size-5 sm:size-6" strokeWidth={2.25} />
-          </button>
+              {hasDetails ? (
+                <div className="mt-3 w-full max-w-[560px] px-1 text-center sm:mt-4">
+                  {slide.name.trim() ? (
+                    <p className="break-words font-heading text-[20px] font-bold leading-snug text-white sm:text-[24px] md:text-[26px]">
+                      {slide.name}
+                    </p>
+                  ) : null}
+                  {slide.date.trim() ? (
+                    <p className="mt-1.5 break-words text-[12px] font-semibold tracking-[0.06em] text-[#fb5001] sm:text-[13px]">
+                      {slide.date}
+                    </p>
+                  ) : null}
+                  {slide.description.trim() ? (
+                    <p className="mt-2 line-clamp-4 break-words text-[13px] font-medium leading-relaxed text-white/75 [overflow-wrap:anywhere] sm:mt-2.5 sm:line-clamp-5 sm:text-[14px] md:text-[15px]">
+                      {slide.description}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </motion.div>
+          </AnimatePresence>
         </div>
+      </div>
     </motion.div>,
-    document.body
+    document.body,
   )
 }
 
 export function TransformationsSection() {
   const { t, i18n } = useTranslation()
-  const { isRtl } = useLocale()
+  const { locale, isRtl } = useLocale()
+  const { data: cmsItems } = useTransformationItemsQuery({ audience: "public" })
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const trackKey = i18n.language
 
-  function openSrc(src: string) {
-    const index = GALLERY_IMAGES.indexOf(src as (typeof GALLERY_IMAGES)[number])
+  const { topSlides, bottomSlides, lightboxSlides } = useMemo(() => {
+    if (cmsItems && cmsItems.length > 0) {
+      const top = pickTransformationsForLoop(cmsItems, "top").map((item) => ({
+        id: item.id,
+        imageUrl: item.imageUrl,
+        name: resolveBilingualText(item.name, locale),
+        description: resolveBilingualText(item.description, locale),
+        date: resolveBilingualText(item.date, locale),
+        alt:
+          resolveBilingualText(item.imageAlt, locale) ||
+          resolveBilingualText(item.name, locale),
+      }))
+      const bottom = pickTransformationsForLoop(cmsItems, "bottom").map(
+        (item) => ({
+          id: item.id,
+          imageUrl: item.imageUrl,
+          name: resolveBilingualText(item.name, locale),
+          description: resolveBilingualText(item.description, locale),
+          date: resolveBilingualText(item.date, locale),
+          alt:
+            resolveBilingualText(item.imageAlt, locale) ||
+            resolveBilingualText(item.name, locale),
+        }),
+      )
+      // Lightbox navigates unique live slides (top then bottom), no duplicates.
+      const seen = new Set<string>()
+      const lightbox: GallerySlide[] = []
+      for (const slide of [...top, ...bottom]) {
+        if (seen.has(slide.id)) continue
+        seen.add(slide.id)
+        lightbox.push(slide)
+      }
+      return {
+        topSlides: top,
+        bottomSlides: bottom,
+        lightboxSlides: lightbox,
+      }
+    }
+
+    const staticSlides = buildStaticSlides((n) =>
+      t("transformations.imageAlt", { n }),
+    )
+    return {
+      topSlides: staticSlides,
+      bottomSlides: [...staticSlides].reverse(),
+      lightboxSlides: staticSlides,
+    }
+  }, [cmsItems, locale, t])
+
+  function openById(id: string) {
+    const index = lightboxSlides.findIndex((slide) => slide.id === id)
     if (index >= 0) setActiveIndex(index)
   }
 
@@ -315,7 +504,7 @@ export function TransformationsSection() {
           <h2
             className={cn(
               "font-heading text-[28px] font-bold leading-[1.2] text-[var(--gym-ink)] sm:text-[36px] md:text-[46px] lg:text-[52px]",
-              isRtl ? "max-w-[14ch]" : "max-w-[16ch]"
+              isRtl ? "max-w-[14ch]" : "max-w-[16ch]",
             )}
           >
             {t("transformations.title")}
@@ -334,7 +523,7 @@ export function TransformationsSection() {
                   "transition-transform duration-300 ease-out",
                   isRtl
                     ? "-rotate-[135deg] group-hover:-rotate-180"
-                    : "-rotate-45 group-hover:rotate-0"
+                    : "-rotate-45 group-hover:rotate-0",
                 )}
                 size={18}
                 strokeWidth={1.75}
@@ -346,25 +535,26 @@ export function TransformationsSection() {
 
       <div className="mt-7 sm:mt-9 md:mt-10 lg:mt-12">
         <GalleryRow
-          images={TOP_ROW}
+          slides={topSlides}
           direction="left"
-          onOpen={openSrc}
+          onOpen={openById}
           trackKey={`${trackKey}-top`}
           isRtl={isRtl}
         />
         <div className="gallery-marquee-spacer" />
         <GalleryRow
-          images={BOTTOM_ROW}
+          slides={bottomSlides}
           direction="right"
-          onOpen={openSrc}
+          onOpen={openById}
           trackKey={`${trackKey}-bottom`}
           isRtl={isRtl}
         />
       </div>
 
-      {activeIndex != null ? (
+      {activeIndex != null && lightboxSlides.length > 0 ? (
         <GalleryLightbox
-          index={activeIndex}
+          slides={lightboxSlides}
+          index={Math.min(activeIndex, lightboxSlides.length - 1)}
           onClose={() => setActiveIndex(null)}
           onIndexChange={setActiveIndex}
         />

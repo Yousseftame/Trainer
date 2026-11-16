@@ -359,6 +359,113 @@ service cloud.firestore {
       allow create, update, delete: if hasPermission('content:manage');
     }
 
+    // Public website home hero banners — anyone can read; staff with content:manage write.
+    match /website_home_hero_slides/{slideId} {
+      allow read: if true;
+      allow create, update, delete: if hasPermission('content:manage');
+    }
+
+    // Trusted partners — coaches count settings + logo gallery.
+    match /website_trusted_partners_settings/{docId} {
+      allow read: if true;
+      allow create, update, delete: if hasPermission('content:manage');
+    }
+
+    match /website_trusted_partner_logos/{logoId} {
+      allow read: if true;
+      allow create, update, delete: if hasPermission('content:manage');
+    }
+
+    // Home “Who I Am” section — singleton CMS document.
+    match /website_who_i_am/{docId} {
+      allow read: if true;
+      allow create, update, delete: if hasPermission('content:manage');
+    }
+
+    // Home “What’s your fitness dream?” gallery cards.
+    match /website_fitness_dream_cards/{cardId} {
+      allow read: if true;
+      allow create, update, delete: if hasPermission('content:manage');
+    }
+
+    // Home Coaching App banner — singleton CMS document.
+    match /website_coaching_app/{docId} {
+      allow read: if true;
+      allow create, update, delete: if hasPermission('content:manage');
+    }
+
+    // Home Video / Mission banner — singleton CMS document.
+    match /website_video_banner/{docId} {
+      allow read: if true;
+      allow create, update, delete: if hasPermission('content:manage');
+    }
+
+    // Home Testimonials — exactly 6 designed slots (slot-0 … slot-5).
+    match /website_testimonials/{itemId} {
+      allow read: if true;
+      allow create, update, delete: if hasPermission('content:manage');
+    }
+
+    // Home Goals banner — singleton (section title + 4 fixed tabs).
+    match /website_goals_banner/{docId} {
+      allow read: if true;
+      allow create, update, delete: if hasPermission('content:manage');
+    }
+
+    // About page hero — singleton CMS document.
+    match /website_about_hero/{docId} {
+      allow read: if true;
+      allow create, update, delete: if hasPermission('content:manage');
+    }
+
+    // About page My Story — singleton (watermark + image + up to 5 points).
+    match /website_about_my_story/{docId} {
+      allow read: if true;
+      allow create, update, delete: if hasPermission('content:manage');
+    }
+
+    // About page How I coach — singleton (title + subtitle + 3 fixed cards).
+    match /website_about_how_i_coach/{docId} {
+      allow read: if true;
+      allow create, update, delete: if hasPermission('content:manage');
+    }
+
+    // About page Who I help — singleton (title + 4 fixed points).
+    match /website_about_who_i_help/{docId} {
+      allow read: if true;
+      allow create, update, delete: if hasPermission('content:manage');
+    }
+
+    // About page Certifications — singleton (title + up to 6 points).
+    match /website_about_certifications/{docId} {
+      allow read: if true;
+      allow create, update, delete: if hasPermission('content:manage');
+    }
+
+    // About page closing CTA banner — singleton (image + title/body/CTA).
+    match /website_about_closing_banner/{docId} {
+      allow read: if true;
+      allow create, update, delete: if hasPermission('content:manage');
+    }
+
+    // Shared FAQ items — featured (max 5) on home; all on /faq.
+    match /website_faq_items/{itemId} {
+      allow read: if true;
+      allow create, update, delete: if hasPermission('content:manage');
+    }
+
+    // Shared transformations gallery — items with loop (top/bottom).
+    match /website_transformations/{itemId} {
+      allow read: if true;
+      allow create, update, delete: if hasPermission('content:manage');
+    }
+
+    // Shared public footer — phone, email, social links (singleton).
+    match /website_footer/{docId} {
+      allow read: if true;
+      allow create, update, delete: if hasPermission('content:manage');
+    }
+
     // Ops notification inbox — created by Cloud Functions; staff may only clear unread.
     match /notices/{id} {
       allow read: if hasPermission('reports:read') ||

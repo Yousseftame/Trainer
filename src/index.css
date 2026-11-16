@@ -242,6 +242,22 @@ html[dir="rtl"] .font-sans,
   display: none;
 }
 
+/* Sidebar nav: keep touch/wheel scroll, never show a scrollbar track */
+.dashboard-shell .dashboard-sidebar-nav,
+.dashboard-shell .dashboard-sidebar-nav * {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.dashboard-shell .dashboard-sidebar-nav::-webkit-scrollbar,
+.dashboard-shell .dashboard-sidebar-nav::-webkit-scrollbar-thumb,
+.dashboard-shell .dashboard-sidebar-nav::-webkit-scrollbar-track {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+  background: transparent !important;
+}
+
 html:has(.public-site),
 body:has(.public-site) {
   overflow-x: clip;
@@ -427,7 +443,9 @@ body:has(.public-site) {
   display: flex;
   width: max-content;
   gap: 0;
-  animation: gallery-marquee-left 80s linear infinite;
+  /* Duration overridden inline from slide count so CMS rows keep static px/s */
+  --gallery-marquee-duration: 80s;
+  animation: gallery-marquee-left var(--gallery-marquee-duration) linear infinite;
   animation-play-state: running;
   backface-visibility: hidden;
   will-change: transform;
@@ -435,7 +453,8 @@ body:has(.public-site) {
 }
 
 .public-site .gallery-marquee--reverse .gallery-marquee__track {
-  animation: gallery-marquee-right 90s linear infinite;
+  --gallery-marquee-duration: 90s;
+  animation: gallery-marquee-right var(--gallery-marquee-duration) linear infinite;
   animation-play-state: running;
 }
 
@@ -602,7 +621,41 @@ html[dir="rtl"] .public-site .contact-slide-hint__chevron {
 
 .public-site .contact-slide .slide-commit__label {
   font-family: var(--font-heading);
-  font-weight: 600;
+  font-weight: 700;
+}
+
+.public-site .contact-slide .slide-commit__text--plain {
+  color: #ffffff;
+  opacity: 1;
+  filter: none;
+}
+
+@keyframes whatsapp-float-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  70% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+}
+
+.public-site .whatsapp-float {
+  position: fixed;
+}
+
+.public-site .whatsapp-float__pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: #25d366;
+  animation: whatsapp-float-pulse 2.2s ease-out infinite;
+  pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -622,5 +675,10 @@ html[dir="rtl"] .public-site .contact-slide-hint__chevron {
 
   .public-site .contact-slide-hint__chevron {
     animation: none;
+  }
+
+  .public-site .whatsapp-float__pulse {
+    animation: none;
+    display: none;
   }
 }

@@ -1,11 +1,11 @@
 import {
   useCallback,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
 } from "react"
-import { Link } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import {
   animate,
@@ -14,19 +14,26 @@ import {
   type PanInfo,
 } from "motion/react"
 import { ArrowLeft, ArrowRight } from "lucide-react"
-import { APP_ROUTES } from "@/config/constants"
+import { useFitnessDreamCardsQuery } from "@/features/website/hooks"
 import { useLocale } from "@/hooks/useLocale"
+import { resolveBilingualText } from "@/lib/program-text"
 import { cn } from "@/lib/utils"
 
-type DreamCard = {
+type DreamCardViewModel = {
+  id: string
+  title: string
+  body: string
+  image: string
+  imageAlt: string
+}
+
+const STATIC_DREAMS: Array<{
   id: string
   titleKey: string
   bodyKey: string
   image: string
   imageAltKey: string
-}
-
-const DREAMS: DreamCard[] = [
+}> = [
   {
     id: "strength",
     titleKey: "dreams.items.strength.title",
@@ -112,7 +119,7 @@ function NavButton({
         "inline-flex size-14 items-center justify-center rounded-full border-2 border-[var(--gym-ink)]/30 text-[var(--gym-ink)]/85 transition-[border-color,color,transform] duration-300 ease-out sm:size-16",
         "hover:border-[var(--gym-ink)]/55 hover:text-[var(--gym-ink)]",
         "active:scale-[0.96]",
-        "disabled:pointer-events-none disabled:opacity-35"
+        "disabled:pointer-events-none disabled:opacity-35",
       )}
     >
       {children}
@@ -120,49 +127,52 @@ function NavButton({
   )
 }
 
-function DreamCardView({ item, tone }: { item: DreamCard; tone: string }) {
-  const { t } = useTranslation()
+function DreamCardView({
+  item,
+  tone,
+}: {
+  item: DreamCardViewModel
+  tone: string
+}) {
   const { isRtl } = useLocale()
 
   return (
     <article
+      dir={isRtl ? "rtl" : "ltr"}
       className={cn(
         "group/card flex h-[500px] flex-col overflow-hidden rounded-[16px] sm:h-[520px] lg:h-[540px]",
-        tone
+        tone,
       )}
     >
       <div className="flex h-[190px] shrink-0 flex-col px-7 pb-5 pt-8 sm:h-[200px] sm:px-8 sm:pt-9 lg:h-[210px] lg:px-9">
         <h3 className="font-heading text-[22px] font-bold leading-tight text-[var(--gym-ink)] sm:text-[26px] lg:text-[28px]">
-          {t(item.titleKey)}
+          {item.title}
         </h3>
         <p className="mt-4 line-clamp-4 text-[16px] leading-[1.6] text-[var(--gym-muted)] sm:mt-5 sm:text-[17px] lg:text-[18px]">
-          {t(item.bodyKey)}
+          {item.body}
         </p>
       </div>
 
       <div className="relative min-h-0 w-full flex-1 overflow-hidden rounded-t-[16px]">
         <img
           src={item.image}
-          alt={t(item.imageAltKey)}
+          alt={item.imageAlt}
           className={cn(
             "absolute inset-0 size-full object-cover object-center",
-            // Hover zoom only on fine pointers — avoids sticky hover jank on touch
             "transition-transform duration-[850ms] ease-out will-change-transform",
-            "[@media(hover:hover)_and_(pointer:fine)]:group-hover/card:scale-[1.07]"
+            "[@media(hover:hover)_and_(pointer:fine)]:group-hover/card:scale-[1.07]",
           )}
           loading="lazy"
           decoding="async"
           draggable={false}
         />
-        <Link
-          to={APP_ROUTES.public.services}
-          aria-label={t("dreams.openItem", { title: t(item.titleKey) })}
+        <span
+          aria-hidden
           className={cn(
-            "absolute bottom-5 end-5 z-10 inline-flex size-12 items-center justify-center rounded-full sm:bottom-6 sm:end-6",
+            "pointer-events-none absolute bottom-5 end-5 z-10 inline-flex size-12 items-center justify-center rounded-full sm:bottom-6 sm:end-6",
             "bg-white text-[var(--gym-ink)] shadow-[0_6px_16px_rgba(0,0,0,0.12)]",
             "transition-colors duration-[450ms] ease-out",
             "[@media(hover:hover)_and_(pointer:fine)]:group-hover/card:bg-[var(--gym-lime)] [@media(hover:hover)_and_(pointer:fine)]:group-hover/card:text-white",
-            "active:scale-95"
           )}
         >
           <ArrowRight
@@ -170,20 +180,54 @@ function DreamCardView({ item, tone }: { item: DreamCard; tone: string }) {
               "transition-transform duration-[450ms] ease-out",
               isRtl
                 ? "-rotate-[135deg] [@media(hover:hover)_and_(pointer:fine)]:group-hover/card:-rotate-180"
-                : "-rotate-45 [@media(hover:hover)_and_(pointer:fine)]:group-hover/card:rotate-0"
+                : "-rotate-45 [@media(hover:hover)_and_(pointer:fine)]:group-hover/card:rotate-0",
             )}
             size={18}
             strokeWidth={1.75}
           />
-        </Link>
+        </span>
       </div>
     </article>
   )
 }
 
+function DreamCardsSkeleton() {
+  return (
+    <div dir="ltr" className="flex gap-8 sm:gap-10 lg:gap-12" aria-hidden>
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          className={cn(
+            "shrink-0",
+            "w-full",
+            "sm:w-[calc((100%-2.5rem)/2)]",
+            "lg:w-[calc((100%-6rem)/3)]",
+            i > 0 && "hidden sm:block",
+            i > 1 && "sm:hidden lg:block",
+          )}
+        >
+          <div
+            className={cn(
+              "flex h-[500px] flex-col overflow-hidden rounded-[16px] sm:h-[520px] lg:h-[540px]",
+              CARD_TONES[i % 2],
+            )}
+          >
+            <div className="flex h-[190px] flex-col gap-3 px-7 pt-8 sm:h-[200px] sm:px-8 lg:h-[210px]">
+              <div className="h-7 w-2/3 animate-pulse rounded-lg bg-black/10" />
+              <div className="h-4 w-full animate-pulse rounded-md bg-black/8" />
+              <div className="h-4 w-5/6 animate-pulse rounded-md bg-black/8" />
+            </div>
+            <div className="min-h-0 flex-1 animate-pulse rounded-t-[16px] bg-black/10" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function FitnessDreamSection() {
   const { t } = useTranslation()
-  const { isRtl } = useLocale()
+  const { locale } = useLocale()
   const viewportRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
   const x = useMotionValue(0)
@@ -193,6 +237,39 @@ export function FitnessDreamSection() {
   const [index, setIndex] = useState(0)
   const [maxIndex, setMaxIndex] = useState(0)
   const [dragBounds, setDragBounds] = useState({ left: 0, right: 0 })
+
+  const {
+    data: cmsCards = [],
+    isPending,
+    isFetched,
+    isError,
+  } = useFitnessDreamCardsQuery({ audience: "public" })
+
+  const hasCmsCards = cmsCards.length > 0
+  const useStaticFallback = isFetched && (isError || !hasCmsCards)
+  const awaitingCms = isPending && !hasCmsCards
+
+  const items = useMemo<DreamCardViewModel[]>(() => {
+    if (hasCmsCards && !useStaticFallback) {
+      return cmsCards.map((card) => ({
+        id: card.id,
+        title: resolveBilingualText(card.title, locale),
+        body: resolveBilingualText(card.description, locale),
+        image: card.imageUrl,
+        imageAlt: resolveBilingualText(card.imageAlt, locale),
+      }))
+    }
+    if (useStaticFallback) {
+      return STATIC_DREAMS.map((item) => ({
+        id: item.id,
+        title: t(item.titleKey),
+        body: t(item.bodyKey),
+        image: item.image,
+        imageAlt: t(item.imageAltKey),
+      }))
+    }
+    return []
+  }, [cmsCards, hasCmsCards, locale, t, useStaticFallback])
 
   const slideTo = useCallback(
     (next: number) => {
@@ -204,13 +281,14 @@ export function FitnessDreamSection() {
       setIndex(clamped)
 
       animRef.current?.stop()
+      // Track is always dir=ltr — same math as English: next slides left (−x).
       animRef.current = animate(
         x,
         -Math.min(clamped * step, maxOffset),
-        SLIDE
+        SLIDE,
       )
     },
-    [x]
+    [x],
   )
 
   const measure = useCallback(() => {
@@ -246,11 +324,14 @@ export function FitnessDreamSection() {
       setIndex(clamped)
     }
 
-    // Snap without fighting an in-flight user slide
     x.set(-Math.min(clamped * nextStep, nextMaxOffset))
   }, [x])
 
   useLayoutEffect(() => {
+    // Locale switch: snap back so EN/AR start from the first card.
+    indexRef.current = 0
+    setIndex(0)
+    x.set(0)
     measure()
     const viewport = viewportRef.current
     if (!viewport) return
@@ -271,7 +352,7 @@ export function FitnessDreamSection() {
       ro.disconnect()
       window.removeEventListener("resize", schedule)
     }
-  }, [measure])
+  }, [measure, items.length, locale, x])
 
   const onDragStart = () => {
     animRef.current?.stop()
@@ -288,38 +369,29 @@ export function FitnessDreamSection() {
     let next = current
     if (swipe < -48 || flick < -500) next = current + 1
     else if (swipe > 48 || flick > 500) next = current - 1
-    else {
-      next = Math.round(-x.get() / step)
-    }
+    else next = Math.round(-x.get() / step)
 
     slideTo(next)
   }
 
+  // Same control model as English: ← previous, → next (track is dir=ltr).
   const navButtons = (
-    <>
+    <div dir="ltr" className="flex items-center gap-3 md:gap-3.5">
       <NavButton
         label={t("dreams.prev")}
-        disabled={index <= 0}
+        disabled={index <= 0 || awaitingCms}
         onClick={() => slideTo(indexRef.current - 1)}
       >
-        {isRtl ? (
-          <ArrowRight className="size-6" strokeWidth={2.25} />
-        ) : (
-          <ArrowLeft className="size-6" strokeWidth={2.25} />
-        )}
+        <ArrowLeft className="size-6" strokeWidth={2.25} />
       </NavButton>
       <NavButton
         label={t("dreams.next")}
-        disabled={index >= maxIndex}
+        disabled={index >= maxIndex || awaitingCms}
         onClick={() => slideTo(indexRef.current + 1)}
       >
-        {isRtl ? (
-          <ArrowLeft className="size-6" strokeWidth={2.25} />
-        ) : (
-          <ArrowRight className="size-6" strokeWidth={2.25} />
-        )}
+        <ArrowRight className="size-6" strokeWidth={2.25} />
       </NavButton>
-    </>
+    </div>
   )
 
   return (
@@ -327,49 +399,54 @@ export function FitnessDreamSection() {
       id="services"
       className="w-full scroll-mt-24 bg-white px-6 pb-14 pt-4 md:px-10 md:pb-20 md:pt-6 lg:px-14"
     >
-      {/* Mobile: title alone. md+: title + arrows top-right */}
       <div className="mb-6 flex items-start justify-between gap-4 md:mb-10">
         <h2 className="font-heading text-[30px] font-bold leading-[1.08] text-[var(--gym-ink)] sm:text-[36px] md:text-[42px] lg:text-[46px]">
           <span className="block">{t("dreams.titleLine1")}</span>
           <span className="block">{t("dreams.titleLine2")}</span>
         </h2>
 
-        <div className="hidden shrink-0 items-center gap-3 pt-1 md:flex md:gap-3.5">
-          {navButtons}
-        </div>
+        <div className="hidden shrink-0 pt-1 md:block">{navButtons}</div>
       </div>
 
-      <div ref={viewportRef} className="overflow-hidden touch-pan-y">
-        <motion.div
-          ref={trackRef}
-          style={{ x }}
-          className="flex gap-8 will-change-transform sm:gap-10 lg:gap-12"
-          drag="x"
-          dragConstraints={dragBounds}
-          dragElastic={0.08}
-          dragMomentum={false}
-          onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
-        >
-          {DREAMS.map((item, i) => (
-            <div
-              key={item.id}
-              data-dream-card
-              className={cn(
-                "shrink-0",
-                "w-full",
-                "sm:w-[calc((100%-2.5rem)/2)]",
-                "lg:w-[calc((100%-6rem)/3)]"
-              )}
-            >
-              <DreamCardView item={item} tone={CARD_TONES[i % 2]} />
-            </div>
-          ))}
-        </motion.div>
+      {/*
+        Keep the track LTR even on Arabic pages so slide direction, drag, and
+        ← / → controls match the English carousel exactly.
+      */}
+      <div ref={viewportRef} dir="ltr" className="overflow-hidden touch-pan-y">
+        {awaitingCms ? (
+          <DreamCardsSkeleton />
+        ) : (
+          <motion.div
+            ref={trackRef}
+            dir="ltr"
+            style={{ x }}
+            className="flex gap-8 will-change-transform sm:gap-10 lg:gap-12"
+            drag="x"
+            dragConstraints={dragBounds}
+            dragElastic={0.08}
+            dragMomentum={false}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
+          >
+            {items.map((item, i) => (
+              <div
+                key={item.id}
+                data-dream-card
+                className={cn(
+                  "shrink-0",
+                  "w-full",
+                  "sm:w-[calc((100%-2.5rem)/2)]",
+                  "lg:w-[calc((100%-6rem)/3)]",
+                )}
+              >
+                <DreamCardView item={item} tone={CARD_TONES[i % 2]} />
+              </div>
+            ))}
+          </motion.div>
+        )}
       </div>
 
-      {/* Mobile only: arrows centered under the card */}
-      <div className="mt-6 flex items-center justify-center gap-3 md:hidden">
+      <div className="mt-6 flex items-center justify-center md:hidden">
         {navButtons}
       </div>
     </section>

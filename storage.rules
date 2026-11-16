@@ -138,5 +138,113 @@ service firebase.storage {
           request.auth.token.role == 'subscriber')
       );
     }
+
+    // Public website home hero backgrounds — CDN-style public read for the landing page.
+    match /website/home/hero/{slideId}/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if hasPermission('content:manage')
+        && underLimit(8 * 1024 * 1024)
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if hasPermission('content:manage');
+    }
+
+    // Public trusted-partner logos for the home marquee.
+    match /website/home/trusted-partners/{logoId}/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if hasPermission('content:manage')
+        && underLimit(2 * 1024 * 1024)
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if hasPermission('content:manage');
+    }
+
+    // Public Who I Am section photo.
+    match /website/home/who-i-am/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if hasPermission('content:manage')
+        && underLimit(8 * 1024 * 1024)
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if hasPermission('content:manage');
+    }
+
+    // Public fitness-dream gallery card images.
+    match /website/home/fitness-dream/{cardId}/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if hasPermission('content:manage')
+        && underLimit(8 * 1024 * 1024)
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if hasPermission('content:manage');
+    }
+
+    // Public coaching-app banner mockup image.
+    match /website/home/coaching-app/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if hasPermission('content:manage')
+        && underLimit(8 * 1024 * 1024)
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if hasPermission('content:manage');
+    }
+
+    // Public mission / video banner clip.
+    match /website/home/video-banner/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if hasPermission('content:manage')
+        && underLimit(80 * 1024 * 1024)
+        && request.resource.contentType.matches('video/.*');
+      allow delete: if hasPermission('content:manage');
+    }
+
+    // Public testimonial avatars (6 fixed slots).
+    match /website/home/testimonials/{slotId}/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if hasPermission('content:manage')
+        && underLimit(4 * 1024 * 1024)
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if hasPermission('content:manage');
+    }
+
+    // Public goals-banner feature mockups (4 fixed tabs).
+    match /website/home/goals-banner/{tabId}/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if hasPermission('content:manage')
+        && underLimit(8 * 1024 * 1024)
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if hasPermission('content:manage');
+    }
+
+    // About page hero background.
+    match /website/about/hero/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if hasPermission('content:manage')
+        && underLimit(8 * 1024 * 1024)
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if hasPermission('content:manage');
+    }
+
+    // About page My Story photo.
+    match /website/about/my-story/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if hasPermission('content:manage')
+        && underLimit(8 * 1024 * 1024)
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if hasPermission('content:manage');
+    }
+
+    // About page closing CTA banner background.
+    match /website/about/closing-banner/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if hasPermission('content:manage')
+        && underLimit(8 * 1024 * 1024)
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if hasPermission('content:manage');
+    }
+
+    // Shared transformations gallery composites.
+    match /website/common/transformations/{itemId}/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if hasPermission('content:manage')
+        && underLimit(8 * 1024 * 1024)
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if hasPermission('content:manage');
+    }
   }
 }

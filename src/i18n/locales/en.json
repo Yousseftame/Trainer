@@ -5,8 +5,8 @@
     "comingSoon": "This section is ready for implementation."
   },
   "announcement": {
-    "message": "The Free Guide to Running a More Organized Personal Training Business",
-    "cta": "Download Here",
+    "message": "Ready to transform your body with personalized training & nutrition?",
+    "cta": "Contact us",
     "dismiss": "Dismiss announcement"
   },
   "nav": {
@@ -48,7 +48,28 @@
     "subscription": "My subscription",
     "profile": "Profile",
     "logout": "Log out",
-    "language": "Language"
+    "language": "Language",
+    "websiteContentNote": "Public website content",
+    "websiteHomeSection": "Home page",
+    "websiteHomeHero": "Hero section",
+    "websiteHomeTrustedPartners": "Trusted partners",
+    "websiteHomeWhoIAm": "Who I am",
+    "websiteHomeFitnessDream": "Fitness dream",
+    "websiteHomeCoachingApp": "Coaching app banner",
+    "websiteHomeVideoBanner": "Video banner",
+    "websiteHomeTestimonials": "Testimonials",
+    "websiteHomeGoalsBanner": "Goals banner",
+    "websiteAboutSection": "About page",
+    "websiteAboutHero": "About hero",
+    "websiteAboutMyStory": "My story",
+    "websiteAboutHowICoach": "How I coach",
+    "websiteAboutWhoIHelp": "Who I help",
+    "websiteAboutCertifications": "Certifications",
+    "websiteAboutClosingBanner": "Closing banner",
+    "websiteCommonSection": "Shared sections",
+    "websiteCommonFaq": "FAQ",
+    "websiteCommonTransformations": "Transformations gallery",
+    "websiteCommonFooter": "Footer"
   },
   "auth": {
     "loginTitle": "Log in",
@@ -153,6 +174,7 @@
   "pages": {
     "home": "Home",
     "about": "Coach profile",
+    "faq": "FAQ",
     "services": "Services & packages",
     "contact": "Contact",
     "adminOverview": "Admin overview",
@@ -167,6 +189,882 @@
     "access": {
       "noneTitle": "No module access yet",
       "noneHint": "Your staff account is signed in, but no dashboard modules are assigned. Ask the head coach to grant permissions for the pages you need."
+    },
+    "website": {
+      "stubBadge": "Website content",
+      "stubDescription": "This section editor is ready in the sidebar. We’ll build the content tools here next — nothing on the public site has changed yet.",
+      "sections": {
+        "homeHero": "Hero section",
+        "homeTrustedPartners": "Trusted partners",
+        "homeWhoIAm": "Who I am",
+        "homeFitnessDream": "What’s your fitness dream",
+        "homeCoachingApp": "Your coaching app, all in one place",
+        "homeVideoBanner": "Video banner",
+        "homeTestimonials": "Testimonials",
+        "homeGoalsBanner": "Goals banner",
+        "aboutHero": "About hero",
+        "aboutMyStory": "My story",
+        "aboutHowICoach": "How I coach",
+        "aboutWhoIHelp": "Who I help",
+        "aboutCertifications": "Certifications",
+        "aboutClosingBanner": "Closing banner",
+        "commonFaq": "FAQ",
+        "commonTransformations": "Transformations gallery",
+        "commonFooter": "Footer"
+      },
+      "homeHero": {
+        "description": "Manage the home page hero banners. Each banner keeps the same design — gradient, overlay, and layout — while you swap the background image and bilingual copy. Live banners slide as a loop on the public site.",
+        "search": "Search banners…",
+        "addBanner": "Add banner",
+        "addTitle": "Add hero banner",
+        "editTitle": "Edit hero banner",
+        "formHint": "Upload a background image and fill Arabic + English copy. Empty locale fields are mirrored from the other language on save. The button always links to #contact.",
+        "chooseImage": "Choose image",
+        "replaceImage": "Replace image",
+        "imageEmpty": "No background selected",
+        "imageHint": "JPG, PNG, or WebP up to {{limit}}. Gradient overlay stays fixed.",
+        "close": "Close",
+        "cancel": "Cancel",
+        "save": "Save banner",
+        "saving": "Saving…",
+        "edit": "Edit",
+        "delete": "Delete",
+        "hide": "Hide",
+        "show": "Show",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "untitled": "Untitled banner",
+        "loading": "Loading banners…",
+        "loadError": "Could not load hero banners. Check your connection and try again.",
+        "emptyTitle": "No hero banners yet",
+        "emptyDescription": "Add your first banner with a background image and bilingual copy. Until then, the public site keeps the built-in static hero.",
+        "emptyFiltered": "No banners match this filter.",
+        "deleteTitle": "Delete this banner?",
+        "deleteDescription": "The banner and its background image will be removed permanently from Storage. This cannot be undone.",
+        "stats": {
+          "total": "Banners",
+          "live": "Live on site",
+          "hidden": "Hidden",
+          "cta": "CTA target"
+        },
+        "filter": {
+          "live": "Live",
+          "hidden": "Hidden"
+        },
+        "status": {
+          "live": "Live",
+          "hidden": "Hidden"
+        },
+        "fields": {
+          "image": "Background image",
+          "enabled": "Show this banner on the public home page",
+          "greeting": "Greeting",
+          "titleBefore": "Title (before accent)",
+          "titleAccent": "Title accent",
+          "titleAfter": "Title (after accent)",
+          "description": "Description",
+          "cta": "Button label",
+          "watermark": "Watermark"
+        },
+        "errors": {
+          "requiredFields": "Fill every text field in at least one language (EN or AR).",
+          "imageRequired": "Please choose a background image for this banner.",
+          "imageTooLarge": "Image exceeds the {{limit}} limit.",
+          "imageType": "Only image files are allowed.",
+          "saveFailed": "Could not save the banner. Try again."
+        },
+        "toasts": {
+          "saved": "Hero banner saved",
+          "deleted": "Hero banner deleted",
+          "shown": "Banner is now live",
+          "hidden": "Banner hidden from the site",
+          "error": "Something went wrong"
+        }
+      },
+      "trustedPartners": {
+        "countTitle": "Coaches count",
+        "countHint": "This number appears in “Trusted by over … coaches” on the home page — same value for English and Arabic.",
+        "saveCount": "Save count",
+        "search": "Search logos…",
+        "addLogo": "Add logo",
+        "editLogo": "Edit logo",
+        "logoFormHint": "Upload a partner logo for the infinite marquee. Optional name is used for accessibility only.",
+        "chooseImage": "Choose image",
+        "replaceImage": "Replace image",
+        "imageEmpty": "No logo selected",
+        "imageHint": "PNG, SVG, JPG, or WebP up to {{limit}}.",
+        "close": "Close",
+        "cancel": "Cancel",
+        "save": "Save logo",
+        "saving": "Saving…",
+        "edit": "Edit",
+        "delete": "Delete",
+        "hide": "Hide",
+        "show": "Show",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "unnamed": "Untitled logo",
+        "loading": "Loading trusted partners…",
+        "loadError": "Could not load trusted partners. Check your connection and try again.",
+        "emptyDescription": "Add partner logos for the home marquee. Until then, the public site keeps the built-in placeholder logos.",
+        "emptyFiltered": "No logos match this filter.",
+        "deleteTitle": "Delete this logo?",
+        "deleteDescription": "The logo file will be removed permanently from Storage. This cannot be undone.",
+        "stats": {
+          "logos": "Logos",
+          "live": "Live on site",
+          "hidden": "Hidden",
+          "count": "Coaches count"
+        },
+        "filter": {
+          "live": "Live",
+          "hidden": "Hidden"
+        },
+        "status": {
+          "live": "Live",
+          "hidden": "Hidden"
+        },
+        "fields": {
+          "count": "Displayed number",
+          "logo": "Logo image",
+          "enabled": "Show this logo in the marquee",
+          "name": "Partner name"
+        },
+        "errors": {
+          "countRequired": "Enter the coaches count.",
+          "imageRequired": "Please choose a logo image.",
+          "imageTooLarge": "Image exceeds the {{limit}} limit.",
+          "imageType": "Only image files are allowed.",
+          "saveFailed": "Could not save. Try again."
+        },
+        "toasts": {
+          "countSaved": "Coaches count saved",
+          "logoSaved": "Partner logo saved",
+          "deleted": "Partner logo deleted",
+          "shown": "Logo is now live",
+          "hidden": "Logo hidden from the site",
+          "error": "Something went wrong"
+        }
+      },
+      "whoIAm": {
+        "preview": "Live preview",
+        "leftTitle": "Photo & experience badge",
+        "leftHint": "Upload the left image and set the big number + label that sit on top of it.",
+        "rightTitle": "Copy & points",
+        "rightHint": "All right-side text is bilingual. Empty locale is mirrored on save. The button still links to the About page.",
+        "chooseImage": "Choose image",
+        "replaceImage": "Replace image",
+        "removeImage": "Remove image",
+        "imageEmpty": "No photo yet — public site keeps the default image",
+        "imageHint": "JPG, PNG, or WebP up to {{limit}}.",
+        "pointsTitle": "Points list",
+        "addPoint": "Add point",
+        "deletePoint": "Delete point",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "save": "Save section",
+        "saving": "Saving…",
+        "loading": "Loading Who I Am…",
+        "loadError": "Could not load Who I Am. Check your connection and try again.",
+        "clearImageTitle": "Remove this photo?",
+        "clearImageDescription": "The photo will be deleted from Storage. The public site will fall back to the default image until you upload a new one.",
+        "stats": {
+          "points": "Points",
+          "years": "Experience badge",
+          "photo": "Photo",
+          "photoSet": "Uploaded",
+          "photoMissing": "Default"
+        },
+        "fields": {
+          "yearsValue": "Experience number",
+          "yearsLabel": "Experience label",
+          "eyebrow": "Section title",
+          "titleLine1": "Headline line 1",
+          "titleLine2": "Headline line 2",
+          "body": "Description",
+          "cta": "Button label",
+          "pointsTitle": "Points heading",
+          "point": "Point text"
+        },
+        "errors": {
+          "requiredField": "{{field}} is required in at least one language.",
+          "pointRequired": "Each point needs text in at least one language.",
+          "pointsEmpty": "Add at least one point.",
+          "imageTooLarge": "Image exceeds the {{limit}} limit."
+        },
+        "toasts": {
+          "saved": "Who I Am section saved",
+          "imageRemoved": "Photo removed",
+          "error": "Something went wrong"
+        }
+      },
+      "fitnessDream": {
+        "search": "Search dream cards…",
+        "addCard": "Add card",
+        "addTitle": "Add fitness dream card",
+        "editTitle": "Edit fitness dream card",
+        "formHint": "Upload the card image and fill Arabic + English title, description, and image alt. Empty locale fields are mirrored on save. The corner arrow is decorative only.",
+        "chooseImage": "Choose image",
+        "replaceImage": "Replace image",
+        "imageEmpty": "No image selected",
+        "imageHint": "JPG, PNG, or WebP up to {{limit}}.",
+        "close": "Close",
+        "cancel": "Cancel",
+        "save": "Save card",
+        "saving": "Saving…",
+        "edit": "Edit",
+        "delete": "Delete",
+        "hide": "Hide",
+        "show": "Show",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "untitled": "Untitled card",
+        "loading": "Loading dream cards…",
+        "loadError": "Could not load fitness dream cards. Check your connection and try again.",
+        "emptyDescription": "Add gallery cards with an image, title, and description. Until then, the public site keeps the built-in static cards.",
+        "emptyFiltered": "No cards match this filter.",
+        "deleteTitle": "Delete this card?",
+        "deleteDescription": "The card and its image will be removed permanently from Storage. This cannot be undone.",
+        "stats": {
+          "total": "Cards",
+          "live": "Live on site",
+          "hidden": "Hidden"
+        },
+        "filter": {
+          "live": "Live",
+          "hidden": "Hidden"
+        },
+        "status": {
+          "live": "Live",
+          "hidden": "Hidden"
+        },
+        "fields": {
+          "image": "Card image",
+          "enabled": "Show this card on the public home page",
+          "title": "Title",
+          "description": "Description",
+          "imageAlt": "Image alt text"
+        },
+        "errors": {
+          "requiredFields": "Fill title, description, and image alt in at least one language (EN or AR).",
+          "imageRequired": "Please choose an image for this card.",
+          "imageTooLarge": "Image exceeds the {{limit}} limit.",
+          "imageType": "Only image files are allowed.",
+          "saveFailed": "Could not save the card. Try again."
+        },
+        "toasts": {
+          "saved": "Fitness dream card saved",
+          "deleted": "Fitness dream card deleted",
+          "shown": "Card is now live",
+          "hidden": "Card hidden from the site",
+          "error": "Something went wrong"
+        }
+      },
+      "coachingApp": {
+        "editorTitle": "Banner content",
+        "editorHint": "Set the headline, device mockup image, and supporting description. Empty locale fields are mirrored on save.",
+        "preview": "Live preview",
+        "previewHint": "Matches the public coaching-app banner layout.",
+        "previewNoImage": "Default image will show until you upload one",
+        "chooseImage": "Choose image",
+        "replaceImage": "Replace image",
+        "removeImage": "Remove image",
+        "imageEmpty": "No mockup yet — public site keeps the default devices image",
+        "imageHint": "PNG, JPG, or WebP up to {{limit}}. Transparent PNG works best.",
+        "untitled": "Untitled banner",
+        "save": "Save banner",
+        "saving": "Saving…",
+        "loading": "Loading coaching app banner…",
+        "loadError": "Could not load the coaching app banner. Check your connection and try again.",
+        "clearImageTitle": "Remove this image?",
+        "clearImageDescription": "The mockup will be deleted from Storage. The public site will fall back to the default image until you upload a new one.",
+        "stats": {
+          "section": "Section",
+          "banner": "Banner",
+          "photo": "Mockup",
+          "photoSet": "Uploaded",
+          "photoMissing": "Default",
+          "fields": "Fields"
+        },
+        "fields": {
+          "image": "Device mockup image",
+          "title": "Headline",
+          "description": "Description",
+          "imageAlt": "Image alt text"
+        },
+        "errors": {
+          "requiredFields": "Fill headline, description, and image alt in at least one language (EN or AR).",
+          "imageTooLarge": "Image exceeds the {{limit}} limit.",
+          "imageType": "Only image files are allowed.",
+          "saveFailed": "Could not save the banner. Try again."
+        },
+        "toasts": {
+          "saved": "Coaching app banner saved",
+          "imageRemoved": "Mockup image removed",
+          "error": "Something went wrong"
+        }
+      },
+      "videoBanner": {
+        "editorTitle": "Banner content",
+        "editorHint": "Upload the autoplay video, set the headline and name, and control each social link (including TikTok). The marquee watermark stays static.",
+        "preview": "Live preview",
+        "previewHint": "Matches the public video banner layout. Marquee text is fixed.",
+        "chooseVideo": "Choose video",
+        "replaceVideo": "Replace video",
+        "removeVideo": "Remove video",
+        "videoEmpty": "No video yet — public site keeps the default clip",
+        "videoHint": "MP4 or WebM up to {{limit}}. Keep it muted-friendly for autoplay.",
+        "untitled": "Untitled headline",
+        "show": "Show",
+        "hide": "Hide",
+        "noSocials": "All socials hidden",
+        "socialsHint": "Toggle visibility per network. Empty URLs still show the icon when enabled (use a real link when ready).",
+        "save": "Save banner",
+        "saving": "Saving…",
+        "loading": "Loading video banner…",
+        "loadError": "Could not load the video banner. Check your connection and try again.",
+        "clearVideoTitle": "Remove this video?",
+        "clearVideoDescription": "The video will be deleted from Storage. The public site will fall back to the default clip until you upload a new one.",
+        "stats": {
+          "video": "Video",
+          "videoSet": "Uploaded",
+          "videoMissing": "Default",
+          "socials": "Visible socials",
+          "networks": "Networks"
+        },
+        "fields": {
+          "video": "Autoplay video",
+          "headline": "Headline",
+          "author": "Name",
+          "socials": "Social links"
+        },
+        "errors": {
+          "requiredFields": "Fill headline and name in at least one language (EN or AR).",
+          "videoTooLarge": "Video exceeds the {{limit}} limit.",
+          "videoType": "Only video files are allowed.",
+          "saveFailed": "Could not save the banner. Try again."
+        },
+        "toasts": {
+          "saved": "Video banner saved",
+          "videoRemoved": "Video removed",
+          "error": "Something went wrong"
+        }
+      },
+      "testimonials": {
+        "editorTitle": "Six client slots",
+        "editorHint": "The home design shows exactly six portraits. Fill each slot with a photo, title, description, and name (EN + AR). Empty locale fields are mirrored on save. Unfilled slots keep the built-in static testimonials on the public site.",
+        "slotLabel": "Slot {{n}}",
+        "addTitle": "Add testimonial",
+        "editTitle": "Edit testimonial",
+        "formHint": "Portrait, quote title, description, and client name.",
+        "chooseImage": "Choose photo",
+        "replaceImage": "Replace photo",
+        "imageHint": "Square portrait works best. JPG, PNG, or WebP up to {{limit}}.",
+        "fillSlot": "Fill slot",
+        "edit": "Edit",
+        "delete": "Delete",
+        "close": "Close",
+        "cancel": "Cancel",
+        "save": "Save testimonial",
+        "saving": "Saving…",
+        "untitled": "Untitled testimonial",
+        "emptyTitle": "Empty slot",
+        "emptyHint": "No CMS entry yet — public site keeps the static quote for this position.",
+        "loading": "Loading testimonials…",
+        "loadError": "Could not load testimonials. Check your connection and try again.",
+        "deleteTitle": "Clear this slot?",
+        "deleteDescription": "The testimonial and its portrait will be removed from Storage. The public site will fall back to the static quote for this slot.",
+        "stats": {
+          "slots": "Designed slots",
+          "filled": "Filled",
+          "empty": "Empty"
+        },
+        "status": {
+          "filled": "Live",
+          "empty": "Empty"
+        },
+        "fields": {
+          "image": "Portrait",
+          "title": "Title",
+          "body": "Description",
+          "author": "Name"
+        },
+        "errors": {
+          "requiredFields": "Fill title, description, and name in at least one language (EN or AR).",
+          "imageRequired": "Please choose a portrait photo for this slot.",
+          "imageTooLarge": "Image exceeds the {{limit}} limit.",
+          "imageType": "Only image files are allowed.",
+          "saveFailed": "Could not save the testimonial. Try again."
+        },
+        "toasts": {
+          "saved": "Testimonial saved",
+          "deleted": "Testimonial slot cleared",
+          "error": "Something went wrong"
+        }
+      },
+      "goalsBanner": {
+        "sectionTitle": "Section headline",
+        "sectionHint": "This is the large title above the four feature categories on the public Goals banner.",
+        "tabsTitle": "Four feature categories",
+        "tabsHint": "The design always shows exactly four tabs. Edit each category’s pill label, title, description, button text, and mockup image. Every button links to the contact section.",
+        "tabLabel": "Category {{n}}",
+        "editTabTitle": "Edit category",
+        "formHint": "Label, title, description, CTA, and mockup. Empty locale fields are mirrored on save.",
+        "ctaHint": "Button always opens the contact section on the public site.",
+        "chooseImage": "Choose image",
+        "replaceImage": "Replace image",
+        "removeImage": "Remove image",
+        "imageEmpty": "Default mockup will show until you upload one",
+        "imageHint": "PNG, JPG, or WebP up to {{limit}}. Transparent PNGs work well for product mockups.",
+        "edit": "Edit",
+        "close": "Close",
+        "cancel": "Cancel",
+        "saveTitle": "Save headline",
+        "saveTab": "Save category",
+        "saving": "Saving…",
+        "untitled": "Untitled category",
+        "loading": "Loading goals banner…",
+        "loadError": "Could not load the goals banner. Check your connection and try again.",
+        "clearImageTitle": "Remove this mockup?",
+        "clearImageDescription": "The image will be deleted from Storage. The public site will fall back to the default mockup for this category.",
+        "stats": {
+          "tabs": "Categories",
+          "images": "Custom images",
+          "defaultImages": "Using default"
+        },
+        "status": {
+          "imageSet": "Custom image",
+          "defaultImage": "Default image"
+        },
+        "fields": {
+          "sectionTitle": "Section headline",
+          "tabLabel": "Category label",
+          "title": "Title",
+          "description": "Description",
+          "cta": "Button label",
+          "image": "Mockup image",
+          "imageAlt": "Image alt text"
+        },
+        "errors": {
+          "titleRequired": "Fill the section headline in at least one language (EN or AR).",
+          "requiredFields": "Fill category label, title, description, button, and image alt in at least one language (EN or AR).",
+          "imageTooLarge": "Image exceeds the {{limit}} limit.",
+          "imageType": "Only image files are allowed.",
+          "saveFailed": "Could not save. Try again."
+        },
+        "toasts": {
+          "titleSaved": "Section headline saved",
+          "tabSaved": "Category saved",
+          "imageRemoved": "Mockup image removed",
+          "error": "Something went wrong"
+        }
+      },
+      "aboutHero": {
+        "editorTitle": "About hero content",
+        "editorHint": "Edit the coach name, tagline, both description paragraphs, experience stat, the block beside it, and hero photo. Eyebrow, role line, and “Meet your coach” stay static on the public page.",
+        "preview": "Live preview",
+        "previewHint": "Matches the About page hero layout. Static labels stay as on the site.",
+        "chooseImage": "Choose image",
+        "replaceImage": "Replace image",
+        "removeImage": "Remove image",
+        "imageEmpty": "Default photo will show until you upload one",
+        "imageHint": "JPG, PNG, or WebP up to {{limit}}. Wide gym photos work best.",
+        "untitled": "Untitled name",
+        "save": "Save hero",
+        "saving": "Saving…",
+        "loading": "Loading about hero…",
+        "loadError": "Could not load the about hero. Check your connection and try again.",
+        "clearImageTitle": "Remove this photo?",
+        "clearImageDescription": "The hero image will be deleted from Storage. The public About page will fall back to the default photo until you upload a new one.",
+        "stats": {
+          "section": "Section",
+          "hero": "About hero",
+          "photo": "Photo",
+          "photoSet": "Uploaded",
+          "photoMissing": "Default",
+          "fields": "Copy fields"
+        },
+        "fields": {
+          "image": "Hero photo",
+          "name": "Name",
+          "headline": "Tagline",
+          "lead": "Description (1)",
+          "leadSecondary": "Description (2)",
+          "yearsValue": "Stat number",
+          "yearsLabel": "Stat label",
+          "metaTitle": "Meta title (beside stat)",
+          "metaBody": "Meta description (beside stat)",
+          "imageAlt": "Image alt text"
+        },
+        "errors": {
+          "requiredFields": "Fill name, tagline, both descriptions, stat number, stat label, meta title, meta description, and image alt in at least one language (EN or AR).",
+          "imageTooLarge": "Image exceeds the {{limit}} limit.",
+          "imageType": "Only image files are allowed.",
+          "saveFailed": "Could not save the about hero. Try again."
+        },
+        "toasts": {
+          "saved": "About hero saved",
+          "imageRemoved": "Hero photo removed",
+          "error": "Something went wrong"
+        }
+      },
+      "aboutMyStory": {
+        "editorTitle": "My story content",
+        "editorHint": "Edit the large faded watermark (like 14+), the story photo, and up to 5 numbered points. The “My story” eyebrow and section title stay static on the public page.",
+        "preview": "Live preview",
+        "pointsTitle": "Story points",
+        "pointsHint": "Add, reorder, or remove points. Maximum {{max}}.",
+        "addPoint": "Add point",
+        "deletePoint": "Delete point",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "chooseImage": "Choose image",
+        "replaceImage": "Replace image",
+        "removeImage": "Remove image",
+        "imageEmpty": "Default photo will show until you upload one",
+        "imageHint": "JPG, PNG, or WebP up to {{limit}}. Portrait photos work best.",
+        "save": "Save story",
+        "saving": "Saving…",
+        "loading": "Loading my story…",
+        "loadError": "Could not load My story. Check your connection and try again.",
+        "clearImageTitle": "Remove this photo?",
+        "clearImageDescription": "The story image will be deleted from Storage. The public About page will fall back to the default photo until you upload a new one.",
+        "stats": {
+          "points": "Points",
+          "watermark": "Watermark",
+          "photo": "Photo",
+          "photoSet": "Uploaded",
+          "photoMissing": "Default"
+        },
+        "fields": {
+          "watermark": "Large watermark",
+          "imageAlt": "Image alt text",
+          "point": "Point text"
+        },
+        "errors": {
+          "requiredField": "{{field}} is required in at least one language.",
+          "pointRequired": "Each point needs text in at least one language (EN or AR).",
+          "pointsEmpty": "Add at least one story point.",
+          "pointsMax": "You can add up to {{max}} points only.",
+          "imageTooLarge": "Image exceeds the {{limit}} limit.",
+          "imageType": "Only image files are allowed."
+        },
+        "toasts": {
+          "saved": "My story saved",
+          "imageRemoved": "Story photo removed",
+          "error": "Something went wrong"
+        }
+      },
+      "aboutHowICoach": {
+        "headerTitle": "Section headline",
+        "headerHint": "Edit the main title and supporting description above the three pillar cards. The “How I coach” eyebrow stays static.",
+        "cardsTitle": "Three pillar cards",
+        "cardsHint": "The design always shows exactly three cards. Edit each card’s title and description. Numbers stay automatic (01–03).",
+        "cardLabel": "Card {{n}}",
+        "editCardTitle": "Edit pillar card",
+        "edit": "Edit",
+        "close": "Close",
+        "cancel": "Cancel",
+        "saveHeader": "Save headline",
+        "saveCard": "Save card",
+        "saving": "Saving…",
+        "untitled": "Untitled card",
+        "loading": "Loading How I coach…",
+        "loadError": "Could not load How I coach. Check your connection and try again.",
+        "stats": {
+          "section": "Section",
+          "pillars": "How I coach",
+          "cards": "Cards",
+          "headerFields": "Headline fields"
+        },
+        "fields": {
+          "title": "Title",
+          "subtitle": "Description",
+          "cardTitle": "Card title",
+          "cardBody": "Card description"
+        },
+        "errors": {
+          "headerRequired": "Fill title and description in at least one language (EN or AR).",
+          "cardRequired": "Fill card title and description in at least one language (EN or AR).",
+          "saveFailed": "Could not save. Try again."
+        },
+        "toasts": {
+          "headerSaved": "Headline saved",
+          "cardSaved": "Card saved",
+          "error": "Something went wrong"
+        }
+      },
+      "aboutWhoIHelp": {
+        "editorTitle": "Who I help content",
+        "editorHint": "Edit the section title and the four fixed audience points. The “Who I help” eyebrow stays static. Numbers stay automatic (01–04).",
+        "preview": "Live preview",
+        "pointsTitle": "Four audience points",
+        "save": "Save Who I help",
+        "saving": "Saving…",
+        "loading": "Loading Who I help…",
+        "loadError": "Could not load Who I help. Check your connection and try again.",
+        "stats": {
+          "section": "Section",
+          "label": "Who I help",
+          "points": "Points",
+          "title": "Title"
+        },
+        "fields": {
+          "title": "Title",
+          "point": "Point text"
+        },
+        "errors": {
+          "titleRequired": "Fill the title in at least one language (EN or AR).",
+          "pointRequired": "Each of the four points needs text in at least one language (EN or AR)."
+        },
+        "toasts": {
+          "saved": "Who I help saved",
+          "error": "Something went wrong"
+        }
+      },
+      "aboutCertifications": {
+        "editorTitle": "Certifications content",
+        "editorHint": "Edit the credentials title and checklist points. Add up to 6 points. The “Certifications” eyebrow stays static.",
+        "preview": "Live preview",
+        "pointsTitle": "Credential points",
+        "pointsHint": "Add, reorder, or remove points. Maximum {{max}}.",
+        "addPoint": "Add point",
+        "deletePoint": "Delete point",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "save": "Save certifications",
+        "saving": "Saving…",
+        "loading": "Loading certifications…",
+        "loadError": "Could not load certifications. Check your connection and try again.",
+        "stats": {
+          "section": "Section",
+          "label": "Certifications",
+          "points": "Points",
+          "title": "Title"
+        },
+        "fields": {
+          "title": "Title",
+          "point": "Point text"
+        },
+        "errors": {
+          "titleRequired": "Fill the title in at least one language (EN or AR).",
+          "pointRequired": "Each point needs text in at least one language (EN or AR).",
+          "pointsEmpty": "Add at least one certification point.",
+          "pointsMax": "You can add up to {{max}} points only."
+        },
+        "toasts": {
+          "saved": "Certifications saved",
+          "error": "Something went wrong"
+        }
+      },
+      "aboutClosingBanner": {
+        "editorTitle": "Closing banner content",
+        "editorHint": "Edit the background photo, headline, description, button label, and button link. Gradients and overlay stay fixed like the public About page.",
+        "preview": "Live preview",
+        "previewHint": "Matches the About closing banner layout. Overlay stays as on the site.",
+        "chooseImage": "Choose image",
+        "replaceImage": "Replace image",
+        "removeImage": "Remove image",
+        "imageEmpty": "Default photo will show until you upload one",
+        "imageHint": "JPG, PNG, or WebP up to {{limit}}. Wide gym photos work best.",
+        "hrefHint": "Use an in-app path like /#contact, or a full https:// link.",
+        "save": "Save banner",
+        "saving": "Saving…",
+        "loading": "Loading closing banner…",
+        "loadError": "Could not load the closing banner. Check your connection and try again.",
+        "clearImageTitle": "Remove this photo?",
+        "clearImageDescription": "The banner image will be deleted from Storage. The public About page will fall back to the default photo until you upload a new one.",
+        "stats": {
+          "section": "Section",
+          "label": "Closing banner",
+          "photo": "Photo",
+          "photoSet": "Uploaded",
+          "photoMissing": "Default",
+          "link": "Button link"
+        },
+        "fields": {
+          "image": "Background image",
+          "title": "Headline",
+          "body": "Description",
+          "ctaLabel": "Button label",
+          "ctaHref": "Button link",
+          "imageAlt": "Image alt text"
+        },
+        "errors": {
+          "requiredFields": "Fill headline, description, button label, and image alt in at least one language (EN or AR).",
+          "hrefRequired": "Button link is required.",
+          "imageTooLarge": "Image exceeds the {{limit}} limit.",
+          "imageType": "Only image files are allowed.",
+          "saveFailed": "Could not save the closing banner. Try again."
+        },
+        "toasts": {
+          "saved": "Closing banner saved",
+          "imageRemoved": "Banner photo removed",
+          "error": "Something went wrong"
+        }
+      },
+      "commonFaq": {
+        "listTitle": "FAQ questions",
+        "listHint": "Manage every question for the FAQ page. Star up to {{max}} to show them in the home FAQ section.",
+        "search": "Search questions…",
+        "add": "Add question",
+        "addTitle": "Add FAQ question",
+        "editTitle": "Edit FAQ question",
+        "formHint": "Fill Arabic + English question and answer. Star up to {{max}} items to show them in the home FAQ section — every question still appears on the FAQ page.",
+        "close": "Close",
+        "cancel": "Cancel",
+        "save": "Save question",
+        "saving": "Saving…",
+        "edit": "Edit",
+        "delete": "Delete",
+        "feature": "Show on home section",
+        "unfeature": "Remove from home section",
+        "featuredOn": "Featured on home",
+        "featuredOff": "Page only",
+        "featuredHint": "Home section slots: {{count}} / {{max}}",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "untitled": "Untitled question",
+        "loading": "Loading FAQ…",
+        "loadError": "Could not load FAQ questions. Check your connection and try again.",
+        "emptyTitle": "No FAQ questions yet",
+        "emptyDescription": "Add your first question. Until then, the public site keeps the built-in FAQ copy.",
+        "emptyFiltered": "No questions match this filter.",
+        "deleteTitle": "Delete this question?",
+        "deleteDescription": "This FAQ item will be removed from the home section and the FAQ page. This cannot be undone.",
+        "stats": {
+          "total": "Questions",
+          "featured": "On home section",
+          "pageOnly": "Page only"
+        },
+        "filter": {
+          "all": "All",
+          "featured": "Home",
+          "pageOnly": "Page only"
+        },
+        "badge": {
+          "featured": "Home",
+          "pageOnly": "Page"
+        },
+        "fields": {
+          "question": "Question",
+          "answer": "Answer"
+        },
+        "errors": {
+          "required": "Fill question and answer in at least one language (EN or AR).",
+          "featuredMax": "You can feature up to {{max}} questions on the home FAQ section."
+        },
+        "toasts": {
+          "saved": "FAQ question saved",
+          "deleted": "FAQ question deleted",
+          "featuredOn": "Shown on home FAQ section",
+          "featuredOff": "Removed from home FAQ section",
+          "error": "Something went wrong"
+        }
+      },
+      "commonTransformations": {
+        "search": "Search transformations…",
+        "add": "Add transformation",
+        "addTitle": "Add transformation",
+        "editTitle": "Edit transformation",
+        "formHint": "Upload a before/after composite image and fill name + short description. Optional date shows in the full-screen view. Choose top or bottom loop for the marquee row.",
+        "listHint": "Top loop scrolls one way, bottom the other — same dual marquee on the public site. Reorder within a loop; switch loop anytime.",
+        "chooseImage": "Choose image",
+        "replaceImage": "Replace image",
+        "imageEmpty": "No image selected",
+        "imageHint": "JPG, PNG, WebP, or AVIF up to {{limit}}. Use a single before/after composite.",
+        "close": "Close",
+        "cancel": "Cancel",
+        "save": "Save transformation",
+        "saving": "Saving…",
+        "edit": "Edit",
+        "delete": "Delete",
+        "hide": "Hide",
+        "show": "Show",
+        "switchLoop": "Switch loop",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "untitled": "Untitled transformation",
+        "datePlaceholder": "March 2024",
+        "loading": "Loading transformations…",
+        "loadError": "Could not load transformations. Check your connection and try again.",
+        "emptyDescription": "Add gallery cards with a composite image, name, and description. Until then, the public site keeps the built-in static gallery.",
+        "emptyFiltered": "No transformations match this filter.",
+        "deleteTitle": "Delete this transformation?",
+        "deleteDescription": "The card and its image will be removed permanently from Storage. This cannot be undone.",
+        "stats": {
+          "total": "Cards",
+          "live": "Live on site",
+          "top": "Top loop",
+          "bottom": "Bottom loop"
+        },
+        "filter": {
+          "allLoops": "All loops",
+          "live": "Live",
+          "hidden": "Hidden"
+        },
+        "loop": {
+          "top": "Top loop",
+          "bottom": "Bottom loop"
+        },
+        "status": {
+          "live": "Live",
+          "hidden": "Hidden"
+        },
+        "fields": {
+          "name": "Name",
+          "description": "Description",
+          "date": "Transformation date",
+          "imageAlt": "Image alt text"
+        },
+        "errors": {
+          "required": "Fill name and description in at least one language (EN or AR).",
+          "imageRequired": "Please choose a before/after image for this card.",
+          "imageTooLarge": "Image exceeds the {{limit}} limit."
+        },
+        "toasts": {
+          "saved": "Transformation saved",
+          "deleted": "Transformation deleted",
+          "shown": "Transformation is now live",
+          "hidden": "Transformation hidden from the site",
+          "loopMoved": "Moved to {{loop}}",
+          "error": "Something went wrong"
+        }
+      },
+      "commonFooter": {
+        "editorTitle": "Footer contact",
+        "editorHint": "Update the public footer phone, email, and social icons. Hide any network you do not want shown. Empty URLs still show the icon when enabled — add a real link when ready.",
+        "preview": "Live preview",
+        "previewHint": "Matches the public footer contact + socials block.",
+        "previewLive": "Shown on every public page footer",
+        "noSocials": "All socials hidden",
+        "socialsHint": "Toggle visibility per network. Hidden icons never appear on the site.",
+        "phoneRawHint": "Used for the click-to-call link. Leave blank to derive from the display number.",
+        "show": "Show",
+        "hide": "Hide",
+        "save": "Save footer",
+        "saving": "Saving…",
+        "loading": "Loading footer…",
+        "loadError": "Could not load footer content. Check your connection and try again.",
+        "stats": {
+          "phone": "Phone",
+          "email": "Email",
+          "visible": "Visible socials",
+          "linked": "With URL",
+          "set": "Set",
+          "missing": "Missing"
+        },
+        "fields": {
+          "phone": "Phone (display)",
+          "phoneRaw": "Phone (tel link)",
+          "email": "Email",
+          "socials": "Social links"
+        },
+        "toasts": {
+          "saved": "Footer saved",
+          "error": "Something went wrong"
+        }
+      }
     },
     "common": {
       "all": "All",
@@ -782,7 +1680,7 @@
     "watermark": "Get Stronger"
   },
   "trust": {
-    "trustedBy": "Trusted by over <strong>380,000</strong> coaches",
+    "trustedBy": "Trusted by over <strong>{{count}}</strong> coaches",
     "logosLabel": "Trusted by leading fitness brands"
   },
   "secondHero": {
@@ -814,6 +1712,63 @@
       "nutrition": "Nutrition specialist",
       "strength": "Strength and conditioning coach",
       "trusted": "Trusted by hundreds"
+    }
+  },
+  "aboutPage": {
+    "backHome": "Back to home",
+    "eyebrow": "Coach profile",
+    "role": "Personal trainer · Strength coach",
+    "nameLabel": "Meet your coach",
+    "name": "Mike Vasquez",
+    "headline": "Strength, discipline, and habits that last beyond the gym.",
+    "lead": "I help people build strength, confidence, and lasting habits with clear programming, honest coaching, and plans that fit real life—not temporary motivation.",
+    "leadSecondary": "Whether you are starting fresh, returning after a break, or leveling up as an athlete, I build a path you can actually follow week after week.",
+    "metaTitle": "Science-backed coaching",
+    "metaBody": "Programming, nutrition guidance, and accountability in one clear system.",
+    "cta": "Book a class",
+    "story": {
+      "eyebrow": "My story",
+      "title": "Coaching built on results, not trends",
+      "p1": "For more than 14 years I’ve coached beginners, athletes, and busy professionals who want real change—not another random workout they abandon in two weeks.",
+      "p2": "I started as a trainer who loved the science of training. What kept me in this work is watching people discover what their body can do when the plan is clear, progressive, and personal.",
+      "p3": "Today I combine strength training, conditioning, and practical nutrition guidance so you know exactly what to do, why it works, and how to stay consistent."
+    },
+    "pillars": {
+      "eyebrow": "How I coach",
+      "title": "A simple system that actually sticks",
+      "subtitle": "Every program is built around three non-negotiables so progress feels measurable and sustainable.",
+      "items": {
+        "method": {
+          "title": "Smart programming",
+          "body": "Workouts progress with intention—right volume, right intensity, and clear weekly structure matched to your level and schedule."
+        },
+        "nutrition": {
+          "title": "Practical nutrition",
+          "body": "No extreme diets. Just food strategies you can follow at home, at work, and on busy days while still moving toward your goal."
+        },
+        "accountability": {
+          "title": "Real accountability",
+          "body": "Check-ins, form feedback, and plan adjustments keep you moving forward when motivation dips and life gets loud."
+        }
+      }
+    },
+    "focus": {
+      "eyebrow": "Who I help",
+      "title": "Built for goals that matter",
+      "items": {
+        "strength": "Build muscle and lasting strength",
+        "fatLoss": "Lose fat without burning out",
+        "health": "Improve energy, posture, and daily health",
+        "athletes": "Train with structure as a young athlete or adult"
+      }
+    },
+    "certs": {
+      "title": "Credentials you can trust"
+    },
+    "closing": {
+      "title": "Ready to start your next chapter?",
+      "body": "Tell me your goal and I’ll help you choose the right path—training, nutrition, or a full coaching package.",
+      "cta": "Book a class"
     }
   },
   "testimonials": {
@@ -860,8 +1815,12 @@
     "secondary": "Get started",
     "hint": "Opens WhatsApp with a ready message — reply anytime.",
     "imageAlt": "Derby Fit Military Workout Package banner for ages 7 to 14",
-    "phoneRaw": "+201000000000",
+    "phoneRaw": "01011151366",
     "prefill": "Hi Derby Fit — I’m interested in the Military Workout Package (ages 7–14)."
+  },
+  "whatsappFloat": {
+    "label": "Chat on WhatsApp",
+    "prefill": "*Hi Derpy Fit*\n\nI’d like to know more about your training programs."
   },
   "contact": {
     "badge": "Contact",
@@ -962,10 +1921,8 @@
   },
   "footer": {
     "callLabel": "Feel free to call me",
-    "phone1": "+(91) 125 879 786",
-    "phone1Raw": "+91125879786",
-    "phone2": "+(84) 578 666 333",
-    "phone2Raw": "+84578666333",
+    "phone": "+20 101 115 1366",
+    "phoneRaw": "+201011151366",
     "emailLabel": "Email me on",
     "email": "example@gmail.com",
     "creditBefore": "Designed by",
@@ -1004,6 +1961,8 @@
   },
   "faq": {
     "title": "Frequently asked questions",
+    "pageSubtitle": "Everything you need to know about plans, sessions, and coaching support.",
+    "seeAll": "See all questions",
     "items": {
       "plan": {
         "q": "How do I choose the right plan for me?",

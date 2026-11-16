@@ -20,8 +20,8 @@ import {
 const COOLDOWN_MS = 60_000
 const STORAGE_KEY = "trainer.auth.resetCooldown"
 
+/** Timestamp only — never store the email in Application storage. */
 type CooldownState = {
-  email: string
   until: number
 }
 
@@ -29,12 +29,13 @@ function readCooldown(): CooldownState | null {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY)
     if (!raw) return null
-    const parsed = JSON.parse(raw) as CooldownState
+    const parsed = JSON.parse(raw) as CooldownState & { email?: string }
     if (!parsed?.until || parsed.until <= Date.now()) {
       sessionStorage.removeItem(STORAGE_KEY)
       return null
     }
-    return parsed
+    // Drop any legacy payload that included an email address.
+    return { until: parsed.until }
   } catch {
     return null
   }
@@ -46,7 +47,10 @@ function writeCooldown(state: CooldownState | null) {
       sessionStorage.removeItem(STORAGE_KEY)
       return
     }
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    sessionStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ until: state.until } satisfies CooldownState),
+    )
   } catch {
     // private mode / quota
   }
@@ -65,8 +69,6 @@ export function ForgotPasswordPage() {
   useEffect(() => {
     const saved = readCooldown()
     if (!saved) return
-    setEmail(saved.email)
-    setSentTo(saved.email)
     setCooldownUntil(saved.until)
   }, [])
 
@@ -90,8 +92,7 @@ export function ForgotPasswordPage() {
 
   function startCooldown(nextEmail: string) {
     const until = Date.now() + COOLDOWN_MS
-    const next = { email: nextEmail, until }
-    writeCooldown(next)
+    writeCooldown({ until })
     setSentTo(nextEmail)
     setCooldownUntil(until)
     setNow(Date.now())

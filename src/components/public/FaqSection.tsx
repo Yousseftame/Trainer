@@ -1,83 +1,43 @@
-import { useId, useState } from "react"
+import { useMemo, useState } from "react"
+import { Link } from "react-router-dom"
 import { useTranslation } from "react-i18next"
-import { AnimatePresence, motion } from "motion/react"
-
-const FAQ_IDS = ["plan", "missed", "switch", "support", "commit"] as const
-
-const iconSpring = { type: "spring" as const, stiffness: 320, damping: 26, mass: 0.7 }
-
-/** Plus rotates as one piece into an X — smoother than morphing bars. */
-function FaqToggleIcon({ open }: { open: boolean }) {
-  return (
-    <motion.span
-      aria-hidden
-      className="relative inline-flex size-5 shrink-0 items-center justify-center"
-      animate={{ rotate: open ? 45 : 0 }}
-      transition={iconSpring}
-    >
-      <span className="absolute h-[2px] w-[15px] rounded-full bg-[var(--gym-ink)]" />
-      <span className="absolute h-[15px] w-[2px] rounded-full bg-[var(--gym-ink)]" />
-    </motion.span>
-  )
-}
-
-function FaqItem({
-  id,
-  open,
-  onToggle,
-}: {
-  id: (typeof FAQ_IDS)[number]
-  open: boolean
-  onToggle: () => void
-}) {
-  const { t } = useTranslation()
-  const panelId = useId()
-  const buttonId = useId()
-
-  return (
-    <div className="overflow-hidden rounded-[10px] bg-[#f5f5f5]">
-      <button
-        type="button"
-        id={buttonId}
-        aria-expanded={open}
-        aria-controls={panelId}
-        onClick={onToggle}
-        className="flex w-full cursor-pointer items-start justify-between gap-3 p-[15px] text-start outline-none transition-colors hover:bg-[#f0f0f0] focus-visible:bg-[#f0f0f0] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--gym-ink)]/20 sm:gap-3 sm:p-5"
-      >
-        <span className="font-heading text-[17px] font-bold leading-[1.3] text-[#1e2222] sm:text-[19px]">
-          {t(`faq.items.${id}.q`)}
-        </span>
-        <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center">
-          <FaqToggleIcon open={open} />
-        </span>
-      </button>
-
-      <AnimatePresence initial={false}>
-        {open ? (
-          <motion.div
-            id={panelId}
-            role="region"
-            aria-labelledby={buttonId}
-            key="content"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
-            className="overflow-hidden"
-          >
-            <p className="px-[15px] pb-[15px] text-[15px] leading-relaxed text-[var(--gym-muted)] sm:px-5 sm:pb-5 sm:text-[16px] md:text-[17px]">
-              {t(`faq.items.${id}.a`)}
-            </p>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-    </div>
-  )
-}
+import { FaqAccordionItem } from "@/components/public/FaqAccordion"
+import {
+  DEFAULT_FAQ_ITEMS,
+  pickFeaturedFaqItems,
+  useFaqItemsQuery,
+} from "@/features/website"
+import { APP_ROUTES } from "@/config/constants"
+import { useLocale } from "@/hooks/useLocale"
+import { resolveBilingualText } from "@/lib/program-text"
 
 export function FaqSection() {
   const { t } = useTranslation()
-  const [openId, setOpenId] = useState<(typeof FAQ_IDS)[number] | null>("plan")
+  const { locale } = useLocale()
+  const { data: cmsItems } = useFaqItemsQuery({ audience: "public" })
+
+  const items = useMemo(() => {
+    if (cmsItems && cmsItems.length > 0) {
+      return pickFeaturedFaqItems(cmsItems).map((item) => ({
+        id: item.id,
+        question: resolveBilingualText(item.question, locale),
+        answer: resolveBilingualText(item.answer, locale),
+      }))
+    }
+    return DEFAULT_FAQ_ITEMS.filter((item) => item.featured).map((item) => ({
+      id: item.id,
+      question: resolveBilingualText(item.question, locale),
+      answer: resolveBilingualText(item.answer, locale),
+    }))
+  }, [cmsItems, locale])
+
+  const [openId, setOpenId] = useState<string | null>(items[0]?.id ?? null)
+
+  // Keep openId valid when CMS list changes.
+  const activeOpenId =
+    openId && items.some((item) => item.id === openId)
+      ? openId
+      : (items[0]?.id ?? null)
 
   return (
     <section
@@ -90,14 +50,26 @@ export function FaqSection() {
         </h2>
 
         <div className="mt-8 flex flex-col gap-5 sm:mt-10 sm:gap-[30px] md:mt-12">
-          {FAQ_IDS.map((id) => (
-            <FaqItem
-              key={id}
-              id={id}
-              open={openId === id}
-              onToggle={() => setOpenId((prev) => (prev === id ? null : id))}
+          {items.map((item) => (
+            <FaqAccordionItem
+              key={item.id}
+              question={item.question}
+              answer={item.answer}
+              open={activeOpenId === item.id}
+              onToggle={() =>
+                setOpenId((prev) => (prev === item.id ? null : item.id))
+              }
             />
           ))}
+        </div>
+
+        <div className="mt-8 flex justify-center sm:mt-10">
+          <Link
+            to={APP_ROUTES.public.faq}
+            className="font-heading text-[15px] font-semibold text-[var(--gym-ink)] underline decoration-[var(--gym-ink)]/35 underline-offset-[5px] transition-colors hover:text-[var(--gym-lime)] hover:decoration-[var(--gym-lime)] sm:text-[16px]"
+          >
+            {t("faq.seeAll")}
+          </Link>
         </div>
       </div>
     </section>

@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next"
 import { X } from "lucide-react"
 import { APP_ROUTES } from "@/config/constants"
 
-const STORAGE_KEY = "public-announcement-dismissed-v1"
+const STORAGE_KEY = "public-announcement-dismissed-v2"
 
 type AnnouncementBarProps = {
   href?: string

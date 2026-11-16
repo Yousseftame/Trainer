@@ -15,12 +15,13 @@ import {
   mapFirebaseUser,
   mapFirebaseUserWithClaims,
 } from "@/features/auth/map-user"
+import { purgeInsecureBrowserStorage } from "@/features/auth/purge-insecure-storage"
 import {
   getLiveFirebaseUser,
-  setLocalSession,
   verifyLiveFirebaseSession,
 } from "@/features/auth/session"
 import { hasActiveEntitlement, type AuthState } from "@/features/auth/types"
+import { unregisterPushNotifications } from "@/features/notifications"
 import { updateMySubscriberProfile } from "@/features/subscribers/service"
 import { useSubscriberSubscriptionsQuery } from "@/features/subscriptions/hooks"
 import {
@@ -70,42 +71,55 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const cleanEmail = email.trim().toLowerCase()
     const cleanPass = password.trim()
     await signInWithEmailAndPassword(getFirebaseAuth(), cleanEmail, cleanPass)
-    setLocalSession(null)
 
     const current = getFirebaseAuth().currentUser
-    if (current) {
-      // Ensure staff claims exist so Firestore rules + callables work
-      try {
-        await callBootstrapStaffClaims()
-        await current.getIdToken(true)
-      } catch {
-        // Subscribers (or accounts without staff profiles) skip bootstrap
-      }
-      const user = await mapFirebaseUserWithClaims(current)
-      if (user.status === "suspended" || user.status === "rejected") {
-        await firebaseSignOut(getFirebaseAuth()).catch(() => undefined)
-        throw new Error("auth/user-disabled")
-      }
-      setState({
-        status: "authenticated",
-        user,
-        subscriptionStatus: null,
-        error: null,
-      })
+    if (!current) {
+      throw new Error("auth/invalid-credential")
     }
+
+    // Staff claims are best-effort here — never fail a valid password login
+    // because bootstrap / token refresh briefly hiccuped.
+    try {
+      await callBootstrapStaffClaims()
+      await current.getIdToken(true)
+    } catch {
+      // Subscribers, or transient callable/network errors — continue.
+    }
+
+    let user
+    try {
+      user = await mapFirebaseUserWithClaims(current, true)
+    } catch {
+      user = mapFirebaseUser(current)
+    }
+
+    if (user.status === "suspended" || user.status === "rejected") {
+      await firebaseSignOut(getFirebaseAuth()).catch(() => undefined)
+      const err = new Error("auth/user-disabled") as Error & { code?: string }
+      err.code = "auth/user-disabled"
+      throw err
+    }
+
+    setState({
+      status: "authenticated",
+      user,
+      subscriptionStatus: null,
+      error: null,
+    })
   }, [])
 
   const signOut = useCallback(async () => {
     // Mark unauthenticated immediately so login/guards do not bounce
     // against a stale "authenticated" React state after Firebase clears.
-    setLocalSession(null)
     setState({
       status: "unauthenticated",
       user: null,
       subscriptionStatus: null,
       error: null,
     })
+    await unregisterPushNotifications().catch(() => undefined)
     await firebaseSignOut(getFirebaseAuth()).catch(() => undefined)
+    purgeInsecureBrowserStorage()
     queryClient.clear()
   }, [queryClient])
 
@@ -160,38 +174,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [state.user])
 
   useEffect(() => {
+    // Wipe legacy secrets / forged session keys before any guard runs.
+    purgeInsecureBrowserStorage()
+
     const auth = getFirebaseAuth()
+    let cancelled = false
+    let tokenListenerGen = 0
+    /** One background staff-claims sync per uid per page session. */
+    let staffClaimsSyncedForUid: string | null = null
+    let staffBootstrapInFlight = false
 
     const unsubscribe = onIdTokenChanged(auth, (firebaseUser) => {
+      const gen = ++tokenListenerGen
       void (async () => {
         if (firebaseUser) {
-          setLocalSession(null)
           try {
-            let user = await mapFirebaseUserWithClaims(firebaseUser)
-            // Bootstrap staff claims for admin identities so callables/rules work
-            if (isAdminRole(user.role)) {
-              try {
-                await callBootstrapStaffClaims()
-                await firebaseUser.getIdToken(true)
-                user = await mapFirebaseUserWithClaims(firebaseUser)
-              } catch (err) {
-                const message =
-                  err instanceof Error ? err.message : String(err ?? "")
-                if (/suspended|permission-denied|user-disabled/i.test(message)) {
-                  setLocalSession(null)
-                  await firebaseSignOut(auth).catch(() => undefined)
-                  setState({
-                    status: "unauthenticated",
-                    user: null,
-                    subscriptionStatus: null,
-                    error: null,
-                  })
-                  return
-                }
-              }
-            }
+            // Cached token only — forced refresh here re-fires this listener and
+            // kept the admin shell on FullPageSpinner for tens of seconds.
+            const user = await mapFirebaseUserWithClaims(firebaseUser, false)
+            if (cancelled || gen !== tokenListenerGen) return
+
             if (user.status === "suspended" || user.status === "rejected") {
-              setLocalSession(null)
               await firebaseSignOut(auth).catch(() => undefined)
               setState({
                 status: "unauthenticated",
@@ -201,13 +204,57 @@ export function AuthProvider({ children }: AuthProviderProps) {
               })
               return
             }
+
+            // Unblock RequireAuth / admin panel immediately.
             setState({
               status: "authenticated",
               user,
               subscriptionStatus: null,
               error: null,
             })
+
+            // Soft-sync staff claims in the background (never blocks the spinner).
+            // Never sign out on permission-denied / network — that kicked staff
+            // back to login during normal token refreshes.
+            if (
+              isAdminRole(user.role) &&
+              staffClaimsSyncedForUid !== firebaseUser.uid &&
+              !staffBootstrapInFlight
+            ) {
+              staffBootstrapInFlight = true
+              void (async () => {
+                try {
+                  await callBootstrapStaffClaims()
+                  if (cancelled) return
+                  await firebaseUser.getIdToken(true)
+                  // Fresh token re-enters this listener and remaps claims.
+                } catch (err) {
+                  const message =
+                    err instanceof Error ? err.message : String(err ?? "")
+                  if (
+                    /user-disabled|status.*suspended|account.*suspended/i.test(
+                      message,
+                    )
+                  ) {
+                    if (cancelled) return
+                    await firebaseSignOut(auth).catch(() => undefined)
+                    setState({
+                      status: "unauthenticated",
+                      user: null,
+                      subscriptionStatus: null,
+                      error: null,
+                    })
+                    return
+                  }
+                } finally {
+                  staffClaimsSyncedForUid = firebaseUser.uid
+                  staffBootstrapInFlight = false
+                }
+              })()
+            }
           } catch {
+            if (cancelled || gen !== tokenListenerGen) return
+            // Claims refresh failed — keep the Firebase session with basic identity.
             setState({
               status: "authenticated",
               user: mapFirebaseUser(firebaseUser),
@@ -218,6 +265,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return
         }
 
+        if (cancelled || gen !== tokenListenerGen) return
+        staffClaimsSyncedForUid = null
+        staffBootstrapInFlight = false
         setState({
           status: "unauthenticated",
           user: null,
@@ -229,10 +279,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     async function revalidate() {
       if (document.visibilityState !== "visible") return
+      // Soft check only — transient network errors must NOT sign the user out.
       const ok = await verifyLiveFirebaseSession()
-      if (!ok) {
-        setLocalSession(null)
-        await firebaseSignOut(auth).catch(() => undefined)
+      if (!ok && !getLiveFirebaseUser()) {
         setState({
           status: "unauthenticated",
           user: null,
@@ -246,6 +295,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     window.addEventListener("focus", revalidate)
 
     return () => {
+      cancelled = true
       unsubscribe()
       document.removeEventListener("visibilitychange", revalidate)
       window.removeEventListener("focus", revalidate)

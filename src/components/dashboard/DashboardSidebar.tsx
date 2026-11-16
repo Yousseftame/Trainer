@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Link, useLocation } from "react-router-dom"
-import { AnimatePresence, motion } from "motion/react"
 import { useTranslation } from "react-i18next"
 import { ChevronDown, ChevronsLeft, LogOut, X } from "lucide-react"
 import type { NavItem } from "@/config/navigation"
@@ -9,6 +8,7 @@ import { useLocale } from "@/hooks/useLocale"
 import { cn } from "@/lib/utils"
 
 const SIDEBAR_EASE = "duration-[400ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+const ACCORDION_EASE = "duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
 
 type DashboardSidebarProps = {
   items: NavItem[]
@@ -32,6 +32,10 @@ function groupIsActive(pathname: string, item: NavItem, homeTo: string) {
   return item.children.some((child) => childIsActive(pathname, child, homeTo))
 }
 
+function groupKey(item: NavItem) {
+  return item.labelKey
+}
+
 export function DashboardSidebar({
   items,
   brand,
@@ -48,28 +52,36 @@ export function DashboardSidebar({
   const { locale } = useLocale()
   const location = useLocation()
   const navRef = useRef<HTMLElement>(null)
+  const itemsRef = useRef(items)
+  itemsRef.current = items
+
+  /** Groups the user manually closed while still on an active child route */
+  const userClosedRef = useRef<Set<string>>(new Set())
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
 
+  // Open the active section on navigation only — never fight a manual close on re-render
   useEffect(() => {
     setOpenGroups((prev) => {
       const next = { ...prev }
-      for (const item of items) {
-        if (!item.children?.length) continue
+      for (const item of itemsRef.current) {
+        if (item.kind === "divider" || !item.children?.length) continue
+        const key = groupKey(item)
         if (groupIsActive(location.pathname, item, homeTo)) {
-          next[item.to] = true
+          userClosedRef.current.delete(key)
+          next[key] = true
         }
       }
       return next
     })
-  }, [location.pathname, items, homeTo])
-
-  useEffect(() => {
-    if (!mobileOpen) return
-    navRef.current?.scrollTo({ top: 0 })
-  }, [mobileOpen])
+  }, [location.pathname, homeTo])
 
   function toggleGroup(key: string) {
-    setOpenGroups((prev) => ({ ...prev, [key]: !prev[key] }))
+    setOpenGroups((prev) => {
+      const willOpen = !prev[key]
+      if (willOpen) userClosedRef.current.delete(key)
+      else userClosedRef.current.add(key)
+      return { ...prev, [key]: willOpen }
+    })
   }
 
   return (
@@ -153,18 +165,24 @@ export function DashboardSidebar({
 
         <nav
           ref={navRef}
-          className="no-scrollbar flex min-h-0 flex-1 flex-col justify-start gap-0.5 overflow-x-hidden overflow-y-auto py-1 lg:gap-1"
+          className="dashboard-sidebar-nav flex min-h-0 flex-1 flex-col justify-start gap-0.5 overflow-x-hidden overflow-y-auto overscroll-contain py-1 lg:gap-1"
           aria-label={t("nav.main")}
         >
           {items.map((item) =>
-            item.children?.length ? (
-              <SidebarNavGroup
+            item.kind === "divider" ? (
+              <SidebarSectionNote
                 key={item.labelKey}
+                label={t(item.labelKey)}
+                collapsed={collapsed}
+              />
+            ) : item.children?.length ? (
+              <SidebarNavGroup
+                key={groupKey(item)}
                 item={item}
                 homeTo={homeTo}
                 collapsed={collapsed}
-                open={Boolean(openGroups[item.to])}
-                onToggle={() => toggleGroup(item.to)}
+                open={Boolean(openGroups[groupKey(item)])}
+                onToggle={() => toggleGroup(groupKey(item))}
                 onNavigate={onMobileClose}
                 onExpandSidebar={collapsed ? onToggle : undefined}
                 badgeByTo={badgeByTo}
@@ -239,6 +257,39 @@ export function DashboardSidebar({
   )
 }
 
+function SidebarSectionNote({
+  label,
+  collapsed,
+}: {
+  label: string
+  collapsed: boolean
+}) {
+  return (
+    <div
+      className={cn(
+        "mt-3 mb-1 shrink-0 px-1 first:mt-1",
+        collapsed && "lg:mt-2 lg:mb-0.5 lg:px-0",
+      )}
+      role="presentation"
+    >
+      <div
+        className={cn(
+          "border-t border-black/[0.08]",
+          collapsed ? "lg:mx-auto lg:w-8" : "mb-2.5",
+        )}
+      />
+      <p
+        className={cn(
+          "px-2 text-[10px] font-bold uppercase leading-snug text-[#9CA3AF]",
+          collapsed && "lg:hidden",
+        )}
+      >
+        {label}
+      </p>
+    </div>
+  )
+}
+
 function SidebarNavGroup({
   item,
   homeTo,
@@ -267,6 +318,7 @@ function SidebarNavGroup({
     (sum, child) => sum + (badgeByTo?.[child.to] ?? 0),
     badgeByTo?.[item.to] ?? 0,
   )
+  const expanded = open && !collapsed
 
   function handleParentClick() {
     if (collapsed && onExpandSidebar) {
@@ -283,8 +335,11 @@ function SidebarNavGroup({
         type="button"
         title={t(item.labelKey)}
         onClick={handleParentClick}
-        aria-expanded={open && !collapsed}
-        className={cn(navItemClass({ collapsed, active: active && !open }), "justify-start")}
+        aria-expanded={expanded}
+        className={cn(
+          navItemClass({ collapsed, active: active && !expanded }),
+          "justify-start touch-manipulation",
+        )}
       >
         <span className="relative inline-flex size-[18px] shrink-0 items-center justify-center">
           <Icon className="size-[18px]" strokeWidth={1.8} />
@@ -294,41 +349,46 @@ function SidebarNavGroup({
         <ChevronDown
           className={cn(
             "ms-auto size-4 shrink-0 text-current transition-transform",
-            SIDEBAR_EASE,
-            open && "rotate-180",
+            ACCORDION_EASE,
+            expanded && "rotate-180",
             collapsed && "lg:hidden",
           )}
           strokeWidth={2}
         />
       </button>
 
-      <AnimatePresence initial={false}>
-        {open && !collapsed ? (
-          <motion.div
-            key={`${item.labelKey}-children`}
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-            className="overflow-hidden"
+      {/* CSS grid accordion — smoother than measuring height:auto on mobile */}
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows] motion-reduce:transition-none",
+          ACCORDION_EASE,
+          expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+        )}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div
+            className={cn(
+              "ms-4 mt-1 flex flex-col gap-0.5 border-s border-[var(--gym-ink,#111111)]/10 ps-2 pb-1 transition-opacity",
+              ACCORDION_EASE,
+              expanded ? "opacity-100" : "opacity-0",
+            )}
+            aria-hidden={!expanded}
           >
-            <div className="ms-4 mt-1 flex flex-col gap-0.5 border-s border-[var(--gym-ink,#111111)]/10 ps-2">
-              {children.map((child) => (
-                <SidebarNavLink
-                  key={child.to}
-                  item={child}
-                  label={t(child.labelKey)}
-                  collapsed={false}
-                  active={childIsActive(location.pathname, child, homeTo)}
-                  onClick={onNavigate}
-                  nested
-                  badge={badgeByTo?.[child.to]}
-                />
-              ))}
-            </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+            {children.map((child) => (
+              <SidebarNavLink
+                key={child.to}
+                item={child}
+                label={t(child.labelKey)}
+                collapsed={false}
+                active={childIsActive(location.pathname, child, homeTo)}
+                onClick={onNavigate}
+                nested
+                badge={badgeByTo?.[child.to]}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -359,7 +419,7 @@ function SidebarNavLink({
       onClick={onClick}
       className={cn(
         navItemClass({ collapsed, active }),
-        "justify-start",
+        "justify-start touch-manipulation",
         nested && "py-2 text-[14px] lg:py-2.5",
       )}
     >

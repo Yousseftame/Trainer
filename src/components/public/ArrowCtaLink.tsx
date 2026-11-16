@@ -12,6 +12,10 @@ type ArrowCtaLinkProps = {
   variant?: "outline" | "lime"
 }
 
+function isExternalHref(href: string) {
+  return /^(https?:|mailto:|tel:)/i.test(href.trim())
+}
+
 /**
  * GymTrainer-style CTA: pill + circle touching at one point.
  * LTR: ↗ → hover →
@@ -26,16 +30,15 @@ export function ArrowCtaLink({
 }: ArrowCtaLinkProps) {
   const { isRtl } = useLocale()
   const isLime = variant === "lime"
+  const external = isExternalHref(to)
 
-  return (
-    <Link
-      to={to}
-      onClick={onClick}
-      className={cn(
-        "group inline-flex h-[50px] items-center text-[16px] font-medium leading-none text-[var(--gym-ink)]",
-        className,
-      )}
-    >
+  const classNames = cn(
+    "group inline-flex h-[50px] items-center text-[16px] font-medium leading-none text-[var(--gym-ink)]",
+    className,
+  )
+
+  const content = (
+    <>
       <span
         className={cn(
           "inline-flex h-full items-center rounded-full px-[25px]",
@@ -63,6 +66,26 @@ export function ArrowCtaLink({
           strokeWidth={1.75}
         />
       </span>
+    </>
+  )
+
+  if (external) {
+    return (
+      <a
+        href={to}
+        onClick={onClick}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={classNames}
+      >
+        {content}
+      </a>
+    )
+  }
+
+  return (
+    <Link to={to} onClick={onClick} className={classNames}>
+      {content}
     </Link>
   )
 }

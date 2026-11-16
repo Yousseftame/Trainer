@@ -17,8 +17,8 @@ import {
 export function AdminLayout() {
   const { user, hasPermission } = useAuth()
   const { locale } = useLocale()
-  const items = filterByPermission(user, adminNav)
-  const homeTo = resolveAdminLandingPath(user)
+  const items = useMemo(() => filterByPermission(user, adminNav), [user])
+  const homeTo = useMemo(() => resolveAdminLandingPath(user), [user])
 
   const canListen =
     hasPermission("reports:read") || hasPermission("notifications:send")

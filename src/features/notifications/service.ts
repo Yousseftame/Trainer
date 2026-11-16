@@ -17,15 +17,27 @@ import {
 import { claimNoticeAlert } from "@/features/notifications/dedupe"
 
 const FCM_COLLECTION = "fcm_tokens"
-const TOKEN_STORAGE_KEY = "derpyfit_fcm_token"
+/** Legacy key — wiped only; tokens must never live in Application storage. */
+const LEGACY_TOKEN_STORAGE_KEY = "derpyfit_fcm_token"
 
 let messaging: Messaging | null = null
 let foregroundUnsub: Unsubscribe | null = null
+/** In-memory only — never localStorage / sessionStorage. */
+let memoryFcmToken: string | undefined
 let registering: Promise<{
   ok: boolean
   token?: string
   reason?: string
 }> | null = null
+
+function wipeLegacyFcmTokenStorage() {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.removeItem(LEGACY_TOKEN_STORAGE_KEY)
+  } catch {
+    // ignore
+  }
+}
 
 function vapidKey() {
   return (import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined)?.trim()
@@ -199,11 +211,8 @@ export async function registerPushNotifications(): Promise<{
         { merge: true },
       )
 
-      try {
-        window.localStorage.setItem(TOKEN_STORAGE_KEY, token)
-      } catch {
-        // ignore
-      }
+      memoryFcmToken = token
+      wipeLegacyFcmTokenStorage()
 
       return { ok: true, token }
     } catch (err) {
@@ -222,16 +231,18 @@ export async function registerPushNotifications(): Promise<{
 
 export async function unregisterPushNotifications(token?: string) {
   const uid = auth.currentUser?.uid
-  let resolved = token
-  if (!resolved) {
+  let resolved = token ?? memoryFcmToken
+
+  const msg = await getMessagingSafe()
+  const key = vapidKey()
+  if (!resolved && msg && key) {
     try {
-      resolved = window.localStorage.getItem(TOKEN_STORAGE_KEY) || undefined
+      resolved = (await getToken(msg, { vapidKey: key })) || undefined
     } catch {
       resolved = undefined
     }
   }
 
-  const msg = await getMessagingSafe()
   if (msg) {
     try {
       await deleteToken(msg)
@@ -255,9 +266,6 @@ export async function unregisterPushNotifications(token?: string) {
       }
     }
   }
-  try {
-    window.localStorage.removeItem(TOKEN_STORAGE_KEY)
-  } catch {
-    // ignore
-  }
+  memoryFcmToken = undefined
+  wipeLegacyFcmTokenStorage()
 }

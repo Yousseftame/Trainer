@@ -5,7 +5,6 @@ import {
   signOut,
   updateProfile,
 } from "firebase/auth"
-import { saveStoredPassword } from "@/features/auth/credentials"
 import { firebaseConfig } from "@/lib/firebase/firebase"
 
 const SECONDARY_APP_NAME = "secondary_auth_provisioning"
@@ -24,8 +23,7 @@ export type ProvisionAccountResult = {
 
 /**
  * Creates a real Firebase Auth user with email & password on a secondary app instance.
- * Also stores the credential locally as fallback, guaranteeing that newly created
- * subscribers or staff members can ALWAYS sign in smoothly without 400/403 errors.
+ * Passwords are never written to localStorage / sessionStorage.
  */
 export async function createRealFirebaseAuthAccount({
   email,
@@ -38,9 +36,6 @@ export async function createRealFirebaseAuthAccount({
 }): Promise<ProvisionAccountResult> {
   const cleanEmail = email.trim().toLowerCase()
   const cleanPassword = password?.trim() || "Member@123456"
-
-  // Always save locally first so client-side login can authenticate immediately
-  saveStoredPassword(cleanEmail, cleanPassword)
 
   const secondaryAuth = getSecondaryAuth()
 
@@ -70,7 +65,6 @@ export async function createRealFirebaseAuthAccount({
     const code = (err as { code?: string })?.code
 
     if (code === "auth/email-already-in-use") {
-      // Email is already in Firebase Auth: save credentials and link account
       return {
         uid: `auth-${cleanEmail.replace(/[^a-z0-9]/g, "_")}`,
         email: cleanEmail,
@@ -84,7 +78,7 @@ export async function createRealFirebaseAuthAccount({
       )
     }
 
-    console.warn("Secondary Firebase Auth provisioning failed, falling back to verified local account:", err)
+    console.warn("Secondary Firebase Auth provisioning failed:", err)
     return {
       uid: `auth-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
       email: cleanEmail,

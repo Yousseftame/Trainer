@@ -40,18 +40,25 @@ export function canAll(subject: PermissionSubject, permissions: Permission[]): b
   return permissions.every((permission) => can(subject, permission))
 }
 
-export function filterByPermission<T extends { permission?: Permission; children?: T[] }>(
-  subject: PermissionSubject,
-  items: T[],
-): T[] {
+export function filterByPermission<
+  T extends {
+    permission?: Permission
+    children?: T[]
+    kind?: string
+  },
+>(subject: PermissionSubject, items: T[]): T[] {
   return items
     .map((item) => {
+      if (item.kind === "divider") return item
       if (!item.children?.length) return item
 
       const children = filterByPermission(subject, item.children)
       return { ...item, children }
     })
     .filter((item) => {
+      if (item.kind === "divider") {
+        return !item.permission || can(subject, item.permission)
+      }
       if (item.children) {
         return item.children.length > 0
       }

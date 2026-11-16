@@ -1,17 +1,42 @@
-import { useState, type FormEvent } from "react"
+import { useMemo, useState, type FormEvent } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { useTranslation } from "react-i18next"
+import {
+  FaFacebookF,
+  FaInstagram,
+  FaLinkedinIn,
+  FaTiktok,
+  FaYoutube,
+} from "react-icons/fa6"
 import { BrandLogo } from "@/components/shared/BrandLogo"
 import { APP_ROUTES } from "@/config/constants"
+import {
+  DEFAULT_FOOTER_CONTACT,
+  DEFAULT_FOOTER_SOCIALS,
+  useFooterContentQuery,
+} from "@/features/website"
 import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
+import type { VideoBannerSocialNetwork } from "@/types/website"
 import footerPattern from "@/assets/footer/footer-bg-pattern.avif"
 import phoneIcon from "@/assets/footer/footer-icon-phone.svg"
 import mailIcon from "@/assets/footer/footer-icon-mail.svg"
 
+const SOCIAL_ICONS: Record<
+  VideoBannerSocialNetwork,
+  { Icon: typeof FaFacebookF; label: string }
+> = {
+  facebook: { Icon: FaFacebookF, label: "Facebook" },
+  linkedin: { Icon: FaLinkedinIn, label: "LinkedIn" },
+  youtube: { Icon: FaYoutube, label: "YouTube" },
+  instagram: { Icon: FaInstagram, label: "Instagram" },
+  tiktok: { Icon: FaTiktok, label: "TikTok" },
+}
+
 const PAGE_LINKS = [
   { labelKey: "footer.pages.home", to: APP_ROUTES.public.home, end: true },
   { labelKey: "footer.pages.about", to: APP_ROUTES.public.about },
+  { labelKey: "footer.pages.faq", to: APP_ROUTES.public.faq },
   { labelKey: "footer.pages.services", to: APP_ROUTES.public.services },
   { labelKey: "footer.pages.packages", to: APP_ROUTES.public.packages },
 ] as const
@@ -65,9 +90,61 @@ function FooterNavLink({
   )
 }
 
+function FooterSocialLinks({
+  items,
+}: {
+  items: Array<{ network: VideoBannerSocialNetwork; href: string }>
+}) {
+  if (items.length === 0) return null
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {items.map(({ network, href }) => {
+        const meta = SOCIAL_ICONS[network]
+        const Icon = meta.Icon
+        return (
+          <a
+            key={network}
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={meta.label}
+            className="inline-flex size-7 items-center justify-center rounded-[7px] bg-[var(--gym-lime)] text-white transition-transform duration-300 ease-out hover:scale-105 active:scale-95 sm:size-8 sm:rounded-[8px]"
+          >
+            <Icon className="size-3.5 sm:size-4" />
+          </a>
+        )
+      })}
+    </div>
+  )
+}
+
 export function PublicFooter() {
   const { t } = useTranslation()
   const [sending, setSending] = useState(false)
+  const { data: footerContent } = useFooterContentQuery({
+    audience: "public",
+  })
+
+  const phone = footerContent?.phone?.trim() || t("footer.phone")
+  const phoneRaw =
+    footerContent?.phoneRaw?.trim() ||
+    t("footer.phoneRaw") ||
+    DEFAULT_FOOTER_CONTACT.phoneRaw
+  const email = footerContent?.email?.trim() || t("footer.email")
+
+  const socials = useMemo(() => {
+    const source =
+      footerContent?.socials?.length
+        ? footerContent.socials
+        : DEFAULT_FOOTER_SOCIALS
+    return source
+      .filter((item) => item.enabled)
+      .map((item) => ({
+        network: item.network,
+        href: item.url.trim() || "#",
+      }))
+  }, [footerContent])
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -126,18 +203,14 @@ export function PublicFooter() {
                   height={28}
                 />
                 <div className="flex min-w-0 flex-col gap-0.5 sm:gap-1.5">
-                  <p className="text-[13px] text-white sm:text-[16px]">{t("footer.callLabel")}</p>
+                  <p className="text-[13px] text-white sm:text-[16px]">
+                    {t("footer.callLabel")}
+                  </p>
                   <a
-                    href={`tel:${t("footer.phone1Raw")}`}
+                    href={`tel:${phoneRaw}`}
                     className="font-heading text-[14px] font-bold text-white transition-colors duration-300 hover:text-[var(--gym-lime)] sm:text-[17px]"
                   >
-                    {t("footer.phone1")}
-                  </a>
-                  <a
-                    href={`tel:${t("footer.phone2Raw")}`}
-                    className="font-heading text-[14px] font-bold text-white transition-colors duration-300 hover:text-[var(--gym-lime)] sm:text-[17px]"
-                  >
-                    {t("footer.phone2")}
+                    {phone}
                   </a>
                 </div>
               </div>
@@ -152,22 +225,34 @@ export function PublicFooter() {
                   height={28}
                 />
                 <div className="flex min-w-0 flex-col gap-0.5 sm:gap-1.5">
-                  <p className="text-[13px] text-white sm:text-[16px]">{t("footer.emailLabel")}</p>
+                  <p className="text-[13px] text-white sm:text-[16px]">
+                    {t("footer.emailLabel")}
+                  </p>
                   <a
-                    href={`mailto:${t("footer.email")}`}
+                    href={`mailto:${email}`}
                     className="font-heading text-[14px] font-bold text-white transition-colors duration-300 hover:text-[var(--gym-lime)] sm:text-[17px]"
                   >
-                    {t("footer.email")}
+                    {email}
                   </a>
                 </div>
               </div>
+
+              {/* Mobile only — socials under email */}
+              <div className="ps-[34px] sm:hidden">
+                <FooterSocialLinks items={socials} />
+              </div>
             </div>
 
-            {/* Credit stays with brand on desktop; moved to footer end on mobile */}
-            <p className="mt-auto hidden text-[14px] leading-relaxed text-[#dcd6d8] sm:block sm:text-[15px]">
-              {t("footer.creditBefore")}{" "}
-              <span className="text-[var(--gym-lime)]">{t("footer.creditBrand")}</span>
-            </p>
+            {/* Desktop — original position under contact block */}
+            <div className="hidden flex-col items-start gap-4 pt-1 sm:flex">
+              <FooterSocialLinks items={socials} />
+              <p className="text-[14px] leading-relaxed text-[#dcd6d8] sm:text-[15px]">
+                {t("footer.creditBefore")}{" "}
+                <span className="text-[var(--gym-lime)]">
+                  {t("footer.creditBrand")}
+                </span>
+              </p>
+            </div>
           </div>
 
           {/* Pages + Account — always 2 cols so mobile stays short */}
@@ -254,9 +339,12 @@ export function PublicFooter() {
           </div>
         </div>
 
-        <p className="mt-6 text-[13px] leading-relaxed text-[#dcd6d8] sm:hidden">
+        {/* Mobile only — credit after send message */}
+        <p className="mt-5 text-[13px] leading-relaxed text-[#dcd6d8] sm:hidden">
           {t("footer.creditBefore")}{" "}
-          <span className="text-[var(--gym-lime)]">{t("footer.creditBrand")}</span>
+          <span className="text-[var(--gym-lime)]">
+            {t("footer.creditBrand")}
+          </span>
         </p>
       </div>
     </footer>

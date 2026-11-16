@@ -145,9 +145,17 @@ export function mapFirebaseUser(user: User): AppUser {
   })
 }
 
-/** Async mapping with fresh ID token claims (preferred after login / bootstrap). */
-export async function mapFirebaseUserWithClaims(user: User): Promise<AppUser> {
-  const tokenResult = await user.getIdTokenResult(true)
+/**
+ * Async mapping from ID token claims.
+ * Prefer cached token (`forceRefresh: false`) on session restore so Auth does not
+ * force a network refresh (and re-enter onIdTokenChanged) before the UI can paint.
+ * Use `forceRefresh: true` only after login / bootstrap when claims may have changed.
+ */
+export async function mapFirebaseUserWithClaims(
+  user: User,
+  forceRefresh = false,
+): Promise<AppUser> {
+  const tokenResult = await user.getIdTokenResult(forceRefresh)
   const claims = tokenResult.claims
   const role = isRole(claims.role) ? claims.role : undefined
   const status = isUserStatus(claims.status) ? claims.status : undefined

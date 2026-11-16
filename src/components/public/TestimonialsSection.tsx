@@ -1,7 +1,13 @@
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { AnimatePresence, motion } from "motion/react"
+import { useTestimonialsQuery } from "@/features/website/hooks"
+import { TESTIMONIAL_SLOTS } from "@/features/website/testimonials"
+import { isRenderableImageSrc } from "@/features/website/paths"
+import { useLocale } from "@/hooks/useLocale"
+import { resolveBilingualText } from "@/lib/program-text"
 import { cn } from "@/lib/utils"
+import type { TestimonialSlotSize } from "@/types/website"
 import feedbackPattern from "@/assets/feedback.avif"
 import starsSrc from "@/assets/feedback-stars.svg"
 import avatar01 from "@/assets/testimonials/01.avif"
@@ -11,19 +17,17 @@ import avatar04 from "@/assets/testimonials/04.avif"
 import avatar05 from "@/assets/testimonials/05.avif"
 import avatar06 from "@/assets/testimonials/06.avif"
 
-const CLIENTS = [
-  { id: "sarah", image: avatar01, size: "one" },
-  { id: "emily", image: avatar02, size: "two" },
-  { id: "samantha", image: avatar03, size: "three" },
-  { id: "john", image: avatar06, size: "four" },
-  { id: "lisa", image: avatar05, size: "five" },
-  { id: "jessica", image: avatar04, size: "six" },
+const STATIC_AVATARS = [
+  avatar01,
+  avatar02,
+  avatar03,
+  avatar06,
+  avatar05,
+  avatar04,
 ] as const
 
-type ClientId = (typeof CLIENTS)[number]["id"]
-
 /** Matches GymTrainer `.testimonial-image.{one…six}` sizes */
-const AVATAR_SIZE: Record<(typeof CLIENTS)[number]["size"], string> = {
+const AVATAR_SIZE: Record<TestimonialSlotSize, string> = {
   one: "size-[70px] md:size-[100px] lg:size-[130px]",
   two: "size-[70px] md:size-[100px] lg:size-[70px]",
   three: "size-[70px] md:size-[100px] lg:size-[150px]",
@@ -33,7 +37,7 @@ const AVATAR_SIZE: Record<(typeof CLIENTS)[number]["size"], string> = {
 }
 
 /** Organic offsets from GymTrainer `.tab-link` margins */
-const AVATAR_OFFSET: Record<(typeof CLIENTS)[number]["size"], string> = {
+const AVATAR_OFFSET: Record<TestimonialSlotSize, string> = {
   one: "",
   two: "",
   three: "",
@@ -42,15 +46,89 @@ const AVATAR_OFFSET: Record<(typeof CLIENTS)[number]["size"], string> = {
   six: "",
 }
 
+type SlotView = {
+  id: string
+  size: TestimonialSlotSize
+  image: string | null
+  title: string
+  body: string
+  author: string
+  fromCms: boolean
+}
+
 export function TestimonialsSection() {
   const { t } = useTranslation()
-  const [active, setActive] = useState<ClientId>("sarah")
+  const { locale } = useLocale()
+  const {
+    data: cmsItems = [],
+    isPending,
+    isError,
+  } = useTestimonialsQuery({ audience: "public" })
 
-  const quote = {
-    title: t(`testimonials.items.${active}.title`),
-    body: t(`testimonials.items.${active}.body`),
-    author: t(`testimonials.items.${active}.author`),
-  }
+  const hasCmsItems = cmsItems.length > 0
+  // Settle to static only after fetch completes (success/error) with no CMS rows.
+  const awaitingCms = isPending && !hasCmsItems && !isError
+
+  const slots = useMemo<SlotView[]>(() => {
+    // Avoid painting static faces before we know whether CMS owns the section.
+    if (awaitingCms) {
+      return TESTIMONIAL_SLOTS.map((slot) => ({
+        id: slot.id,
+        size: slot.size,
+        image: null,
+        title: "",
+        body: "",
+        author: "",
+        fromCms: false,
+      }))
+    }
+
+    const byId = new Map(cmsItems.map((item) => [item.id, item]))
+
+    return TESTIMONIAL_SLOTS.map((slot) => {
+      const cms = byId.get(slot.id)
+      const cmsReady =
+        Boolean(cms) &&
+        isRenderableImageSrc(cms!.imageUrl) &&
+        (cms!.title.en.trim() || cms!.title.ar.trim()) &&
+        (cms!.body.en.trim() || cms!.body.ar.trim()) &&
+        (cms!.author.en.trim() || cms!.author.ar.trim())
+
+      if (cmsReady && cms && hasCmsItems) {
+        return {
+          id: slot.id,
+          size: slot.size,
+          image: cms.imageUrl,
+          title: resolveBilingualText(cms.title, locale),
+          body: resolveBilingualText(cms.body, locale),
+          author: resolveBilingualText(cms.author, locale),
+          fromCms: true,
+        }
+      }
+
+      // Empty CMS slots (or fully static mode) keep the designed static fallback.
+      return {
+        id: slot.id,
+        size: slot.size,
+        image: STATIC_AVATARS[slot.slotIndex],
+        title: t(`testimonials.items.${slot.staticKey}.title`),
+        body: t(`testimonials.items.${slot.staticKey}.body`),
+        author: t(`testimonials.items.${slot.staticKey}.author`),
+        fromCms: false,
+      }
+    })
+  }, [awaitingCms, cmsItems, hasCmsItems, locale, t])
+
+  const [activeId, setActiveId] = useState(slots[0]?.id ?? "slot-0")
+
+  useEffect(() => {
+    if (!slots.some((s) => s.id === activeId)) {
+      setActiveId(slots[0]?.id ?? "slot-0")
+    }
+  }, [activeId, slots])
+
+  const active = slots.find((s) => s.id === activeId) ?? slots[0]
+  const showSkeleton = awaitingCms && !hasCmsItems
 
   return (
     <section
@@ -58,7 +136,6 @@ export function TestimonialsSection() {
       className="w-full scroll-mt-24 bg-white px-6 pb-14 pt-10 md:px-10 md:pb-16 md:pt-12 lg:px-14 lg:pb-[72px] lg:pt-12 xl:pb-[96px] xl:pt-14"
     >
       <div className="mx-auto w-full max-w-[1300px]">
-        {/* Title sits above; desktop tabs pull up under it (GymTrainer -140/-180) */}
         <div className="relative z-10 mb-8 md:mb-10 lg:mb-11">
           <h2 className="font-heading text-[36px] font-bold leading-[1.3] text-[var(--gym-ink)] sm:text-[42px] md:text-[46px] lg:text-[52px]">
             {t("testimonials.title")}
@@ -70,46 +147,53 @@ export function TestimonialsSection() {
             "grid grid-cols-1 items-start gap-10",
             "md:grid-cols-[1.2fr_0.75fr] md:gap-8",
             "lg:mt-[-140px] lg:grid-cols-2 lg:items-end lg:gap-[30px]",
-            "xl:mt-[-180px] xl:gap-[120px]"
+            "xl:mt-[-180px] xl:gap-[120px]",
           )}
         >
-          {/* Left — stars + quote animate as one block; height locked so nothing jumps */}
           <div className="relative z-10 flex min-h-[280px] flex-col items-start lg:min-h-[320px] lg:pt-[140px] xl:min-h-[340px] xl:pt-[180px]">
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={active}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.25, ease: "easeInOut" }}
-                className="flex w-full flex-col items-start"
-              >
-                <img
-                  src={starsSrc}
-                  alt=""
-                  aria-hidden
-                  className="h-[19px] w-[140px] shrink-0"
-                  width={140}
-                  height={19}
-                  draggable={false}
-                />
+            {showSkeleton || !active ? (
+              <div className="flex w-full flex-col gap-3" aria-hidden>
+                <div className="h-[19px] w-[140px] animate-pulse rounded bg-black/5" />
+                <div className="h-5 w-[70%] animate-pulse rounded bg-black/5" />
+                <div className="h-24 w-full max-w-[36em] animate-pulse rounded bg-black/5" />
+                <div className="h-5 w-[40%] animate-pulse rounded bg-black/5" />
+              </div>
+            ) : (
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={active.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                  className="flex w-full flex-col items-start"
+                >
+                  <img
+                    src={starsSrc}
+                    alt=""
+                    aria-hidden
+                    className="h-[19px] w-[140px] shrink-0"
+                    width={140}
+                    height={19}
+                    draggable={false}
+                  />
 
-                <p className="mt-2.5 font-heading text-[16px] font-bold text-[var(--gym-ink)] lg:mt-[25px] lg:text-[18px]">
-                  {quote.title}
-                </p>
+                  <p className="mt-2.5 font-heading text-[16px] font-bold text-[var(--gym-ink)] lg:mt-[25px] lg:text-[18px]">
+                    {active.title}
+                  </p>
 
-                <p className="mt-2.5 max-w-[36em] font-heading text-[18px] font-medium leading-[1.4] text-[#1e2222] lg:mt-5 lg:text-[22px]">
-                  {quote.body}
-                </p>
+                  <p className="mt-2.5 max-w-[36em] font-heading text-[18px] font-medium leading-[1.4] text-[#1e2222] lg:mt-5 lg:text-[22px]">
+                    {active.body}
+                  </p>
 
-                <p className="mt-5 text-[16px] text-[var(--gym-muted)] lg:text-[18px]">
-                  {quote.author}
-                </p>
-              </motion.div>
-            </AnimatePresence>
+                  <p className="mt-5 text-[16px] text-[var(--gym-muted)] lg:text-[18px]">
+                    {active.author}
+                  </p>
+                </motion.div>
+              </AnimatePresence>
+            )}
           </div>
 
-          {/* Right — pattern + avatar cloud */}
           <div
             role="tablist"
             aria-label={t("testimonials.avatarsLabel")}
@@ -118,22 +202,23 @@ export function TestimonialsSection() {
               "md:gap-5 md:justify-start md:py-8",
               "lg:justify-center lg:gap-[50px] lg:py-[100px]",
               "xl:gap-[70px]",
-              "2xl:gap-[100px]"
+              "2xl:gap-[100px]",
             )}
             style={{
               backgroundImage: `url(${feedbackPattern})`,
             }}
           >
-            {CLIENTS.map((client) => {
-              const isActive = client.id === active
+            {slots.map((client) => {
+              const isActive = client.id === activeId
               return (
                 <button
                   key={client.id}
                   type="button"
                   role="tab"
                   aria-selected={isActive}
-                  aria-label={t(`testimonials.items.${client.id}.author`)}
-                  onClick={() => setActive(client.id)}
+                  aria-label={client.author || undefined}
+                  disabled={showSkeleton}
+                  onClick={() => setActiveId(client.id)}
                   className={cn(
                     "group relative shrink-0 overflow-hidden rounded-full border-4 bg-transparent p-0 transition-[filter,border-color,transform] duration-300 ease-out",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gym-lime)] focus-visible:ring-offset-2",
@@ -141,21 +226,25 @@ export function TestimonialsSection() {
                     isActive
                       ? "z-[2] border-[var(--gym-lime)]"
                       : "border-white grayscale hover:scale-105 hover:grayscale-[0.35]",
-                    // Mobile/tablet: thinner border like GymTrainer ≤479
-                    "max-sm:border-2"
+                    "max-sm:border-2",
+                    showSkeleton && "pointer-events-none animate-pulse border-white/70 bg-black/[0.06]",
                   )}
                 >
-                  <img
-                    src={client.image}
-                    alt=""
-                    className={cn(
-                      "block object-cover",
-                      AVATAR_SIZE[client.size]
-                    )}
-                    loading="eager"
-                    decoding="async"
-                    draggable={false}
-                  />
+                  {client.image ? (
+                    <img
+                      src={client.image}
+                      alt=""
+                      className={cn("block object-cover", AVATAR_SIZE[client.size])}
+                      loading="eager"
+                      decoding="async"
+                      draggable={false}
+                    />
+                  ) : (
+                    <span
+                      aria-hidden
+                      className={cn("block bg-transparent", AVATAR_SIZE[client.size])}
+                    />
+                  )}
                 </button>
               )
             })}

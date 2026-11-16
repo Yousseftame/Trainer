@@ -4,28 +4,23 @@ import { ChevronsRight } from "lucide-react"
 import { FaWhatsapp } from "react-icons/fa6"
 import { env } from "@/config/env"
 import { useLocale } from "@/hooks/useLocale"
+import { buildWhatsAppHref } from "@/lib/whatsapp"
 import { cn } from "@/lib/utils"
 import ctaBackground from "@/assets/6914cc3285b9aaa636f59a97_Cta.svg"
-
-function buildWhatsAppHref(rawPhone: string, prefill?: string) {
-  const digits = rawPhone.replace(/\D/g, "")
-  if (!digits) return null
-  const base = `https://wa.me/${digits}`
-  if (!prefill?.trim()) return base
-  return `${base}?text=${encodeURIComponent(prefill.trim())}`
-}
 
 export function WhatsAppBannerSection() {
   const { t } = useTranslation()
   const { isRtl } = useLocale()
 
-  const href = useMemo(() => {
+  const whatsappHref = useMemo(() => {
     const phone =
-      env.supportWhatsApp?.trim() || t("whatsappBanner.phoneRaw").trim()
-    return buildWhatsAppHref(phone, t("whatsappBanner.prefill"))
+      env.supportWhatsApp?.trim() ||
+      t("whatsappBanner.phoneRaw").trim() ||
+      "01011151366"
+    return buildWhatsAppHref(phone, t("whatsappFloat.prefill"))
   }, [t])
 
-  if (!href) return null
+  if (!whatsappHref) return null
 
   const buttonLabelClass = cn(
     "relative z-10 whitespace-nowrap text-[12px] font-extrabold uppercase tracking-[0.05em] sm:text-[14px] sm:tracking-[0.06em]",
@@ -82,9 +77,7 @@ export function WhatsAppBannerSection() {
           <div className="mt-7 flex w-full justify-center sm:mt-10">
             <div className="inline-flex max-w-full flex-col items-stretch gap-2.5 sm:flex-row sm:items-center sm:gap-4">
               <a
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
+                href="#contact"
                 className={cn(
                   "group relative flex h-[50px] w-full items-center justify-between gap-3 overflow-hidden rounded-full border-2 border-transparent bg-white py-1 pe-1 ps-5 text-black sm:h-[56px] sm:w-auto sm:min-w-[13.75rem] sm:py-1.5 sm:pe-1.5 sm:ps-7",
                   "shadow-[0_4px_14px_rgba(0,0,0,0.2)] sm:shadow-[0_8px_24px_rgba(0,0,0,0.18)]",
@@ -111,7 +104,9 @@ export function WhatsAppBannerSection() {
               </a>
 
               <a
-                href="#contact"
+                href={whatsappHref}
+                target="_blank"
+                rel="noopener noreferrer"
                 className={cn(
                   "group relative flex h-[50px] w-full items-center justify-between gap-3 overflow-hidden rounded-full border-2 border-[#25D366] bg-black py-1 pe-1 ps-5 text-[#25D366] sm:h-[56px] sm:w-auto sm:min-w-[13.75rem] sm:py-1.5 sm:pe-1.5 sm:ps-7",
                   "shadow-[0_4px_14px_rgba(37,211,102,0.16)] sm:shadow-[0_8px_24px_rgba(37,211,102,0.12)]",
