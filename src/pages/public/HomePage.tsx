@@ -23,7 +23,6 @@ export function HomePage() {
       <HeroSection />
       <TrustSection />
       <WhoIAmSection />
-
       <FitnessDreamSection />
       <SecondHeroSection />
       <MissionBannerSection />

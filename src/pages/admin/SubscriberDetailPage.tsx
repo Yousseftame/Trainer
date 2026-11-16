@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Check,
   Dumbbell,
+  KeyRound,
   Languages,
   Mail,
   Pencil,
@@ -530,6 +531,11 @@ export function SubscriberDetailPage() {
           </p>
           <dl className="mt-5 space-y-4 text-[14px]">
             <DetailRow icon={<Mail className="size-4" />} label={t("admin.subscribers.columns.email")} value={subscriber.email} />
+            <DetailRow
+              icon={<KeyRound className="size-4" />}
+              label={t("admin.subscribers.columns.password")}
+              value={subscriber.loginPassword || "—"}
+            />
             <DetailRow icon={<Phone className="size-4" />} label={t("admin.subscribers.columns.phone")} value={subscriber.phone || "—"} />
             <DetailRow
               icon={<Languages className="size-4" />}

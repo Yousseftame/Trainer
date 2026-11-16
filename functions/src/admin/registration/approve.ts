@@ -101,6 +101,7 @@ export const approveRegistrationRequest = onCall(async (request) => {
     name: normalizeBilingual(prev.name ?? existing.name, displayName),
     email,
     phone: String(prev.phone ?? existing.phone ?? ""),
+    loginPassword: password,
     status: "active",
     locale: (prev.locale as Locale) || locale,
     sex: prev.sex === "male" || prev.sex === "female" ? prev.sex : undefined,

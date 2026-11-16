@@ -21,6 +21,7 @@ export {
   setSubscriberAccountStatus,
   deleteSubscriberAccount,
   purgeDemoSubscriberData,
+  sendSubscriberCredentialsEmail,
   approveRegistrationRequest,
   rejectRegistrationRequest,
   assignSubscription,

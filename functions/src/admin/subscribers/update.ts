@@ -50,5 +50,16 @@ export const updateSubscriberAccount = onCall(async (request) => {
     }
   }
 
+  // Keep staff-visible login password in sync when Auth password changes.
+  if (password) {
+    await db.collection(COLLECTIONS.subscribers).doc(subscriberId).set(
+      {
+        loginPassword: password,
+        updatedAt: new Date().toISOString(),
+      },
+      {merge: true},
+    );
+  }
+
   return {ok: true, subscriberId};
 });

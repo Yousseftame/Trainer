@@ -81,6 +81,10 @@ export function normalizeSubscriberDoc(
     name: nameObj ?? { en: displayName, ar: displayName },
     email: String(raw.email ?? ""),
     phone: String(raw.phone ?? ""),
+    loginPassword:
+      typeof raw.loginPassword === "string" && raw.loginPassword.trim()
+        ? raw.loginPassword
+        : undefined,
     status,
     locale,
     createdAt:
@@ -409,12 +413,46 @@ export async function saveSubscriber(
 
   return {
     ...existing,
-    ...patch,
+    displayName: resolvedDisplayName,
+    name: {
+      en: nameObj.en || resolvedDisplayName,
+      ar: nameObj.ar || resolvedDisplayName,
+    },
+    phone: input.phone.trim(),
+    locale: input.locale,
+    sex: input.sex,
+    age:
+      input.age && Number.isFinite(input.age) && input.age > 0
+        ? Math.round(input.age)
+        : existing.age,
+    heightCm:
+      input.heightCm && Number.isFinite(input.heightCm) && input.heightCm > 0
+        ? Number(input.heightCm)
+        : existing.heightCm,
+    startingWeightKg:
+      input.startingWeightKg &&
+      Number.isFinite(input.startingWeightKg) &&
+      input.startingWeightKg > 0
+        ? Number(input.startingWeightKg)
+        : existing.startingWeightKg,
+    targetWeightKg:
+      input.targetWeightKg &&
+      Number.isFinite(input.targetWeightKg) &&
+      input.targetWeightKg > 0
+        ? Number(input.targetWeightKg)
+        : existing.targetWeightKg,
+    goal: goal ?? existing.goal,
+    healthNotes: healthNotes ?? existing.healthNotes,
+    coachNotes: coachNotes ?? existing.coachNotes,
+    preferredPackageId:
+      input.preferredPackageId ?? existing.preferredPackageId,
+    loginPassword: nextPassword || existing.loginPassword,
     id: input.id,
     email: existing.email,
     status: existing.status,
     createdAt: existing.createdAt,
-  } as Subscriber
+    updatedAt: now,
+  }
 }
 
 export type UpdateSubscriberStatusInput = {

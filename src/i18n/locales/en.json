@@ -1066,6 +1066,29 @@
         }
       }
     },
+    "shareCredentials": {
+      "title": "Share login details",
+      "hint": "Send the member their email, password, and login link via WhatsApp or email.",
+      "close": "Close",
+      "member": "Member",
+      "email": "Email",
+      "password": "Password",
+      "phone": "Phone",
+      "whatsapp": "WhatsApp",
+      "emailAction": "Send email",
+      "sendingEmail": "Sending…",
+      "copy": "Copy details",
+      "copied": "Copied",
+      "emailFromHint": "Email is sent from {{from}} via Gmail SMTP.",
+      "toasts": {
+        "copied": "Login details copied",
+        "copyFailed": "Could not copy details",
+        "whatsappOpened": "WhatsApp opened",
+        "whatsappFailed": "Add a valid phone number first",
+        "emailSent": "Login email sent",
+        "emailFailed": "Could not send the login email"
+      }
+    },
     "common": {
       "all": "All",
       "actions": "Actions",
@@ -1206,6 +1229,7 @@
       "columns": {
         "name": "Subscriber",
         "email": "Email",
+        "password": "Password",
         "phone": "Phone",
         "account": "Account",
         "package": "Package",

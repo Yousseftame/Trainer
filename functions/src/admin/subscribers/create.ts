@@ -57,6 +57,7 @@ export const createSubscriberAccount = onCall(async (request) => {
     name: normalizeBilingual(data.name, displayName),
     email,
     phone: String(data.phone ?? ""),
+    loginPassword: password,
     status,
     locale,
     sex: parseSex(data.sex),

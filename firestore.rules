@@ -50,7 +50,10 @@ service cloud.firestore {
         request.resource.data.id == sid &&
         request.resource.data.email == resource.data.email &&
         request.resource.data.status == resource.data.status &&
-        request.resource.data.createdAt == resource.data.createdAt;
+        request.resource.data.createdAt == resource.data.createdAt &&
+        // loginPassword is Admin-SDK only (create / approve / password reset)
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['loginPassword']);
     }
 
     // Staff client updates are allowlisted (identity/status stay locked separately).

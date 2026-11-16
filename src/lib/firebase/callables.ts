@@ -106,6 +106,23 @@ export async function callPurgeDemoSubscriberData() {
   }
 }
 
+export async function callSendSubscriberCredentialsEmail(input: {
+  subscriberId?: string
+  toEmail: string
+  password: string
+  displayName?: string
+  loginUrl: string
+  logoUrl?: string
+  locale?: "en" | "ar"
+}) {
+  const fn = httpsCallable(
+    getFirebaseFunctions(),
+    "sendSubscriberCredentialsEmail",
+  )
+  const result = await fn(input)
+  return result.data as { ok: boolean; mailId: string; to: string }
+}
+
 export async function callListSubscriberContentLibrary() {
   const fn = httpsCallable(getFirebaseFunctions(), "listSubscriberContentLibrary")
   const result = await fn({})

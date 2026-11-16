@@ -16,6 +16,7 @@ import {
   RegistrationReviewDialog,
   type RegistrationDialogState,
 } from "@/components/dashboard/RegistrationReviewDialog"
+import { ShareCredentialsDialog } from "@/components/dashboard/ShareCredentialsDialog"
 import { APP_ROUTES } from "@/config/constants"
 import { useAuth } from "@/features/auth/auth-context"
 import {
@@ -31,6 +32,7 @@ import { usePackagesQuery } from "@/features/subscriptions/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatDate, initials } from "@/lib/format"
+import type { ShareCredentialsPayload } from "@/lib/share-credentials"
 import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 
@@ -68,6 +70,8 @@ export function RegistrationRequestsPage() {
   )
   const [dialogState, setDialogState] =
     useState<RegistrationDialogState | null>(null)
+  const [sharePayload, setSharePayload] =
+    useState<ShareCredentialsPayload | null>(null)
 
   useEffect(() => {
     if (!focusRequestId || !rows.length) return
@@ -307,8 +311,22 @@ export function RegistrationRequestsPage() {
                 ? t("admin.requests.toast.approved")
                 : t("admin.requests.toast.rejected"),
             )
-            if (payload.decision === "approved" && result.subscriber?.id) {
-              // Keep admin on requests; overview/subscribers refresh via query invalidation
+            if (
+              payload.decision === "approved" &&
+              result.subscriber?.id &&
+              payload.password?.trim()
+            ) {
+              setSharePayload({
+                subscriberId: result.subscriber.id,
+                displayName: result.subscriber.displayName,
+                email: result.subscriber.email,
+                phone:
+                  result.subscriber.phone || result.request.phone || "",
+                password:
+                  result.subscriber.loginPassword?.trim() ||
+                  payload.password.trim(),
+                locale: result.subscriber.locale,
+              })
             }
           } catch (err) {
             appToast.error(
@@ -339,6 +357,12 @@ export function RegistrationRequestsPage() {
             )
           }
         }}
+      />
+
+      <ShareCredentialsDialog
+        open={Boolean(sharePayload)}
+        payload={sharePayload}
+        onClose={() => setSharePayload(null)}
       />
     </div>
   )

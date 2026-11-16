@@ -1066,6 +1066,29 @@
         }
       }
     },
+    "shareCredentials": {
+      "title": "مشاركة بيانات الدخول",
+      "hint": "أرسل للمشترك بريده وكلمة المرور ورابط الدخول عبر واتساب أو البريد.",
+      "close": "إغلاق",
+      "member": "المشترك",
+      "email": "البريد",
+      "password": "كلمة المرور",
+      "phone": "الهاتف",
+      "whatsapp": "واتساب",
+      "emailAction": "إرسال بريد",
+      "sendingEmail": "جارٍ الإرسال…",
+      "copy": "نسخ البيانات",
+      "copied": "تم النسخ",
+      "emailFromHint": "يُرسل البريد من {{from}} عبر Gmail SMTP.",
+      "toasts": {
+        "copied": "تم نسخ بيانات الدخول",
+        "copyFailed": "تعذر نسخ البيانات",
+        "whatsappOpened": "تم فتح واتساب",
+        "whatsappFailed": "أضف رقم هاتف صالح أولاً",
+        "emailSent": "تم إرسال بريد الدخول",
+        "emailFailed": "تعذر إرسال بريد الدخول"
+      }
+    },
     "common": {
       "all": "الكل",
       "actions": "إجراءات",
@@ -1205,6 +1228,7 @@
       "columns": {
         "name": "المشترك",
         "email": "البريد",
+        "password": "كلمة المرور",
         "phone": "الهاتف",
         "account": "الحساب",
         "package": "الباقة",

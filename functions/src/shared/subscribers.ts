@@ -38,6 +38,8 @@ export function buildSubscriberRecord(input: {
   name?: Bilingual;
   email: string;
   phone: string;
+  /** Staff-visible login password (Admin SDK only). */
+  loginPassword?: string;
   status: UserStatus;
   locale: Locale;
   sex?: "male" | "female";
@@ -54,12 +56,14 @@ export function buildSubscriberRecord(input: {
 }): Record<string, unknown> {
   const now = new Date().toISOString();
   const name = input.name ?? {en: input.displayName, ar: input.displayName};
+  const loginPassword = input.loginPassword?.trim();
   return stripUndefined({
     id: input.id,
     displayName: input.displayName,
     name,
     email: input.email.trim().toLowerCase(),
     phone: input.phone.trim(),
+    loginPassword: loginPassword || undefined,
     status: input.status,
     locale: input.locale,
     sex: input.sex,

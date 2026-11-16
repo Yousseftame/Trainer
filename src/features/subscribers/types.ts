@@ -7,6 +7,11 @@ export type Subscriber = {
   name?: { en: string; ar: string }
   email: string
   phone: string
+  /**
+   * Plaintext login password set by staff on create / approve / reset.
+   * Written only by Cloud Functions for admin reference — never by the client.
+   */
+  loginPassword?: string
   status: UserStatus
   locale: "en" | "ar"
   createdAt: string

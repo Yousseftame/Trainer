@@ -10,6 +10,7 @@ import {
   accountStatusTone,
   subscriptionStatusTone,
 } from "@/components/dashboard/StatusBadge"
+import { ShareCredentialsDialog } from "@/components/dashboard/ShareCredentialsDialog"
 import { SubscriberFormDialog } from "@/components/dashboard/SubscriberFormDialog"
 import {
   SubscriptionActionDialog,
@@ -37,6 +38,7 @@ import {
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatDate, initials } from "@/lib/format"
+import type { ShareCredentialsPayload } from "@/lib/share-credentials"
 import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 import type { UserStatus } from "@/types/user"
@@ -85,6 +87,8 @@ export function SubscribersPage() {
     tone: "danger" | "primary" | "warning"
     onConfirm: () => Promise<void>
   } | null>(null)
+  const [sharePayload, setSharePayload] =
+    useState<ShareCredentialsPayload | null>(null)
 
   const actionsBusy =
     updateStatusMutation.isPending || deleteSubscriberMutation.isPending
@@ -492,6 +496,32 @@ export function SubscribersPage() {
                 onClick={() => setFormState({ open: true, subscriber: row })}
               />
             ) : null}
+            {canWrite ? (
+              <TableAction
+                label={
+                  locale === "ar" ? "إرسال بيانات الدخول" : "Send login details"
+                }
+                disabled={actionsBusy || !row.loginPassword}
+                onClick={() => {
+                  if (!row.loginPassword) {
+                    appToast.error(
+                      locale === "ar"
+                        ? "لا توجد كلمة مرور محفوظة لهذا المشترك. حدّث كلمة المرور أولاً."
+                        : "No saved password for this subscriber. Set a password first.",
+                    )
+                    return
+                  }
+                  setSharePayload({
+                    subscriberId: row.id,
+                    displayName: subscriberDisplayName(row, locale),
+                    email: row.email,
+                    phone: row.phone || "",
+                    password: row.loginPassword,
+                    locale: row.locale,
+                  })
+                }}
+              />
+            ) : null}
             {canManageSubs ? (
               <TableAction
                 label={t("admin.common.manage")}
@@ -557,7 +587,7 @@ export function SubscribersPage() {
           }}
           onSave={async (payload) => {
             const isEdit = Boolean(payload.id)
-            await saveSubscriberMutation.mutateAsync(payload)
+            const saved = await saveSubscriberMutation.mutateAsync(payload)
             setFormState({ open: false, subscriber: null })
             appToast.success(
               isEdit
@@ -568,6 +598,17 @@ export function SubscribersPage() {
                   ? "تم إنشاء حساب المشترك بنجاح"
                   : "Subscriber account created successfully",
             )
+            if (!isEdit && payload.password?.trim()) {
+              setSharePayload({
+                subscriberId: saved.id,
+                displayName: saved.displayName,
+                email: saved.email,
+                phone: saved.phone || payload.phone || "",
+                password:
+                  saved.loginPassword?.trim() || payload.password.trim(),
+                locale: saved.locale,
+              })
+            }
           }}
         />
       ) : null}
@@ -611,6 +652,12 @@ export function SubscribersPage() {
           if (!confirmDialog) return
           await confirmDialog.onConfirm()
         }}
+      />
+
+      <ShareCredentialsDialog
+        open={Boolean(sharePayload)}
+        payload={sharePayload}
+        onClose={() => setSharePayload(null)}
       />
     </div>
   )
