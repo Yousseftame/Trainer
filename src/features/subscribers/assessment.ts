@@ -143,6 +143,40 @@ export function normalizeRegistrationAssessment(
   return Object.keys(assessment).length > 0 ? assessment : undefined
 }
 
+const EXPERIENCE_LABELS: Record<string, { en: string; ar: string }> = {
+  beginner: { en: "Beginner", ar: "مبتدئ" },
+  intermediate: { en: "Intermediate", ar: "متوسط" },
+  advanced: { en: "Advanced", ar: "متقدم" },
+}
+
+const ACTIVITY_LABELS: Record<string, { en: string; ar: string }> = {
+  sedentary: { en: "Sedentary", ar: "قليل الحركة" },
+  light: { en: "Lightly active", ar: "نشاط خفيف" },
+  moderate: { en: "Moderately active", ar: "نشاط متوسط" },
+  very_active: { en: "Very active", ar: "نشاط عالٍ" },
+}
+
+const FREQUENCY_LABELS: Record<string, { en: string; ar: string }> = {
+  "1_2": { en: "1–2 days / week", ar: "1–2 أيام / أسبوع" },
+  "3_4": { en: "3–4 days / week", ar: "3–4 أيام / أسبوع" },
+  "5_6": { en: "5–6 days / week", ar: "5–6 أيام / أسبوع" },
+  daily: { en: "Daily", ar: "يومياً" },
+}
+
+const GOAL_LABELS: Record<string, { en: string; ar: string }> = {
+  muscle_gain: { en: "Muscle gain", ar: "بناء عضل" },
+  fat_loss: { en: "Fat loss", ar: "خسارة دهون" },
+  maintenance: { en: "Maintenance", ar: "حفاظ على الوزن" },
+  performance: { en: "Athletic performance", ar: "أداء رياضي" },
+}
+
+const FITNESS_ENUM_LABELS: Record<string, { en: string; ar: string }> = {
+  ...EXPERIENCE_LABELS,
+  ...ACTIVITY_LABELS,
+  ...FREQUENCY_LABELS,
+  ...GOAL_LABELS,
+}
+
 /** Short bilingual summary for subscriber healthNotes when free-text notes are empty. */
 export function buildAssessmentProfileSummary(
   assessment: RegistrationAssessment | undefined,
@@ -155,23 +189,56 @@ export function buildAssessmentProfileSummary(
   const enParts: string[] = []
   const arParts: string[] = []
 
-  if (assessment.fitnessExperience) {
-    enParts.push(`Experience: ${assessment.fitnessExperience}`)
-    arParts.push(`الخبرة: ${assessment.fitnessExperience}`)
+  if (assessment.fitnessExperience && EXPERIENCE_LABELS[assessment.fitnessExperience]) {
+    enParts.push(
+      `Experience: ${EXPERIENCE_LABELS[assessment.fitnessExperience].en}`,
+    )
+    arParts.push(
+      `الخبرة: ${EXPERIENCE_LABELS[assessment.fitnessExperience].ar}`,
+    )
   }
-  if (assessment.activityLevel) {
-    enParts.push(`Activity: ${assessment.activityLevel}`)
-    arParts.push(`النشاط: ${assessment.activityLevel}`)
+  if (assessment.activityLevel && ACTIVITY_LABELS[assessment.activityLevel]) {
+    enParts.push(`Activity: ${ACTIVITY_LABELS[assessment.activityLevel].en}`)
+    arParts.push(`النشاط: ${ACTIVITY_LABELS[assessment.activityLevel].ar}`)
   }
-  if (assessment.workoutFrequency) {
-    enParts.push(`Frequency: ${assessment.workoutFrequency}`)
-    arParts.push(`التكرار: ${assessment.workoutFrequency}`)
+  if (
+    assessment.workoutFrequency &&
+    FREQUENCY_LABELS[assessment.workoutFrequency]
+  ) {
+    enParts.push(
+      `Frequency: ${FREQUENCY_LABELS[assessment.workoutFrequency].en}`,
+    )
+    arParts.push(
+      `التكرار: ${FREQUENCY_LABELS[assessment.workoutFrequency].ar}`,
+    )
   }
-  if (assessment.primaryGoal) {
-    enParts.push(`Primary goal: ${assessment.primaryGoal}`)
-    arParts.push(`الهدف الأساسي: ${assessment.primaryGoal}`)
+  if (assessment.primaryGoal && GOAL_LABELS[assessment.primaryGoal]) {
+    enParts.push(`Primary goal: ${GOAL_LABELS[assessment.primaryGoal].en}`)
+    arParts.push(`الهدف الأساسي: ${GOAL_LABELS[assessment.primaryGoal].ar}`)
   }
 
   if (!enParts.length) return undefined
   return { en: enParts.join(" · "), ar: arParts.join(" · ") }
+}
+
+/**
+ * Display helper for profile health notes that may contain raw fitness enum keys
+ * (from older approve summaries). Renders WhatsApp-style localized labels.
+ */
+export function formatHealthNotesForDisplay(
+  text: string | undefined | null,
+  locale: "en" | "ar",
+): string {
+  const raw = String(text ?? "").trim()
+  if (!raw) return ""
+
+  let out = raw
+  for (const [key, labels] of Object.entries(FITNESS_ENUM_LABELS)) {
+    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    out = out.replace(
+      new RegExp(`(^|[\\s·:])(${escaped})(?=$|[\\s·])`, "gi"),
+      (_match, prefix: string) => `${prefix}${labels[locale]}`,
+    )
+  }
+  return out
 }

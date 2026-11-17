@@ -55,6 +55,7 @@ import {
   weightDelta as weightDeltaFromList,
 } from "@/features/progress/metrics"
 import { subscriberDisplayName } from "@/features/subscribers"
+import { formatHealthNotesForDisplay } from "@/features/subscribers/assessment"
 import {
   useDeleteSubscriberMutation,
   useSaveSubscriberMutation,
@@ -595,12 +596,16 @@ export function SubscriberDetailPage() {
             <DetailRow
               label={locale === "ar" ? "ملاحظات صحية / إصابات" : "Health & injury notes"}
               value={
-                subscriber.healthNotes?.[locale] ||
-                subscriber.healthNotes?.en ||
-                subscriber.healthNotes?.ar ||
-                "—"
+                formatHealthNotesForDisplay(
+                  subscriber.healthNotes?.[locale] ||
+                    subscriber.healthNotes?.en ||
+                    subscriber.healthNotes?.ar ||
+                    "",
+                  locale,
+                ) || "—"
               }
               stacked
+              dir={locale === "ar" ? "rtl" : "ltr"}
             />
             {subscriber.updatedAt ? (
               <DetailRow
@@ -1418,11 +1423,13 @@ function DetailRow({
   value,
   icon,
   stacked,
+  dir,
 }: {
   label: string
   value: string
   icon?: ReactNode
   stacked?: boolean
+  dir?: "ltr" | "rtl"
 }) {
   if (stacked) {
     return (
@@ -1431,7 +1438,12 @@ function DetailRow({
           {icon}
           {label}
         </dt>
-        <dd className="font-semibold leading-relaxed text-[var(--gym-ink,#111111)]">{value}</dd>
+        <dd
+          dir={dir}
+          className="font-semibold leading-relaxed text-[var(--gym-ink,#111111)]"
+        >
+          {value}
+        </dd>
       </div>
     )
   }
