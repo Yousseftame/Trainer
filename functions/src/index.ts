@@ -44,6 +44,7 @@ export {
   requestExerciseChange,
   requestMealChange,
   updateMySubscriberProfile,
+  recordSubscriberCheckIn,
 } from "./subscriber/index.js";
 
 export {

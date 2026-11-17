@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import {
@@ -17,6 +17,7 @@ import {
   type RegistrationDialogState,
 } from "@/components/dashboard/RegistrationReviewDialog"
 import { ShareCredentialsDialog } from "@/components/dashboard/ShareCredentialsDialog"
+import { SendRegistrationOfferDialog } from "@/components/dashboard/SendRegistrationOfferDialog"
 import { APP_ROUTES } from "@/config/constants"
 import { useAuth } from "@/features/auth/auth-context"
 import {
@@ -32,6 +33,10 @@ import { usePackagesQuery } from "@/features/subscriptions/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatDate, initials } from "@/lib/format"
+import {
+  buildOfferPayloadFromRequest,
+  type RegistrationOfferPayload,
+} from "@/lib/registration-offer"
 import type { ShareCredentialsPayload } from "@/lib/share-credentials"
 import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
@@ -72,6 +77,8 @@ export function RegistrationRequestsPage() {
     useState<RegistrationDialogState | null>(null)
   const [sharePayload, setSharePayload] =
     useState<ShareCredentialsPayload | null>(null)
+  const [offerPayload, setOfferPayload] =
+    useState<RegistrationOfferPayload | null>(null)
 
   useEffect(() => {
     if (!focusRequestId || !rows.length) return
@@ -89,6 +96,23 @@ export function RegistrationRequestsPage() {
     () => new Map(packages.map((p) => [p.id, p])),
     [packages],
   )
+
+  function openOffer(row: RegistrationRequest) {
+    const pkg = row.packageId ? packageMap.get(row.packageId) : undefined
+    setOfferPayload(
+      buildOfferPayloadFromRequest({
+        displayName: row.displayName,
+        name: row.name,
+        email: row.email,
+        phone: row.phone,
+        locale: row.locale,
+        goal: row.goal,
+        assessment: row.assessment,
+        packageName: pkg?.name,
+        packagePrice: pkg?.price,
+      }),
+    )
+  }
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -259,6 +283,11 @@ export function RegistrationRequestsPage() {
           row.status === "pending" ? (
             <>
               <TableAction
+                label={t("admin.requests.offer.action")}
+                disabled={actionsBusy}
+                onClick={() => openOffer(row)}
+              />
+              <TableAction
                 label={t("admin.requests.approve")}
                 tone="primary"
                 disabled={actionsBusy}
@@ -277,6 +306,10 @@ export function RegistrationRequestsPage() {
             </>
           ) : (
             <div className="flex items-center gap-1">
+              <TableAction
+                label={t("admin.requests.offer.action")}
+                onClick={() => openOffer(row)}
+              />
               {row.subscriberId ? (
                 <Link
                   to={APP_ROUTES.admin.subscriberDetail(row.subscriberId)}
@@ -364,6 +397,30 @@ export function RegistrationRequestsPage() {
         payload={sharePayload}
         onClose={() => setSharePayload(null)}
       />
+
+      <SendRegistrationOfferDialog
+        open={Boolean(offerPayload)}
+        payload={offerPayload}
+        onClose={() => setOfferPayload(null)}
+      />
+    </div>
+  )
+}
+
+function AssessmentDetailRow({
+  label,
+  value,
+}: {
+  label: string
+  value?: string | number | null
+}) {
+  if (value === undefined || value === null || value === "") return null
+  return (
+    <div className="flex justify-between gap-3 text-[13px]">
+      <dt className="text-[#8c8c8c]">{label}</dt>
+      <dd className="max-w-[60%] text-end font-semibold text-[var(--gym-ink,#111111)]">
+        {value}
+      </dd>
     </div>
   )
 }
@@ -377,10 +434,11 @@ function RequestDetails({
 }) {
   const { t } = useTranslation()
   const { locale } = useLocale()
+  const assessment = row.assessment
 
   return (
     <div className="grid gap-4 sm:grid-cols-[1fr_240px]">
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div>
           <p className="text-[12px] font-bold uppercase tracking-[0.08em] text-[#8c8c8c]">
             {t("admin.requests.goal")}
@@ -389,6 +447,127 @@ function RequestDetails({
             {row.goal[locale]}
           </p>
         </div>
+
+        {assessment ? (
+          <div className="space-y-4 rounded-2xl border border-[var(--gym-ink)]/8 bg-[#fafafa] p-4">
+            <p className="text-[12px] font-bold uppercase tracking-[0.08em] text-[#8c8c8c]">
+              {t("admin.requests.assessment.title")}
+            </p>
+
+            <div className="space-y-2">
+              <p className="text-[12px] font-semibold text-[var(--gym-ink)]/70">
+                {t("admin.requests.assessment.personal")}
+              </p>
+              <dl className="space-y-1.5">
+                <AssessmentDetailRow
+                  label={t("admin.requests.assessment.age")}
+                  value={assessment.age}
+                />
+                <AssessmentDetailRow
+                  label={t("admin.requests.assessment.sex")}
+                  value={
+                    assessment.sex
+                      ? t(`contact.assessment.options.sex.${assessment.sex}`)
+                      : undefined
+                  }
+                />
+                <AssessmentDetailRow
+                  label={t("admin.requests.assessment.height")}
+                  value={
+                    assessment.heightCm != null
+                      ? t("admin.requests.assessment.cm", {
+                          value: assessment.heightCm,
+                        })
+                      : undefined
+                  }
+                />
+                <AssessmentDetailRow
+                  label={t("admin.requests.assessment.weight")}
+                  value={
+                    assessment.startingWeightKg != null
+                      ? t("admin.requests.assessment.kg", {
+                          value: assessment.startingWeightKg,
+                        })
+                      : undefined
+                  }
+                />
+                <AssessmentDetailRow
+                  label={t("admin.requests.assessment.targetWeight")}
+                  value={
+                    assessment.targetWeightKg != null
+                      ? t("admin.requests.assessment.kg", {
+                          value: assessment.targetWeightKg,
+                        })
+                      : undefined
+                  }
+                />
+                {assessment.healthNotes?.[locale] ||
+                assessment.healthNotes?.en ||
+                assessment.healthNotes?.ar ? (
+                  <div className="pt-1">
+                    <p className="text-[12px] text-[#8c8c8c]">
+                      {t("admin.requests.assessment.healthNotes")}
+                    </p>
+                    <p className="mt-1 text-[13px] font-medium leading-relaxed text-[var(--gym-ink,#111111)]">
+                      {assessment.healthNotes?.[locale] ||
+                        assessment.healthNotes?.en ||
+                        assessment.healthNotes?.ar}
+                    </p>
+                  </div>
+                ) : null}
+              </dl>
+            </div>
+
+            <div className="space-y-2 border-t border-[var(--gym-ink)]/6 pt-3">
+              <p className="text-[12px] font-semibold text-[var(--gym-ink)]/70">
+                {t("admin.requests.assessment.fitness")}
+              </p>
+              <dl className="space-y-1.5">
+                <AssessmentDetailRow
+                  label={t("admin.requests.assessment.experience")}
+                  value={
+                    assessment.fitnessExperience
+                      ? t(
+                          `contact.assessment.options.experience.${assessment.fitnessExperience}`,
+                        )
+                      : undefined
+                  }
+                />
+                <AssessmentDetailRow
+                  label={t("admin.requests.assessment.activity")}
+                  value={
+                    assessment.activityLevel
+                      ? t(
+                          `contact.assessment.options.activity.${assessment.activityLevel}`,
+                        )
+                      : undefined
+                  }
+                />
+                <AssessmentDetailRow
+                  label={t("admin.requests.assessment.frequency")}
+                  value={
+                    assessment.workoutFrequency
+                      ? t(
+                          `contact.assessment.options.frequency.${assessment.workoutFrequency}`,
+                        )
+                      : undefined
+                  }
+                />
+                <AssessmentDetailRow
+                  label={t("admin.requests.assessment.primaryGoal")}
+                  value={
+                    assessment.primaryGoal
+                      ? t(
+                          `contact.assessment.options.goal.${assessment.primaryGoal}`,
+                        )
+                      : undefined
+                  }
+                />
+              </dl>
+            </div>
+          </div>
+        ) : null}
+
         {row.reviewNotesLocalized?.[locale] || row.reviewNotes ? (
           <div>
             <p className="text-[12px] font-bold uppercase tracking-[0.08em] text-[#8c8c8c]">

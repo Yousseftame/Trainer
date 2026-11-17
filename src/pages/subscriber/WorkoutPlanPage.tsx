@@ -218,22 +218,34 @@ export function WorkoutPlanPage() {
   // 1. Substitute Exercise Handler (session-local approved alt)
   function handleSwapExercise(substitute: ExerciseAlternative, _reason: string) {
     if (!changeModalExercise) return
+    const original =
+      rawSelectedDay?.exercises.find((ex) => ex.id === changeModalExercise.id) ||
+      changeModalExercise
     const updated: WorkoutExercise = {
-      ...changeModalExercise,
+      ...original,
       name: substitute.name,
-      equipment: substitute.equipment || changeModalExercise.equipment,
-      notes: substitute.notes || changeModalExercise.notes,
-      description: substitute.reason || changeModalExercise.description,
-      videoContentId:
-        substitute.videoContentId ?? changeModalExercise.videoContentId,
-      videoUrl: substitute.videoContentId
-        ? undefined
-        : changeModalExercise.videoUrl,
+      equipment: substitute.equipment || original.equipment,
+      notes: substitute.notes || original.notes,
+      description: substitute.reason || original.description,
+      videoContentId: substitute.videoContentId ?? original.videoContentId,
+      videoUrl: substitute.videoContentId ? undefined : original.videoUrl,
     }
     setExerciseOverrides((prev) => ({
       ...prev,
-      [changeModalExercise.id]: updated,
+      [original.id]: updated,
     }))
+  }
+
+  function handleRevertExercise(exerciseId: string) {
+    setExerciseOverrides((prev) => {
+      if (!prev[exerciseId]) return prev
+      const next = { ...prev }
+      delete next[exerciseId]
+      return next
+    })
+    appToast.success(
+      isAr ? "تم استعادة التمرين الأصلي" : "Original exercise restored",
+    )
   }
 
   // 1b. Coach-review request (no approved alt, or explicit request path)
@@ -788,6 +800,10 @@ export function WorkoutPlanPage() {
                   const desc = resolveBilingualText(exercise.description, locale)
                   const notes = resolveBilingualText(exercise.notes, locale)
                   const hasVideo = Boolean(exercise.videoUrl || exercise.videoContentId)
+                  const isSwapped = Boolean(exerciseOverrides[exercise.id])
+                  const originalExercise =
+                    rawSelectedDay?.exercises.find((ex) => ex.id === exercise.id) ||
+                    exercise
 
                   const exerciseLabel =
                     typeof exercise.name === "string"
@@ -803,7 +819,12 @@ export function WorkoutPlanPage() {
                   return (
                     <div
                       key={exercise.id || idx}
-                      className="group rounded-2xl border border-black/[0.06] bg-[#FAFAFA] p-3.5 sm:p-4 transition hover:bg-white hover:border-black/15 hover:shadow-2xs space-y-3"
+                      className={cn(
+                        "group rounded-2xl border p-3.5 sm:p-4 transition hover:shadow-2xs space-y-3",
+                        isSwapped
+                          ? "border-[var(--gym-orange,#fb5001)]/30 bg-[var(--gym-orange,#fb5001)]/[0.04]"
+                          : "border-black/[0.06] bg-[#FAFAFA] hover:bg-white hover:border-black/15",
+                      )}
                     >
                       <div className="flex items-center justify-between gap-3">
                         {/* Right: Exercise Info & Metrics */}
@@ -813,9 +834,16 @@ export function WorkoutPlanPage() {
                               {idx + 1}
                             </span>
                             <div className="min-w-0">
-                              <h4 className="font-heading text-[15px] sm:text-[16px] font-extrabold text-[var(--gym-ink,#111111)] truncate">
-                                {name}
-                              </h4>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <h4 className="font-heading text-[15px] sm:text-[16px] font-extrabold text-[var(--gym-ink,#111111)] truncate">
+                                  {name}
+                                </h4>
+                                {isSwapped ? (
+                                  <span className="rounded-full bg-[var(--gym-orange,#fb5001)]/10 px-2 py-0.5 text-[10px] font-bold text-[var(--gym-orange,#fb5001)]">
+                                    {isAr ? "بديل نشط" : "Substituted"}
+                                  </span>
+                                ) : null}
+                              </div>
                               {desc ? (
                                 <p className="text-[12px] text-[#6B7280] line-clamp-1 mt-0.5">
                                   {desc}
@@ -846,6 +874,53 @@ export function WorkoutPlanPage() {
                                 : `Rest: ${formatRest(exercise.restSeconds ?? 60)}`}
                             </span>
                           </div>
+
+                          {!isSwapped &&
+                          (exercise.alternatives?.length || 0) > 0 ? (
+                            <div className="mt-1 space-y-1 rounded-xl border border-black/[0.05] bg-white px-2.5 py-1.5">
+                              <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#8c8c8c]">
+                                {isAr
+                                  ? `بدائل معتمدة (${exercise.alternatives!.length})`
+                                  : `Approved alternatives (${exercise.alternatives!.length})`}
+                              </p>
+                              {exercise.alternatives!.map((alt) => {
+                                const altName = resolveBilingualText(alt.name, locale)
+                                const altReason = resolveBilingualText(alt.reason, locale)
+                                return (
+                                  <div
+                                    key={alt.id}
+                                    className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]"
+                                  >
+                                    <span className="font-bold text-[#111111]">
+                                      {altName}
+                                    </span>
+                                    {alt.equipment ? (
+                                      <span className="text-[#6B7280]">
+                                        · {alt.equipment}
+                                      </span>
+                                    ) : null}
+                                    {altReason ? (
+                                      <span className="text-[#8c8c8c]">
+                                        · {altReason}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          ) : null}
+
+                          {isSwapped ? (
+                            <button
+                              type="button"
+                              onClick={() => handleRevertExercise(exercise.id)}
+                              className="text-[11px] font-bold text-[#8c8c8c] underline hover:text-[var(--gym-orange,#fb5001)] transition"
+                            >
+                              {isAr
+                                ? "إلغاء والاستعادة للأصل"
+                                : "Cancel & restore original"}
+                            </button>
+                          ) : null}
                         </div>
 
                         {/* Action Buttons: Swap + Video + Optional real photo */}
@@ -853,9 +928,24 @@ export function WorkoutPlanPage() {
                           {/* Swap Exercise Button (opens Change Modal) */}
                           <button
                             type="button"
-                            onClick={() => setChangeModalExercise(exercise)}
-                            className="flex size-9 sm:size-10 items-center justify-center rounded-xl bg-black/5 text-[var(--gym-ink,#111111)] hover:bg-[var(--gym-orange,#fb5001)] hover:text-white transition shadow-2xs"
-                            title={isAr ? "طلب استبدال هذا التمرين" : "Substitute exercise"}
+                            onClick={() =>
+                              setChangeModalExercise(originalExercise)
+                            }
+                            className={cn(
+                              "flex size-9 sm:size-10 items-center justify-center rounded-xl transition shadow-2xs",
+                              isSwapped
+                                ? "bg-[var(--gym-orange,#fb5001)] text-white"
+                                : "bg-black/5 text-[var(--gym-ink,#111111)] hover:bg-[var(--gym-orange,#fb5001)] hover:text-white",
+                            )}
+                            title={
+                              isSwapped
+                                ? isAr
+                                  ? "تغيير البديل أو طلب المدرب"
+                                  : "Change substitute or ask coach"
+                                : isAr
+                                  ? "طلب استبدال هذا التمرين"
+                                  : "Substitute exercise"
+                            }
                           >
                             <RefreshCw className="size-4" />
                           </button>

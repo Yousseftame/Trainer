@@ -1,5 +1,15 @@
 import type { UserStatus } from "@/types/user"
 import type { SubscriberSubscription } from "@/types/subscription"
+import type { RegistrationAssessment } from "./assessment"
+
+export type {
+  RegistrationAssessment,
+  AssessmentSex,
+  FitnessExperience,
+  ActivityLevel,
+  WorkoutFrequency,
+  PrimaryFitnessGoal,
+} from "./assessment"
 
 export type Subscriber = {
   id: string
@@ -26,6 +36,8 @@ export type Subscriber = {
   coachNotes?: { en: string; ar: string }
   preferredPackageId?: string
   registrationRequestId?: string
+  /** Last successful subscriber panel login / session check-in (ISO). */
+  lastCheckInAt?: string
 }
 
 export type RegistrationRequestStatus = "pending" | "approved" | "rejected"
@@ -39,6 +51,8 @@ export type RegistrationRequest = {
   locale: "en" | "ar"
   packageId: string | null
   goal: { en: string; ar: string }
+  /** Personalized fitness & nutrition assessment from contact onboarding. */
+  assessment?: RegistrationAssessment
   source: "contact" | "manual"
   status: RegistrationRequestStatus
   subscriberId?: string

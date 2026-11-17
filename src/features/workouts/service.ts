@@ -455,7 +455,7 @@ export async function assignWorkoutProgram(
       }
     }
     format = template.format
-    days = cloneDays(template.days)
+    days = input.days ? cloneDays(input.days) : cloneDays(template.days)
     pdfContentId = template.pdfContentId
     pdfName = template.pdfName
   }

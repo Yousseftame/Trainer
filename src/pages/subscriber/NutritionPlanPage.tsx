@@ -1066,14 +1066,7 @@ export function NutritionPlanPage() {
                                 ) : null}
                               </div>
 
-                              {/* Alternatives Count Badge */}
                               <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold text-[#8c8c8c]">
-                                {altCount > 0 ? (
-                                  <span className="rounded-md bg-neutral-100 px-2 py-0.5 text-[#555]">
-                                    {isAr ? `بدائل : ${altCount}` : `Alternatives: ${altCount}`}
-                                  </span>
-                                ) : null}
-
                                 {qty ? (
                                   <span className="inline-flex items-center gap-1 text-[#111111]">
                                     <Scale className="size-3 text-[#8c8c8c]" />
@@ -1105,6 +1098,45 @@ export function NutritionPlanPage() {
                                 <p className="text-[11px] text-[#8c8c8c] italic leading-tight">
                                   {notes}
                                 </p>
+                              ) : null}
+
+                              {!isSwapped && altCount > 0 ? (
+                                <div className="mt-1.5 space-y-1 rounded-xl border border-black/[0.05] bg-neutral-50 px-2 py-1.5">
+                                  <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#8c8c8c]">
+                                    {isAr
+                                      ? `بدائل معتمدة (${altCount})`
+                                      : `Approved alternatives (${altCount})`}
+                                  </p>
+                                  {item.alternatives!.map((alt) => {
+                                    const altName = resolveBilingualText(alt.name, locale)
+                                    const altQty = resolveBilingualText(alt.quantity, locale)
+                                    return (
+                                      <div
+                                        key={alt.id}
+                                        className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]"
+                                      >
+                                        <span className="font-bold text-[#111111]">
+                                          {altName}
+                                        </span>
+                                        {altQty ? (
+                                          <span className="text-[#6B7280]">{altQty}</span>
+                                        ) : null}
+                                        {alt.calories ? (
+                                          <span className="text-[#8c8c8c]">
+                                            · {alt.calories} kcal
+                                          </span>
+                                        ) : null}
+                                        {(alt.protein || alt.carbs || alt.fats) && (
+                                          <span className="font-extrabold text-[#8c8c8c]">
+                                            {alt.protein ? `P ${alt.protein}g ` : ""}
+                                            {alt.carbs ? `C ${alt.carbs}g ` : ""}
+                                            {alt.fats ? `F ${alt.fats}g` : ""}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )
+                                  })}
+                                </div>
                               ) : null}
 
                               {/* Revert link if swapped */}

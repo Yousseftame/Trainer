@@ -517,9 +517,10 @@ export function WorkoutLiveSessionModal({
   function handleSwapFromModal(substitute: ExerciseAlternative, _reason: string) {
     const current = exercisesList[currentIdx]
     if (!current) return
+    const baseline = day.exercises.find((ex) => ex.id === current.id) || current
     const originalName =
       substitutions[current.id]?.originalName ||
-      resolveBilingualText(current.name, locale)
+      resolveBilingualText(baseline.name, locale)
     const substituteName = resolveBilingualText(substitute.name, locale)
     setSubstitutions((map) => ({
       ...map,
@@ -530,14 +531,31 @@ export function WorkoutLiveSessionModal({
       const ex = updated[currentIdx]
       if (!ex) return prev
       updated[currentIdx] = {
-        ...ex,
+        ...baseline,
         name: substitute.name,
-        equipment: substitute.equipment || ex.equipment,
-        notes: substitute.notes || ex.notes,
-        videoContentId: substitute.videoContentId ?? ex.videoContentId,
-        videoUrl: substitute.videoContentId ? undefined : ex.videoUrl,
+        equipment: substitute.equipment || baseline.equipment,
+        notes: substitute.notes || baseline.notes,
+        videoContentId: substitute.videoContentId ?? baseline.videoContentId,
+        videoUrl: substitute.videoContentId ? undefined : baseline.videoUrl,
       }
       return updated
+    })
+  }
+
+  function handleRevertCurrentExercise() {
+    const current = exercisesList[currentIdx]
+    if (!current || !substitutions[current.id]) return
+    const baseline = day.exercises.find((ex) => ex.id === current.id)
+    if (!baseline) return
+    setExercisesList((prev) => {
+      const updated = [...prev]
+      updated[currentIdx] = { ...baseline }
+      return updated
+    })
+    setSubstitutions((map) => {
+      const next = { ...map }
+      delete next[current.id]
+      return next
     })
   }
 
@@ -750,11 +768,25 @@ export function WorkoutLiveSessionModal({
               <button
                 type="button"
                 onClick={() => setShowChangeModal(true)}
-                className="flex size-10 items-center justify-center rounded-full bg-black/65 backdrop-blur-md border border-white/20 text-white shadow-lg active:scale-95 transition"
+                className={cn(
+                  "flex size-10 items-center justify-center rounded-full backdrop-blur-md border shadow-lg active:scale-95 transition",
+                  substitutions[currentExercise.id]
+                    ? "bg-[var(--gym-orange,#fb5001)] border-white/20 text-white"
+                    : "bg-black/65 border-white/20 text-white",
+                )}
                 title={isAr ? "تبديل التمرين" : "Substitute Exercise"}
               >
                 <RefreshCw className="size-4" />
               </button>
+              {substitutions[currentExercise.id] ? (
+                <button
+                  type="button"
+                  onClick={handleRevertCurrentExercise}
+                  className="inline-flex h-10 items-center rounded-full bg-black/65 backdrop-blur-md border border-white/20 px-3 text-[11px] font-bold text-white shadow-lg active:scale-95 transition"
+                >
+                  {isAr ? "استعادة الأصل" : "Restore original"}
+                </button>
+              ) : null}
             </div>
 
             <button
@@ -1116,7 +1148,10 @@ export function WorkoutLiveSessionModal({
       <ExerciseChangeModal
         isOpen={showChangeModal}
         onClose={() => setShowChangeModal(false)}
-        exercise={currentExercise}
+        exercise={
+          day.exercises.find((ex) => ex.id === currentExercise.id) ||
+          currentExercise
+        }
         onSwapExercise={handleSwapFromModal}
         onRequestChange={
           onRequestExerciseChange ? handleRequestChangeFromModal : undefined

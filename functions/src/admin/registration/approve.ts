@@ -95,6 +95,115 @@ export const approveRegistrationRequest = onCall(async (request) => {
   const prevSub = await db.collection(COLLECTIONS.subscribers).doc(uid).get();
   const prev = prevSub.exists ? prevSub.data() ?? {} : {};
 
+  const assessmentRaw =
+    existing.assessment && typeof existing.assessment === "object"
+      ? (existing.assessment as Record<string, unknown>)
+      : undefined;
+
+  const asFiniteNumber = (value: unknown): number | undefined =>
+    typeof value === "number" && Number.isFinite(value) ? value : undefined;
+
+  const assessmentSex =
+    assessmentRaw?.sex === "male" || assessmentRaw?.sex === "female"
+      ? (assessmentRaw.sex as "male" | "female")
+      : undefined;
+
+  const assessmentHealthNotes = normalizeBilingual(assessmentRaw?.healthNotes);
+
+  const experienceLabels: Record<string, {en: string; ar: string}> = {
+    beginner: {
+      en: "Beginner — new or returning after a long break",
+      ar: "مبتدئ — جديد أو عائد بعد انقطاع طويل",
+    },
+    intermediate: {
+      en: "Intermediate — training consistently for 6+ months",
+      ar: "متوسط — تدريب منتظم لأكثر من 6 أشهر",
+    },
+    advanced: {
+      en: "Advanced — years of structured training",
+      ar: "متقدم — سنوات من التدريب المنظم",
+    },
+  };
+  const activityLabels: Record<string, {en: string; ar: string}> = {
+    sedentary: {
+      en: "Sedentary — mostly sitting",
+      ar: "قليل الحركة — معظم الوقت جلوساً",
+    },
+    light: {
+      en: "Lightly active — walks / light movement",
+      ar: "نشاط خفيف — مشي أو حركة بسيطة",
+    },
+    moderate: {
+      en: "Moderately active — regular daily movement",
+      ar: "نشاط متوسط — حركة يومية منتظمة",
+    },
+    very_active: {
+      en: "Very active — physical job or high daily output",
+      ar: "نشاط عالٍ — عمل بدني أو مجهود يومي كبير",
+    },
+  };
+  const frequencyLabels: Record<string, {en: string; ar: string}> = {
+    "1_2": {en: "1–2 days / week", ar: "1–2 أيام / أسبوع"},
+    "3_4": {en: "3–4 days / week", ar: "3–4 أيام / أسبوع"},
+    "5_6": {en: "5–6 days / week", ar: "5–6 أيام / أسبوع"},
+    daily: {en: "Daily", ar: "يومياً"},
+  };
+  const primaryGoalLabels: Record<string, {en: string; ar: string}> = {
+    muscle_gain: {en: "Muscle gain", ar: "بناء عضل"},
+    fat_loss: {en: "Fat loss", ar: "خسارة دهون"},
+    maintenance: {en: "Maintenance", ar: "حفاظ على الوزن"},
+    performance: {en: "Athletic performance", ar: "أداء رياضي"},
+  };
+
+  const fitnessSummaryPartsEn: string[] = [];
+  const fitnessSummaryPartsAr: string[] = [];
+  if (assessmentRaw) {
+    const experience = String(assessmentRaw.fitnessExperience ?? "").trim();
+    const activity = String(assessmentRaw.activityLevel ?? "").trim();
+    const frequency = String(assessmentRaw.workoutFrequency ?? "").trim();
+    const primaryGoal = String(assessmentRaw.primaryGoal ?? "").trim();
+    if (experience && experienceLabels[experience]) {
+      fitnessSummaryPartsEn.push(
+        `Experience: ${experienceLabels[experience].en}`,
+      );
+      fitnessSummaryPartsAr.push(
+        `الخبرة: ${experienceLabels[experience].ar}`,
+      );
+    }
+    if (activity && activityLabels[activity]) {
+      fitnessSummaryPartsEn.push(`Activity: ${activityLabels[activity].en}`);
+      fitnessSummaryPartsAr.push(`النشاط: ${activityLabels[activity].ar}`);
+    }
+    if (frequency && frequencyLabels[frequency]) {
+      fitnessSummaryPartsEn.push(
+        `Frequency: ${frequencyLabels[frequency].en}`,
+      );
+      fitnessSummaryPartsAr.push(
+        `التكرار: ${frequencyLabels[frequency].ar}`,
+      );
+    }
+    if (primaryGoal && primaryGoalLabels[primaryGoal]) {
+      fitnessSummaryPartsEn.push(
+        `Primary goal: ${primaryGoalLabels[primaryGoal].en}`,
+      );
+      fitnessSummaryPartsAr.push(
+        `الهدف الأساسي: ${primaryGoalLabels[primaryGoal].ar}`,
+      );
+    }
+  }
+  const fitnessSummary =
+    fitnessSummaryPartsEn.length > 0
+      ? {
+          en: fitnessSummaryPartsEn.join(" · "),
+          ar: fitnessSummaryPartsAr.join(" · "),
+        }
+      : undefined;
+
+  const mergedHealthNotes =
+    normalizeBilingual(prev.healthNotes) ??
+    assessmentHealthNotes ??
+    (fitnessSummary ? normalizeBilingual(fitnessSummary) : undefined);
+
   const subscriber = buildSubscriberRecord({
     id: uid,
     displayName: String(prev.displayName ?? displayName),
@@ -104,15 +213,28 @@ export const approveRegistrationRequest = onCall(async (request) => {
     loginPassword: password,
     status: "active",
     locale: (prev.locale as Locale) || locale,
-    sex: prev.sex === "male" || prev.sex === "female" ? prev.sex : undefined,
-    age: typeof prev.age === "number" ? prev.age : undefined,
-    heightCm: typeof prev.heightCm === "number" ? prev.heightCm : undefined,
+    sex:
+      prev.sex === "male" || prev.sex === "female"
+        ? prev.sex
+        : assessmentSex,
+    age:
+      typeof prev.age === "number"
+        ? prev.age
+        : asFiniteNumber(assessmentRaw?.age),
+    heightCm:
+      typeof prev.heightCm === "number"
+        ? prev.heightCm
+        : asFiniteNumber(assessmentRaw?.heightCm),
     startingWeightKg:
-      typeof prev.startingWeightKg === "number" ? prev.startingWeightKg : undefined,
+      typeof prev.startingWeightKg === "number"
+        ? prev.startingWeightKg
+        : asFiniteNumber(assessmentRaw?.startingWeightKg),
     targetWeightKg:
-      typeof prev.targetWeightKg === "number" ? prev.targetWeightKg : undefined,
+      typeof prev.targetWeightKg === "number"
+        ? prev.targetWeightKg
+        : asFiniteNumber(assessmentRaw?.targetWeightKg),
     goal: normalizeBilingual(prev.goal ?? existing.goal),
-    healthNotes: normalizeBilingual(prev.healthNotes),
+    healthNotes: mergedHealthNotes,
     coachNotes: normalizeBilingual(prev.coachNotes ?? reviewNotesLocalized),
     preferredPackageId: selectedPkgId ?? undefined,
     registrationRequestId: requestId,

@@ -1285,6 +1285,52 @@
       "reviewed": "تم المراجعة",
       "goal": "ماذا طلبوا",
       "source": "المصدر",
+      "offer": {
+        "action": "إرسال العرض",
+        "title": "إرسال عرض الانضمام",
+        "hint": "راجع رسالة واتساب، اختر المستلم، ثم افتح واتساب والرسالة جاهزة للإرسال.",
+        "close": "إغلاق",
+        "sendTo": "إرسال الرسالة إلى",
+        "recipients": {
+          "customer": "العميل",
+          "store": "رقمي (المتجر)",
+          "custom": "رقم مخصص",
+          "customHint": "مندوب / رقم آخر"
+        },
+        "noPhone": "لا يوجد هاتف في الطلب",
+        "customPhone": "رقم واتساب",
+        "customPhonePlaceholder": "01xxxxxxxxx",
+        "preview": "معاينة الرسالة",
+        "langEn": "EN",
+        "langAr": "AR",
+        "copy": "نسخ النص",
+        "copied": "تم النسخ",
+        "sendWhatsapp": "فتح واتساب",
+        "footerHint": "يُنسخ نص الرسالة عند فتح النافذة. رقم Instapay يُدرج تلقائياً.",
+        "toasts": {
+          "copied": "تم نسخ رسالة العرض",
+          "copyFailed": "تعذر نسخ الرسالة",
+          "whatsappOpened": "تم فتح واتساب مع العرض",
+          "whatsappFailed": "أدخل رقم واتساب صالحاً"
+        }
+      },
+      "assessment": {
+        "title": "تقييم اللياقة والتغذية",
+        "personal": "الملف الشخصي",
+        "fitness": "تقييم اللياقة",
+        "age": "العمر",
+        "sex": "الجنس",
+        "height": "الطول",
+        "weight": "الوزن الحالي",
+        "targetWeight": "الوزن المستهدف",
+        "healthNotes": "الصحة والإصابات",
+        "experience": "الخبرة",
+        "activity": "مستوى النشاط",
+        "frequency": "تكرار التمرين",
+        "primaryGoal": "الهدف الأساسي",
+        "cm": "{{value}} سم",
+        "kg": "{{value}} كجم"
+      },
       "toast": {
         "approved": "تم قبول الطلب — سيتم إنشاء الحساب عند ربط Firebase",
         "rejected": "تم رفض الطلب"
@@ -1896,6 +1942,91 @@
       "messageRequired": "اكتب رسالة قصيرة عن أهدافك",
       "messageShort": "الرسالة يجب أن تكون {{min}} أحرف على الأقل",
       "messageLong": "الرسالة يجب ألا تتجاوز {{max}} حرفاً"
+    },
+    "assessment": {
+      "title": "تقييم اللياقة والتغذية الشخصي",
+      "subtitle": "بعض التفاصيل التدريبية لنبدأ خطتك بشكل مناسب من اليوم الأول.",
+      "continue": "متابعة",
+      "back": "رجوع",
+      "optional": "اختياري",
+      "progress": "الخطوة {{current}} من {{total}}",
+      "steps": {
+        "contact": "بياناتك",
+        "personal": "الملف",
+        "fitness": "اللياقة"
+      },
+      "personal": {
+        "title": "الملف الشخصي",
+        "hint": "مقاييس أساسية نستخدمها كنقطة بداية وحدود أمان."
+      },
+      "fitness": {
+        "title": "تقييم اللياقة",
+        "hint": "أخبرنا عن خبرتك التدريبية لنطابق البرنامج مع مستواك."
+      },
+      "fields": {
+        "age": "العمر *",
+        "sex": "الجنس *",
+        "heightCm": "الطول (سم) *",
+        "startingWeightKg": "الوزن الحالي (كجم) *",
+        "targetWeightKg": "الوزن المستهدف (كجم)",
+        "healthNotes": "الحالات الصحية وملاحظات الإصابات",
+        "fitnessExperience": "الخبرة الرياضية *",
+        "activityLevel": "مستوى النشاط *",
+        "workoutFrequency": "تكرار التمرين *",
+        "primaryGoal": "الهدف الأساسي *"
+      },
+      "placeholders": {
+        "age": "مثال: 28",
+        "sex": "اختر واحداً...",
+        "heightCm": "مثال: 175",
+        "startingWeightKg": "مثال: 78",
+        "targetWeightKg": "مثال: 72",
+        "healthNotes": "إصابات أو أدوية أو أي شيء يجب أن يعرفه المدرب...",
+        "select": "اختر واحداً..."
+      },
+      "options": {
+        "sex": {
+          "male": "ذكر",
+          "female": "أنثى"
+        },
+        "experience": {
+          "beginner": "مبتدئ — جديد أو عائد بعد انقطاع طويل",
+          "intermediate": "متوسط — تدريب منتظم لأكثر من 6 أشهر",
+          "advanced": "متقدم — سنوات من التدريب المنظم"
+        },
+        "activity": {
+          "sedentary": "قليل الحركة — معظم الوقت جلوساً",
+          "light": "نشاط خفيف — مشي أو حركة بسيطة",
+          "moderate": "نشاط متوسط — حركة يومية منتظمة",
+          "very_active": "نشاط عالٍ — عمل بدني أو مجهود يومي كبير"
+        },
+        "frequency": {
+          "1_2": "1–2 أيام / أسبوع",
+          "3_4": "3–4 أيام / أسبوع",
+          "5_6": "5–6 أيام / أسبوع",
+          "daily": "يومياً"
+        },
+        "goal": {
+          "muscle_gain": "بناء عضل",
+          "fat_loss": "خسارة دهون",
+          "maintenance": "حفاظ على الوزن",
+          "performance": "أداء رياضي"
+        }
+      },
+      "errors": {
+        "ageRequired": "أدخل عمرك",
+        "ageInvalid": "أدخل عمراً صالحاً بين 12 و 100",
+        "sexRequired": "اختر الجنس",
+        "heightRequired": "أدخل طولك",
+        "heightInvalid": "أدخل طولاً بين 100 و 250 سم",
+        "weightRequired": "أدخل وزنك الحالي",
+        "weightInvalid": "أدخل وزناً بين 30 و 300 كجم",
+        "targetWeightInvalid": "أدخل وزناً مستهدفاً بين 30 و 300 كجم",
+        "experienceRequired": "اختر خبرتك الرياضية",
+        "activityRequired": "اختر مستوى نشاطك",
+        "frequencyRequired": "اختر عدد أيام التمرين الممكنة",
+        "goalRequired": "اختر هدفك الأساسي"
+      }
     }
   },
   "goalsBanner": {

@@ -1286,6 +1286,52 @@
       "reviewed": "Reviewed",
       "goal": "What they asked for",
       "source": "Source",
+      "offer": {
+        "action": "Send offer",
+        "title": "Send join offer",
+        "hint": "Preview the WhatsApp offer, pick who receives it, then open WhatsApp with the message ready.",
+        "close": "Close",
+        "sendTo": "Send message to",
+        "recipients": {
+          "customer": "Customer",
+          "store": "My number (store)",
+          "custom": "Custom number",
+          "customHint": "Courier / other"
+        },
+        "noPhone": "No phone on request",
+        "customPhone": "WhatsApp number",
+        "customPhonePlaceholder": "01xxxxxxxxx",
+        "preview": "Message preview",
+        "langEn": "EN",
+        "langAr": "AR",
+        "copy": "Copy text",
+        "copied": "Copied",
+        "sendWhatsapp": "Open WhatsApp",
+        "footerHint": "Message text is copied when this dialog opens. Instapay number is included automatically.",
+        "toasts": {
+          "copied": "Offer message copied",
+          "copyFailed": "Could not copy message",
+          "whatsappOpened": "WhatsApp opened with the offer",
+          "whatsappFailed": "Enter a valid WhatsApp phone number"
+        }
+      },
+      "assessment": {
+        "title": "Fitness & nutrition assessment",
+        "personal": "Personal profile",
+        "fitness": "Fitness assessment",
+        "age": "Age",
+        "sex": "Gender",
+        "height": "Height",
+        "weight": "Current weight",
+        "targetWeight": "Target weight",
+        "healthNotes": "Health & injuries",
+        "experience": "Experience",
+        "activity": "Activity level",
+        "frequency": "Workout frequency",
+        "primaryGoal": "Primary goal",
+        "cm": "{{value}} cm",
+        "kg": "{{value}} kg"
+      },
       "toast": {
         "approved": "Request approved — account will be created when Firebase is connected",
         "rejected": "Request rejected"
@@ -1897,6 +1943,91 @@
       "messageRequired": "Write a short message about your goals",
       "messageShort": "Message must be at least {{min}} characters",
       "messageLong": "Message must be {{max}} characters or fewer"
+    },
+    "assessment": {
+      "title": "Personalized Fitness & Nutrition Assessment",
+      "subtitle": "A few coaching details so we can tailor your plan from day one.",
+      "continue": "Continue",
+      "back": "Back",
+      "optional": "optional",
+      "progress": "Step {{current}} of {{total}}",
+      "steps": {
+        "contact": "Your details",
+        "personal": "Profile",
+        "fitness": "Fitness"
+      },
+      "personal": {
+        "title": "Personal profile",
+        "hint": "Basic metrics we use to set starting points and safety boundaries."
+      },
+      "fitness": {
+        "title": "Fitness assessment",
+        "hint": "Tell us your training background so the program matches your level."
+      },
+      "fields": {
+        "age": "Age *",
+        "sex": "Gender *",
+        "heightCm": "Height (cm) *",
+        "startingWeightKg": "Current weight (kg) *",
+        "targetWeightKg": "Target weight (kg)",
+        "healthNotes": "Health conditions & injury notes",
+        "fitnessExperience": "Fitness experience *",
+        "activityLevel": "Activity level *",
+        "workoutFrequency": "Workout frequency *",
+        "primaryGoal": "Primary goal *"
+      },
+      "placeholders": {
+        "age": "e.g. 28",
+        "sex": "Select one...",
+        "heightCm": "e.g. 175",
+        "startingWeightKg": "e.g. 78",
+        "targetWeightKg": "e.g. 72",
+        "healthNotes": "Injuries, medications, or anything your coach should know...",
+        "select": "Select one..."
+      },
+      "options": {
+        "sex": {
+          "male": "Male",
+          "female": "Female"
+        },
+        "experience": {
+          "beginner": "Beginner — new or returning after a long break",
+          "intermediate": "Intermediate — training consistently for 6+ months",
+          "advanced": "Advanced — years of structured training"
+        },
+        "activity": {
+          "sedentary": "Sedentary — mostly sitting",
+          "light": "Lightly active — walks / light movement",
+          "moderate": "Moderately active — regular daily movement",
+          "very_active": "Very active — physical job or high daily output"
+        },
+        "frequency": {
+          "1_2": "1–2 days / week",
+          "3_4": "3–4 days / week",
+          "5_6": "5–6 days / week",
+          "daily": "Daily"
+        },
+        "goal": {
+          "muscle_gain": "Muscle gain",
+          "fat_loss": "Fat loss",
+          "maintenance": "Maintenance",
+          "performance": "Athletic performance"
+        }
+      },
+      "errors": {
+        "ageRequired": "Enter your age",
+        "ageInvalid": "Enter a valid age between 12 and 100",
+        "sexRequired": "Select your gender",
+        "heightRequired": "Enter your height",
+        "heightInvalid": "Enter a height between 100 and 250 cm",
+        "weightRequired": "Enter your current weight",
+        "weightInvalid": "Enter a weight between 30 and 300 kg",
+        "targetWeightInvalid": "Enter a target weight between 30 and 300 kg",
+        "experienceRequired": "Select your fitness experience",
+        "activityRequired": "Select your activity level",
+        "frequencyRequired": "Select how often you can train",
+        "goalRequired": "Select your primary goal"
+      }
     }
   },
   "goalsBanner": {

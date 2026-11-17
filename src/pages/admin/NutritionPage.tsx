@@ -4,9 +4,11 @@ import { useTranslation } from "react-i18next"
 import {
   Archive,
   CalendarDays,
+  Camera,
   ChevronDown,
   ClipboardCopy,
   Droplet,
+  Eye,
   FileText,
   Flame,
   History,
@@ -28,8 +30,10 @@ import {
   type NutritionDialogMode,
 } from "@/components/dashboard/NutritionProgramFormDialog"
 import { ConfirmActionDialog } from "@/components/dashboard/ConfirmActionDialog"
+import { MealChangeRequestDetailsDialog } from "@/components/dashboard/MealChangeRequestDetailsDialog"
 import { ProgramHistoryDialog } from "@/components/dashboard/ProgramHistoryDialog"
 import { ProgramLogsDialog } from "@/components/dashboard/ProgramLogsDialog"
+import type { MealChangeRequest } from "@/features/nutrition/meal-change-requests"
 import { FilterChip, StatCard } from "@/components/dashboard/StatCard"
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
 import {
@@ -104,6 +108,15 @@ export function NutritionPage() {
     subscriberName?: string
     highlightLogId?: string
   }>({ open: false })
+
+  const [detailsRequest, setDetailsRequest] = useState<MealChangeRequest | null>(
+    null,
+  )
+  const [photoPreview, setPhotoPreview] = useState<{
+    url: string
+    title: string
+    meta?: string
+  } | null>(null)
 
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean
@@ -330,8 +343,51 @@ export function NutritionPage() {
     [allLogs],
   )
 
+  const recentMealPhotos = useMemo(() => {
+    const rows: Array<{
+      key: string
+      logId: string
+      subscriberId: string
+      subscriberName: string
+      date: string
+      slotId: string
+      slotTitle: string
+      photoUrl: string
+      note?: string
+      uploadedAt: string
+    }> = []
+    for (const log of allLogs) {
+      const photos = log.mealPhotos ?? []
+      if (!photos.length) continue
+      const sub = subscribers.find((s) => s.id === log.subscriberId)
+      for (const photo of photos) {
+        if (!photo.photoUrl) continue
+        rows.push({
+          key: `${log.id}:${photo.slotId}:${photo.uploadedAt}`,
+          logId: log.id,
+          subscriberId: log.subscriberId,
+          subscriberName: sub?.displayName || log.subscriberId,
+          date: log.date || log.loggedAt,
+          slotId: photo.slotId,
+          slotTitle: photo.slotTitle || photo.slotId,
+          photoUrl: photo.photoUrl,
+          note: photo.note,
+          uploadedAt: photo.uploadedAt || log.loggedAt,
+        })
+      }
+    }
+    return rows
+      .sort(
+        (a, b) =>
+          new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
+      )
+      .slice(0, 12)
+  }, [allLogs, subscribers])
+
   useEffect(() => {
     if (!focusRequestId || !pendingMealRequests.length) return
+    const focused = pendingMealRequests.find((r) => r.id === focusRequestId)
+    if (focused) setDetailsRequest(focused)
     const timer = window.setTimeout(() => {
       focusRequestRef.current?.scrollIntoView({
         behavior: "smooth",
@@ -412,6 +468,7 @@ export function NutritionPage() {
           <div className="space-y-2.5">
             {pendingMealRequests.map((req) => {
               const focused = focusRequestId === req.id
+              const isFullMeal = req.mealItemId.startsWith("meal:")
               return (
                 <div
                   key={req.id}
@@ -424,17 +481,36 @@ export function NutritionPage() {
                       : "border-amber-200/70",
                   )}
                 >
-                  <div className="min-w-0 space-y-1">
-                    <p className="truncate text-[13px] font-bold text-[var(--gym-ink,#111111)]">
-                      {req.subscriberName ||
-                        req.subscriberEmail ||
-                        req.subscriberId}
-                    </p>
+                  <div className="min-w-0 space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate text-[13px] font-bold text-[var(--gym-ink,#111111)]">
+                        {req.subscriberName ||
+                          req.subscriberEmail ||
+                          req.subscriberId}
+                      </p>
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-[10px] font-extrabold",
+                          isFullMeal
+                            ? "bg-orange-50 text-orange-800"
+                            : "bg-sky-50 text-sky-800",
+                        )}
+                      >
+                        {isFullMeal
+                          ? isAr
+                            ? "وجبة كاملة"
+                            : "Full meal"
+                          : isAr
+                            ? "صنف طعام"
+                            : "Food item"}
+                      </span>
+                    </div>
                     <p className="text-[12px] text-[#6B7280]">
                       <strong className="text-[var(--gym-ink,#111111)]">
                         {req.mealItemName}
                       </strong>
                       {req.mealSlotTitle ? ` · ${req.mealSlotTitle}` : ""}
+                      {req.dayLabel ? ` · ${req.dayLabel}` : ""}
                       {" · "}
                       {isAr ? "السبب: " : "Reason: "}
                       {req.reason}
@@ -442,12 +518,20 @@ export function NutritionPage() {
                       {formatDate(req.createdAt, locale)}
                     </p>
                     {req.notes ? (
-                      <p className="rounded-xl bg-[#F7F7F7] px-2.5 py-1.5 text-[12px] text-[#525252]">
+                      <p className="rounded-xl bg-[#F7F7F7] px-2.5 py-1.5 text-[12px] text-[#525252] line-clamp-2">
                         {req.notes}
                       </p>
                     ) : null}
                   </div>
                   <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setDetailsRequest(req)}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-[var(--gym-orange,#fb5001)] px-3.5 py-1.5 text-[12px] font-bold text-white"
+                    >
+                      <Eye className="size-3.5" />
+                      {isAr ? "التفاصيل" : "Details"}
+                    </button>
                     <Link
                       to={APP_ROUTES.admin.subscriberDetail(req.subscriberId)}
                       className="rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-[12px] font-bold text-[#525252]"
@@ -479,6 +563,9 @@ export function NutritionPage() {
                               decision: "reviewed",
                             })
                             if (focusRequestId === req.id) clearFocusParams()
+                            if (detailsRequest?.id === req.id) {
+                              setDetailsRequest(null)
+                            }
                             appToast.success(
                               isAr
                                 ? "تم تعليم الطلب كمُراجع"
@@ -498,6 +585,9 @@ export function NutritionPage() {
                               decision: "dismissed",
                             })
                             if (focusRequestId === req.id) clearFocusParams()
+                            if (detailsRequest?.id === req.id) {
+                              setDetailsRequest(null)
+                            }
                             appToast.success(
                               isAr ? "تم إغلاق الطلب" : "Request dismissed",
                             )
@@ -516,6 +606,87 @@ export function NutritionPage() {
         </section>
       ) : null}
 
+      {recentMealPhotos.length > 0 ? (
+        <section className="rounded-[24px] border border-black/[0.06] bg-white p-4 sm:p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-black/5 text-[var(--gym-ink,#111111)]">
+              <Camera className="size-4" strokeWidth={2.1} />
+            </span>
+            <div>
+              <h3 className="font-heading text-[15px] font-extrabold text-[var(--gym-ink,#111111)]">
+                {isAr
+                  ? `صور توثيق الوجبات (${recentMealPhotos.length})`
+                  : `Meal verification photos (${recentMealPhotos.length})`}
+              </h3>
+              <p className="text-[12px] font-medium text-[#8c8c8c]">
+                {isAr
+                  ? "كل صورة مربوطة بمشترك / تاريخ / وجبة — اضغط للمعاينة أو افتح السجل."
+                  : "Each photo is tied to subscriber / date / meal — preview or open the log."}
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+            {recentMealPhotos.map((photo) => (
+              <div
+                key={photo.key}
+                className="overflow-hidden rounded-2xl border border-black/[0.06] bg-[#FAFAFA]"
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPhotoPreview({
+                      url: photo.photoUrl,
+                      title: `${photo.subscriberName} · ${photo.slotTitle}`,
+                      meta: `${formatDate(photo.date, locale)}${photo.note ? ` · ${photo.note}` : ""}`,
+                    })
+                  }
+                  className="relative block aspect-[4/3] w-full overflow-hidden bg-neutral-200"
+                >
+                  <img
+                    src={photo.photoUrl}
+                    alt={`${photo.slotTitle} — ${photo.subscriberName}`}
+                    className="size-full object-cover"
+                    loading="lazy"
+                  />
+                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2.5 pt-8 text-start text-[12px] font-bold text-white">
+                    {photo.slotTitle}
+                  </span>
+                </button>
+                <div className="space-y-1.5 p-3">
+                  <p className="truncate text-[13px] font-bold text-[var(--gym-ink,#111111)]">
+                    {photo.subscriberName}
+                  </p>
+                  <p className="text-[11px] font-medium text-[#8c8c8c]">
+                    {formatDate(photo.date, locale)}
+                    {" · "}
+                    {photo.slotTitle}
+                  </p>
+                  {photo.note ? (
+                    <p className="line-clamp-2 rounded-xl bg-white px-2.5 py-1.5 text-[12px] text-[#525252] border border-black/[0.04]">
+                      {photo.note}
+                    </p>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLogsModal({
+                        open: true,
+                        subscriberId: photo.subscriberId,
+                        subscriberName: photo.subscriberName,
+                        highlightLogId: photo.logId,
+                      })
+                    }
+                    className="text-[11px] font-bold text-[var(--gym-orange,#fb5001)] hover:underline"
+                  >
+                    {isAr ? "فتح سجل الالتزام" : "Open adherence log"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {recentLogs.length > 0 ? (
         <section className="rounded-[24px] border border-black/[0.06] bg-white p-4 sm:p-5">
           <div className="mb-3">
@@ -524,14 +695,17 @@ export function NutritionPage() {
             </h3>
             <p className="text-[12px] font-medium text-[#8c8c8c]">
               {isAr
-                ? "من صفحة التغذية — افتح السجل للتفاصيل."
-                : "From the nutrition page — open a log for details."}
+                ? "من صفحة التغذية — افتح السجل للتفاصيل والصور."
+                : "From the nutrition page — open a log for details and photos."}
             </p>
           </div>
           <div className="space-y-2">
             {recentLogs.map((log) => {
               const sub = subscribers.find((s) => s.id === log.subscriberId)
               const focused = focusLogId === log.id
+              const photoCount = log.mealPhotos?.length ?? 0
+              const completedMeals =
+                log.mealChecks?.filter((m) => m.completed).length ?? 0
               return (
                 <button
                   key={log.id}
@@ -558,11 +732,25 @@ export function NutritionPage() {
                     <p className="text-[11px] font-medium text-[#8c8c8c]">
                       {formatDate(log.date || log.loggedAt, locale)}
                       {log.notes ? ` · ${isAr ? "فيه ملاحظات" : "Has notes"}` : ""}
+                      {photoCount > 0
+                        ? ` · ${isAr ? `${photoCount} صور` : `${photoCount} photos`}`
+                        : ""}
+                      {completedMeals > 0
+                        ? ` · ${isAr ? `${completedMeals} وجبات مكتملة` : `${completedMeals} meals done`}`
+                        : ""}
                     </p>
                   </div>
-                  <span className="rounded-full bg-black/5 px-2.5 py-0.5 text-[11px] font-bold text-[#525252]">
-                    {log.status}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {photoCount > 0 ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-0.5 text-[11px] font-bold text-orange-800">
+                        <Camera className="size-3" />
+                        {photoCount}
+                      </span>
+                    ) : null}
+                    <span className="rounded-full bg-black/5 px-2.5 py-0.5 text-[11px] font-bold text-[#525252]">
+                      {log.status}
+                    </span>
+                  </div>
                 </button>
               )
             })}
@@ -1233,6 +1421,100 @@ export function NutritionPage() {
             if (focusLogId) clearFocusParams()
           }}
         />
+      ) : null}
+
+      <MealChangeRequestDetailsDialog
+        open={Boolean(detailsRequest)}
+        request={detailsRequest}
+        busy={actionsBusy}
+        canManage={canManage}
+        onClose={() => {
+          setDetailsRequest(null)
+          if (focusRequestId) clearFocusParams()
+        }}
+        onOpenLogs={
+          detailsRequest
+            ? () => {
+                setLogsModal({
+                  open: true,
+                  subscriberId: detailsRequest.subscriberId,
+                  subscriberName:
+                    detailsRequest.subscriberName ||
+                    detailsRequest.subscriberEmail,
+                })
+              }
+            : undefined
+        }
+        onMarkReviewed={
+          detailsRequest && canManage
+            ? async () => {
+                const id = detailsRequest.id
+                await resolveMealMutation.mutateAsync({
+                  requestId: id,
+                  decision: "reviewed",
+                })
+                setDetailsRequest(null)
+                if (focusRequestId === id) clearFocusParams()
+                appToast.success(
+                  isAr ? "تم تعليم الطلب كمُراجع" : "Marked as reviewed",
+                )
+              }
+            : undefined
+        }
+        onDismiss={
+          detailsRequest && canManage
+            ? async () => {
+                const id = detailsRequest.id
+                await resolveMealMutation.mutateAsync({
+                  requestId: id,
+                  decision: "dismissed",
+                })
+                setDetailsRequest(null)
+                if (focusRequestId === id) clearFocusParams()
+                appToast.success(
+                  isAr ? "تم إغلاق الطلب" : "Request dismissed",
+                )
+              }
+            : undefined
+        }
+      />
+
+      {photoPreview ? (
+        <div
+          className="fixed inset-0 z-[140] flex items-center justify-center bg-black/70 p-4"
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setPhotoPreview(null)
+          }}
+        >
+          <div className="relative w-full max-w-3xl overflow-hidden rounded-[24px] bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-3 border-b border-black/[0.06] px-4 py-3 sm:px-5">
+              <div className="min-w-0">
+                <p className="truncate text-[14px] font-bold text-[var(--gym-ink,#111111)]">
+                  {photoPreview.title}
+                </p>
+                {photoPreview.meta ? (
+                  <p className="mt-0.5 text-[12px] font-medium text-[#8c8c8c]">
+                    {photoPreview.meta}
+                  </p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={() => setPhotoPreview(null)}
+                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#F4F4F4]"
+                aria-label={isAr ? "إغلاق" : "Close"}
+              >
+                <span className="text-[16px] leading-none">×</span>
+              </button>
+            </div>
+            <img
+              src={photoPreview.url}
+              alt={photoPreview.title}
+              className="max-h-[75vh] w-full object-contain bg-black"
+            />
+          </div>
+        </div>
       ) : null}
 
       {/* Confirm Action Dialog */}

@@ -1,8 +1,20 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { AnimatePresence, motion } from "motion/react"
-import { Check, Headphones, Mail } from "lucide-react"
+import { ArrowLeft, ArrowRight, Check, Headphones, Mail } from "lucide-react"
 import SlideCommit from "@/components/SlideCommit.tsx"
+import {
+  ACTIVITY_LEVEL_OPTIONS,
+  FITNESS_EXPERIENCE_OPTIONS,
+  PRIMARY_GOAL_OPTIONS,
+  WORKOUT_FREQUENCY_OPTIONS,
+  type ActivityLevel,
+  type AssessmentSex,
+  type FitnessExperience,
+  type PrimaryFitnessGoal,
+  type RegistrationAssessment,
+  type WorkoutFrequency,
+} from "@/features/subscribers/assessment"
 import { useCreateRegistrationRequestMutation } from "@/features/subscribers/hooks"
 import { usePackagesQuery } from "@/features/subscriptions/hooks"
 import { useLocale } from "@/hooks/useLocale"
@@ -15,7 +27,9 @@ const PHONE_RE = /^\+?[\d\s()-]{8,20}$/
 const MESSAGE_MIN = 10
 const MESSAGE_MAX = 1000
 
-type FieldKey =
+type FormStep = "contact" | "personal" | "fitness"
+
+type ContactFieldKey =
   | "firstName"
   | "lastName"
   | "email"
@@ -23,15 +37,88 @@ type FieldKey =
   | "plan"
   | "message"
 
+type AssessmentFieldKey =
+  | "age"
+  | "sex"
+  | "heightCm"
+  | "startingWeightKg"
+  | "targetWeightKg"
+  | "healthNotes"
+  | "fitnessExperience"
+  | "activityLevel"
+  | "workoutFrequency"
+  | "primaryGoal"
+
+type FieldKey = ContactFieldKey | AssessmentFieldKey
 type FieldErrors = Partial<Record<FieldKey, string>>
 
-const FIELD_ORDER: FieldKey[] = [
+type ContactFormState = {
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  plan: string
+  message: string
+}
+
+type AssessmentFormState = {
+  age: string
+  sex: "" | AssessmentSex
+  heightCm: string
+  startingWeightKg: string
+  targetWeightKg: string
+  healthNotes: string
+  fitnessExperience: "" | FitnessExperience
+  activityLevel: "" | ActivityLevel
+  workoutFrequency: "" | WorkoutFrequency
+  primaryGoal: "" | PrimaryFitnessGoal
+}
+
+const EMPTY_CONTACT: ContactFormState = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  plan: "",
+  message: "",
+}
+
+const EMPTY_ASSESSMENT: AssessmentFormState = {
+  age: "",
+  sex: "",
+  heightCm: "",
+  startingWeightKg: "",
+  targetWeightKg: "",
+  healthNotes: "",
+  fitnessExperience: "",
+  activityLevel: "",
+  workoutFrequency: "",
+  primaryGoal: "",
+}
+
+const CONTACT_FIELD_ORDER: ContactFieldKey[] = [
   "firstName",
   "lastName",
   "email",
   "phone",
   "plan",
   "message",
+]
+
+const PERSONAL_FIELD_ORDER: AssessmentFieldKey[] = [
+  "age",
+  "sex",
+  "heightCm",
+  "startingWeightKg",
+  "targetWeightKg",
+  "healthNotes",
+]
+
+const FITNESS_FIELD_ORDER: AssessmentFieldKey[] = [
+  "fitnessExperience",
+  "activityLevel",
+  "workoutFrequency",
+  "primaryGoal",
 ]
 
 const baseFieldClass = cn(
@@ -56,14 +143,59 @@ const fieldErrorClass = cn(
 const inputFieldClass = cn(baseFieldClass, "h-[54px] sm:h-[58px]")
 const textareaFieldClass = cn(
   baseFieldClass,
-  "min-h-[128px] resize-y py-4 leading-relaxed sm:min-h-[140px]",
+  "min-h-[110px] resize-y py-4 leading-relaxed sm:min-h-[120px]",
 )
 
 const labelClass =
   "mb-2.5 block font-heading text-[13px] font-semibold tracking-[0.02em] text-[var(--gym-ink)]/80 sm:text-[14px]"
 
+const secondaryBtnClass = cn(
+  "inline-flex h-[50px] shrink-0 items-center justify-center gap-2 rounded-full",
+  "border border-[var(--gym-ink)]/15 bg-white px-6",
+  "font-heading text-[14px] font-bold text-[var(--gym-ink)]",
+  "transition-colors duration-300 hover:border-[var(--gym-ink)]/30 hover:bg-[#f7f7f7]",
+  "sm:text-[15px]",
+)
+
+const primaryBtnClass = cn(
+  "inline-flex h-[50px] shrink-0 items-center justify-center gap-2 rounded-full",
+  "bg-[var(--gym-ink)] px-6 font-heading text-[14px] font-bold text-white",
+  "transition-colors duration-300 hover:bg-[var(--gym-ink)]/90",
+  "sm:text-[15px]",
+)
+
 function fieldClassName(hasError: boolean, extra?: string) {
   return cn(extra, hasError ? fieldErrorClass : fieldIdleClass)
+}
+
+function parsePositiveNumber(value: string): number | undefined {
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  const n = Number(trimmed)
+  if (!Number.isFinite(n) || n <= 0) return undefined
+  return n
+}
+
+function buildAssessmentPayload(
+  state: AssessmentFormState,
+): RegistrationAssessment {
+  const health = state.healthNotes.trim()
+  const payload: RegistrationAssessment = {}
+  const age = parsePositiveNumber(state.age)
+  if (age !== undefined) payload.age = age
+  if (state.sex) payload.sex = state.sex
+  const heightCm = parsePositiveNumber(state.heightCm)
+  if (heightCm !== undefined) payload.heightCm = heightCm
+  const startingWeightKg = parsePositiveNumber(state.startingWeightKg)
+  if (startingWeightKg !== undefined) payload.startingWeightKg = startingWeightKg
+  const targetWeightKg = parsePositiveNumber(state.targetWeightKg)
+  if (targetWeightKg !== undefined) payload.targetWeightKg = targetWeightKg
+  if (health) payload.healthNotes = { en: health, ar: health }
+  if (state.fitnessExperience) payload.fitnessExperience = state.fitnessExperience
+  if (state.activityLevel) payload.activityLevel = state.activityLevel
+  if (state.workoutFrequency) payload.workoutFrequency = state.workoutFrequency
+  if (state.primaryGoal) payload.primaryGoal = state.primaryGoal
+  return payload
 }
 
 export function ContactSection() {
@@ -72,14 +204,30 @@ export function ContactSection() {
   const { data: packages = [] } = usePackagesQuery()
   const createRequestMutation = useCreateRegistrationRequestMutation()
   const activePackages = packages.filter((pkg) => pkg.isActive)
+  const BackIcon = isRtl ? ArrowRight : ArrowLeft
+  const NextIcon = isRtl ? ArrowLeft : ArrowRight
 
   const formRef = useRef<HTMLFormElement>(null)
   const slideWrapRef = useRef<HTMLDivElement>(null)
   const fieldRefs = useRef<Partial<Record<FieldKey, HTMLElement | null>>>({})
   const [slideWidth, setSlideWidth] = useState(320)
   const [submitted, setSubmitted] = useState(false)
+  const [step, setStep] = useState<FormStep>("contact")
+  const [stepDirection, setStepDirection] = useState(1)
   const [selectedPlan, setSelectedPlan] = useState("")
+  const [contactDraft, setContactDraft] =
+    useState<ContactFormState>(EMPTY_CONTACT)
+  const [assessment, setAssessment] =
+    useState<AssessmentFormState>(EMPTY_ASSESSMENT)
   const [errors, setErrors] = useState<FieldErrors>({})
+
+  function goToStep(next: FormStep) {
+    const order: FormStep[] = ["contact", "personal", "fitness"]
+    const from = order.indexOf(step)
+    const to = order.indexOf(next)
+    setStepDirection(to >= from ? 1 : -1)
+    setStep(next)
+  }
 
   useEffect(() => {
     function onSelectPackage(event: Event) {
@@ -87,6 +235,7 @@ export function ContactSection() {
       if (detail?.packageId) {
         setSelectedPlan(detail.packageId)
         clearFieldError("plan")
+        setStep("contact")
       }
     }
     window.addEventListener("derpyfit:select-package", onSelectPackage)
@@ -95,19 +244,41 @@ export function ContactSection() {
   }, [])
 
   useEffect(() => {
-    if (submitted) return
-    const el = slideWrapRef.current
-    if (!el) return
+    if (submitted || step !== "fitness") return
+
+    let ro: ResizeObserver | null = null
+    let cancelled = false
+    const timers: number[] = []
 
     const measure = () => {
-      const w = Math.floor(el.clientWidth)
-      setSlideWidth(Math.max(200, w))
+      // Prefer the stable form width so step slide transforms never shrink the CTA.
+      const formW = formRef.current?.clientWidth ?? 0
+      const wrapW = slideWrapRef.current?.clientWidth ?? 0
+      const w = Math.floor(Math.max(formW, wrapW))
+      if (w > 0) setSlideWidth(w)
     }
-    measure()
-    const ro = new ResizeObserver(measure)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [submitted])
+
+    const attach = () => {
+      if (cancelled) return
+      measure()
+      const target = formRef.current ?? slideWrapRef.current
+      if (!target || ro) return
+      ro = new ResizeObserver(measure)
+      ro.observe(target)
+    }
+
+    attach()
+    // Fitness step mounts after AnimatePresence exit — retry until width is real.
+    timers.push(window.setTimeout(attach, 0))
+    timers.push(window.setTimeout(attach, 80))
+    timers.push(window.setTimeout(attach, 500))
+
+    return () => {
+      cancelled = true
+      for (const id of timers) window.clearTimeout(id)
+      ro?.disconnect()
+    }
+  }, [submitted, step])
 
   function clearFieldError(field: FieldKey) {
     setErrors((prev) => {
@@ -116,6 +287,14 @@ export function ContactSection() {
       delete next[field]
       return next
     })
+  }
+
+  function patchAssessment<K extends keyof AssessmentFormState>(
+    key: K,
+    value: AssessmentFormState[K],
+  ) {
+    setAssessment((prev) => ({ ...prev, [key]: value }))
+    clearFieldError(key)
   }
 
   function readFormValues() {
@@ -141,15 +320,17 @@ export function ContactSection() {
     }
   }
 
-  function validateForm(): FieldErrors {
-    const { firstName, lastName, email, phone, plan, message } = readFormValues()
+  function validateContact(values: ContactFormState = readFormValues()): FieldErrors {
+    const { firstName, lastName, email, phone, plan, message } = values
     const next: FieldErrors = {}
 
     if (!firstName) next.firstName = t("contact.errors.firstNameRequired")
-    else if (firstName.length < 2) next.firstName = t("contact.errors.firstNameShort")
+    else if (firstName.length < 2)
+      next.firstName = t("contact.errors.firstNameShort")
 
     if (!lastName) next.lastName = t("contact.errors.lastNameRequired")
-    else if (lastName.length < 2) next.lastName = t("contact.errors.lastNameShort")
+    else if (lastName.length < 2)
+      next.lastName = t("contact.errors.lastNameShort")
 
     if (!email) next.email = t("contact.errors.emailRequired")
     else if (!EMAIL_RE.test(email)) next.email = t("contact.errors.emailInvalid")
@@ -171,8 +352,53 @@ export function ContactSection() {
     return next
   }
 
-  function focusFirstError(nextErrors: FieldErrors) {
-    const firstKey = FIELD_ORDER.find((key) => nextErrors[key])
+  function validatePersonal(): FieldErrors {
+    const next: FieldErrors = {}
+    const age = parsePositiveNumber(assessment.age)
+    const height = parsePositiveNumber(assessment.heightCm)
+    const weight = parsePositiveNumber(assessment.startingWeightKg)
+    const target = assessment.targetWeightKg.trim()
+      ? parsePositiveNumber(assessment.targetWeightKg)
+      : undefined
+
+    if (!assessment.age.trim()) next.age = t("contact.assessment.errors.ageRequired")
+    else if (!age || age < 12 || age > 100)
+      next.age = t("contact.assessment.errors.ageInvalid")
+
+    if (!assessment.sex) next.sex = t("contact.assessment.errors.sexRequired")
+
+    if (!assessment.heightCm.trim())
+      next.heightCm = t("contact.assessment.errors.heightRequired")
+    else if (!height || height < 100 || height > 250)
+      next.heightCm = t("contact.assessment.errors.heightInvalid")
+
+    if (!assessment.startingWeightKg.trim())
+      next.startingWeightKg = t("contact.assessment.errors.weightRequired")
+    else if (!weight || weight < 30 || weight > 300)
+      next.startingWeightKg = t("contact.assessment.errors.weightInvalid")
+
+    if (assessment.targetWeightKg.trim() && (!target || target < 30 || target > 300)) {
+      next.targetWeightKg = t("contact.assessment.errors.targetWeightInvalid")
+    }
+
+    return next
+  }
+
+  function validateFitness(): FieldErrors {
+    const next: FieldErrors = {}
+    if (!assessment.fitnessExperience)
+      next.fitnessExperience = t("contact.assessment.errors.experienceRequired")
+    if (!assessment.activityLevel)
+      next.activityLevel = t("contact.assessment.errors.activityRequired")
+    if (!assessment.workoutFrequency)
+      next.workoutFrequency = t("contact.assessment.errors.frequencyRequired")
+    if (!assessment.primaryGoal)
+      next.primaryGoal = t("contact.assessment.errors.goalRequired")
+    return next
+  }
+
+  function focusFirstError(order: FieldKey[], nextErrors: FieldErrors) {
+    const firstKey = order.find((key) => nextErrors[key])
     if (!firstKey) return
     const el = fieldRefs.current[firstKey]
     if (!el) return
@@ -182,20 +408,72 @@ export function ContactSection() {
     }
   }
 
+  function goToPersonal() {
+    const values = readFormValues()
+    const nextErrors = validateContact(values)
+    setErrors(nextErrors)
+    if (CONTACT_FIELD_ORDER.some((key) => nextErrors[key])) {
+      appToast.error(
+        nextErrors[CONTACT_FIELD_ORDER.find((k) => nextErrors[k])!] ||
+          t("contact.toast.invalid"),
+      )
+      focusFirstError(CONTACT_FIELD_ORDER, nextErrors)
+      return
+    }
+    setContactDraft(values)
+    goToStep("personal")
+    window.scrollTo({ top: formRef.current?.offsetTop ?? 0, behavior: "smooth" })
+  }
+
+  function goToFitness() {
+    const nextErrors = validatePersonal()
+    setErrors(nextErrors)
+    if (PERSONAL_FIELD_ORDER.some((key) => nextErrors[key])) {
+      appToast.error(
+        nextErrors[PERSONAL_FIELD_ORDER.find((k) => nextErrors[k])!] ||
+          t("contact.toast.invalid"),
+      )
+      focusFirstError(PERSONAL_FIELD_ORDER, nextErrors)
+      return
+    }
+    goToStep("fitness")
+    window.scrollTo({ top: formRef.current?.offsetTop ?? 0, behavior: "smooth" })
+  }
+
   async function handleConfirm() {
-    const nextErrors = validateForm()
+    const contactValues =
+      contactDraft.firstName || contactDraft.email
+        ? contactDraft
+        : readFormValues()
+    const contactErrors = validateContact(contactValues)
+    const personalErrors = validatePersonal()
+    const fitnessErrors = validateFitness()
+    const nextErrors = { ...contactErrors, ...personalErrors, ...fitnessErrors }
     setErrors(nextErrors)
 
-    const firstKey = FIELD_ORDER.find((key) => nextErrors[key])
-    if (firstKey) {
-      appToast.error(nextErrors[firstKey] || t("contact.toast.invalid"))
-      focusFirstError(nextErrors)
+    if (Object.keys(contactErrors).length) {
+      goToStep("contact")
+      appToast.error(t("contact.toast.invalid"))
+      focusFirstError(CONTACT_FIELD_ORDER, contactErrors)
+      throw new Error("invalid")
+    }
+    if (Object.keys(personalErrors).length) {
+      goToStep("personal")
+      appToast.error(t("contact.toast.invalid"))
+      focusFirstError(PERSONAL_FIELD_ORDER, personalErrors)
+      throw new Error("invalid")
+    }
+    if (Object.keys(fitnessErrors).length) {
+      goToStep("fitness")
+      appToast.error(
+        nextErrors[FITNESS_FIELD_ORDER.find((k) => nextErrors[k])!] ||
+          t("contact.toast.invalid"),
+      )
+      focusFirstError(FITNESS_FIELD_ORDER, fitnessErrors)
       throw new Error("invalid")
     }
 
-    const form = formRef.current
-    if (!form) throw new Error("invalid")
-    const { firstName, lastName, email, phone, plan, message } = readFormValues()
+    const { firstName, lastName, email, phone, plan, message } = contactValues
 
     try {
       const fullName = `${firstName} ${lastName}`.trim()
@@ -207,6 +485,7 @@ export function ContactSection() {
         locale,
         packageId: plan || null,
         goal: { en: message, ar: message },
+        assessment: buildAssessmentPayload(assessment),
         source: "contact",
       })
     } catch {
@@ -219,7 +498,24 @@ export function ContactSection() {
     setSubmitted(false)
     setErrors({})
     setSelectedPlan("")
+    setContactDraft(EMPTY_CONTACT)
+    setAssessment(EMPTY_ASSESSMENT)
+    setStepDirection(1)
+    setStep("contact")
     window.setTimeout(() => formRef.current?.reset(), 0)
+  }
+
+  const STEPS: FormStep[] = ["contact", "personal", "fitness"]
+  const stepIndex = Math.max(0, STEPS.indexOf(step))
+  const stepCount = STEPS.length
+  const stepNumber = stepIndex + 1
+  const progressRatio = stepNumber / stepCount
+  const slideOffset = (isRtl ? -1 : 1) * stepDirection * 28
+  const stepMotion = {
+    initial: { opacity: 0, x: slideOffset },
+    animate: { opacity: 1, x: 0 },
+    exit: { opacity: 0, x: -slideOffset * 0.5 },
+    transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] as const },
   }
 
   return (
@@ -316,228 +612,702 @@ export function ContactSection() {
                   {t("contact.title")}
                 </h2>
 
+                <div className="mt-6 sm:mt-8">
+                  <div className="flex items-end justify-between gap-4">
+                    <div className="min-w-0">
+                      <AnimatePresence mode="wait" initial={false}>
+                        <motion.p
+                          key={step}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                          className="font-heading text-[15px] font-bold tracking-tight text-[var(--gym-ink)] sm:text-[16px]"
+                        >
+                          {step === "contact"
+                            ? t("contact.assessment.steps.contact")
+                            : step === "personal"
+                              ? t("contact.assessment.personal.title")
+                              : t("contact.assessment.fitness.title")}
+                        </motion.p>
+                      </AnimatePresence>
+                      <p
+                        key={`progress-label-${stepNumber}`}
+                        className="mt-1 text-[12.5px] font-medium text-[var(--gym-muted)] sm:text-[13px]"
+                      >
+                        {t("contact.assessment.progress", {
+                          current: stepNumber,
+                          total: stepCount,
+                        })}
+                      </p>
+                    </div>
+                    <span
+                      key={`progress-fraction-${stepNumber}`}
+                      className="shrink-0 font-heading text-[13px] font-bold tabular-nums text-[var(--gym-ink)]/45"
+                    >
+                      {stepNumber}
+                      <span className="mx-0.5 font-medium text-[var(--gym-muted)]/50">
+                        /
+                      </span>
+                      {stepCount}
+                    </span>
+                  </div>
+
+                  <div
+                    className="mt-3.5 h-[3px] w-full overflow-hidden rounded-full bg-[var(--gym-ink)]/[0.06]"
+                    role="progressbar"
+                    aria-valuemin={1}
+                    aria-valuemax={stepCount}
+                    aria-valuenow={stepNumber}
+                    aria-label={t("contact.assessment.progress", {
+                      current: stepNumber,
+                      total: stepCount,
+                    })}
+                  >
+                    <motion.div
+                      key={`bar-${stepNumber}`}
+                      className="h-full rounded-full bg-[var(--gym-lime)]"
+                      initial={{ width: `${Math.max(progressRatio - 1 / stepCount, 0) * 100}%` }}
+                      animate={{ width: `${progressRatio * 100}%` }}
+                      transition={{
+                        duration: 0.45,
+                        ease: [0.22, 1, 0.36, 1],
+                      }}
+                    />
+                  </div>
+                </div>
+
                 <form
                   ref={formRef}
-                  className="mt-8 flex flex-col gap-6 sm:mt-10 sm:gap-7"
+                  className="mt-7 flex flex-col gap-6 sm:mt-8 sm:gap-7"
                   noValidate
                   onSubmit={(event) => event.preventDefault()}
                 >
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-5">
-                    <Field
-                      label={t("contact.fields.firstName")}
-                      error={errors.firstName}
-                      errorId="contact-error-firstName"
-                    >
-                      <input
-                        ref={(el) => {
-                          fieldRefs.current.firstName = el
-                        }}
-                        name="firstName"
-                        type="text"
-                        autoComplete="given-name"
-                        placeholder={t("contact.placeholders.firstName")}
-                        aria-invalid={Boolean(errors.firstName)}
-                        aria-describedby={
-                          errors.firstName ? "contact-error-firstName" : undefined
-                        }
-                        onInput={() => clearFieldError("firstName")}
-                        className={fieldClassName(
-                          Boolean(errors.firstName),
-                          inputFieldClass,
-                        )}
-                      />
-                    </Field>
-                    <Field
-                      label={t("contact.fields.lastName")}
-                      error={errors.lastName}
-                      errorId="contact-error-lastName"
-                    >
-                      <input
-                        ref={(el) => {
-                          fieldRefs.current.lastName = el
-                        }}
-                        name="lastName"
-                        type="text"
-                        autoComplete="family-name"
-                        placeholder={t("contact.placeholders.lastName")}
-                        aria-invalid={Boolean(errors.lastName)}
-                        aria-describedby={
-                          errors.lastName ? "contact-error-lastName" : undefined
-                        }
-                        onInput={() => clearFieldError("lastName")}
-                        className={fieldClassName(
-                          Boolean(errors.lastName),
-                          inputFieldClass,
-                        )}
-                      />
-                    </Field>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-5">
-                    <Field
-                      label={t("contact.fields.email")}
-                      error={errors.email}
-                      errorId="contact-error-email"
-                    >
-                      <input
-                        ref={(el) => {
-                          fieldRefs.current.email = el
-                        }}
-                        name="email"
-                        type="email"
-                        autoComplete="email"
-                        inputMode="email"
-                        placeholder={t("contact.placeholders.email")}
-                        aria-invalid={Boolean(errors.email)}
-                        aria-describedby={
-                          errors.email ? "contact-error-email" : undefined
-                        }
-                        onInput={() => clearFieldError("email")}
-                        className={fieldClassName(
-                          Boolean(errors.email),
-                          inputFieldClass,
-                        )}
-                      />
-                    </Field>
-                    <Field
-                      label={t("contact.fields.phone")}
-                      error={errors.phone}
-                      errorId="contact-error-phone"
-                    >
-                      <input
-                        ref={(el) => {
-                          fieldRefs.current.phone = el
-                        }}
-                        name="phone"
-                        type="tel"
-                        autoComplete="tel"
-                        inputMode="tel"
-                        placeholder={t("contact.placeholders.phone")}
-                        aria-invalid={Boolean(errors.phone)}
-                        aria-describedby={
-                          errors.phone ? "contact-error-phone" : undefined
-                        }
-                        onInput={() => clearFieldError("phone")}
-                        className={fieldClassName(
-                          Boolean(errors.phone),
-                          inputFieldClass,
-                        )}
-                      />
-                    </Field>
-                  </div>
-
-                  <Field
-                    label={t("contact.fields.plan")}
-                    error={errors.plan}
-                    errorId="contact-error-plan"
-                  >
-                    <div className="relative">
-                      <select
-                        ref={(el) => {
-                          fieldRefs.current.plan = el
-                        }}
-                        name="plan"
-                        value={selectedPlan}
-                        aria-invalid={Boolean(errors.plan)}
-                        aria-describedby={
-                          errors.plan ? "contact-error-plan" : undefined
-                        }
-                        onChange={(e) => {
-                          setSelectedPlan(e.target.value)
-                          clearFieldError("plan")
-                        }}
-                        className={fieldClassName(
-                          Boolean(errors.plan),
-                          cn(inputFieldClass, "appearance-none pe-12"),
-                        )}
+                  <div className="relative w-full min-w-0 overflow-hidden">
+                  <AnimatePresence mode="wait" initial={false}>
+                    {step === "contact" ? (
+                      <motion.div
+                        key="contact-step"
+                        {...stepMotion}
+                        className="flex flex-col gap-6 sm:gap-7 will-change-transform"
                       >
-                        <option value="" disabled>
-                          {t("contact.placeholders.plan")}
-                        </option>
-                        {activePackages.map((pkg) => (
-                          <option key={pkg.id} value={pkg.id}>
-                            {pkg.name[locale]} — {pkg.price[locale]}
-                          </option>
-                        ))}
-                      </select>
-                      <span
-                        aria-hidden
-                        className={cn(
-                          "pointer-events-none absolute top-1/2 inline-flex size-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/70 text-[var(--gym-ink)]",
-                          isRtl ? "left-3" : "right-3",
-                        )}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                          <path
-                            d="M6 9l6 6 6-6"
-                            stroke="currentColor"
-                            strokeWidth="2.25"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
+                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-5">
+                          <Field
+                            label={t("contact.fields.firstName")}
+                            error={errors.firstName}
+                            errorId="contact-error-firstName"
+                          >
+                            <input
+                              ref={(el) => {
+                                fieldRefs.current.firstName = el
+                              }}
+                              name="firstName"
+                              type="text"
+                              autoComplete="given-name"
+                              defaultValue={contactDraft.firstName}
+                              placeholder={t("contact.placeholders.firstName")}
+                              aria-invalid={Boolean(errors.firstName)}
+                              aria-describedby={
+                                errors.firstName
+                                  ? "contact-error-firstName"
+                                  : undefined
+                              }
+                              onInput={() => clearFieldError("firstName")}
+                              className={fieldClassName(
+                                Boolean(errors.firstName),
+                                inputFieldClass,
+                              )}
+                            />
+                          </Field>
+                          <Field
+                            label={t("contact.fields.lastName")}
+                            error={errors.lastName}
+                            errorId="contact-error-lastName"
+                          >
+                            <input
+                              ref={(el) => {
+                                fieldRefs.current.lastName = el
+                              }}
+                              name="lastName"
+                              type="text"
+                              autoComplete="family-name"
+                              defaultValue={contactDraft.lastName}
+                              placeholder={t("contact.placeholders.lastName")}
+                              aria-invalid={Boolean(errors.lastName)}
+                              aria-describedby={
+                                errors.lastName
+                                  ? "contact-error-lastName"
+                                  : undefined
+                              }
+                              onInput={() => clearFieldError("lastName")}
+                              className={fieldClassName(
+                                Boolean(errors.lastName),
+                                inputFieldClass,
+                              )}
+                            />
+                          </Field>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-5">
+                          <Field
+                            label={t("contact.fields.email")}
+                            error={errors.email}
+                            errorId="contact-error-email"
+                          >
+                            <input
+                              ref={(el) => {
+                                fieldRefs.current.email = el
+                              }}
+                              name="email"
+                              type="email"
+                              autoComplete="email"
+                              inputMode="email"
+                              defaultValue={contactDraft.email}
+                              placeholder={t("contact.placeholders.email")}
+                              aria-invalid={Boolean(errors.email)}
+                              aria-describedby={
+                                errors.email ? "contact-error-email" : undefined
+                              }
+                              onInput={() => clearFieldError("email")}
+                              className={fieldClassName(
+                                Boolean(errors.email),
+                                inputFieldClass,
+                              )}
+                            />
+                          </Field>
+                          <Field
+                            label={t("contact.fields.phone")}
+                            error={errors.phone}
+                            errorId="contact-error-phone"
+                          >
+                            <input
+                              ref={(el) => {
+                                fieldRefs.current.phone = el
+                              }}
+                              name="phone"
+                              type="tel"
+                              autoComplete="tel"
+                              inputMode="tel"
+                              defaultValue={contactDraft.phone}
+                              placeholder={t("contact.placeholders.phone")}
+                              aria-invalid={Boolean(errors.phone)}
+                              aria-describedby={
+                                errors.phone ? "contact-error-phone" : undefined
+                              }
+                              onInput={() => clearFieldError("phone")}
+                              className={fieldClassName(
+                                Boolean(errors.phone),
+                                inputFieldClass,
+                              )}
+                            />
+                          </Field>
+                        </div>
+
+                        <Field
+                          label={t("contact.fields.plan")}
+                          error={errors.plan}
+                          errorId="contact-error-plan"
+                        >
+                          <div className="relative">
+                            <select
+                              ref={(el) => {
+                                fieldRefs.current.plan = el
+                              }}
+                              name="plan"
+                              value={selectedPlan}
+                              aria-invalid={Boolean(errors.plan)}
+                              aria-describedby={
+                                errors.plan ? "contact-error-plan" : undefined
+                              }
+                              onChange={(e) => {
+                                setSelectedPlan(e.target.value)
+                                clearFieldError("plan")
+                              }}
+                              className={fieldClassName(
+                                Boolean(errors.plan),
+                                cn(inputFieldClass, "appearance-none pe-12"),
+                              )}
+                            >
+                              <option value="" disabled>
+                                {t("contact.placeholders.plan")}
+                              </option>
+                              {activePackages.map((pkg) => (
+                                <option key={pkg.id} value={pkg.id}>
+                                  {pkg.name[locale]} — {pkg.price[locale]}
+                                </option>
+                              ))}
+                            </select>
+                            <SelectChevron isRtl={isRtl} />
+                          </div>
+                        </Field>
+
+                        <Field
+                          label={t("contact.fields.message")}
+                          error={errors.message}
+                          errorId="contact-error-message"
+                        >
+                          <textarea
+                            ref={(el) => {
+                              fieldRefs.current.message = el
+                            }}
+                            name="message"
+                            rows={4}
+                            maxLength={MESSAGE_MAX}
+                            defaultValue={contactDraft.message}
+                            placeholder={t("contact.placeholders.message")}
+                            aria-invalid={Boolean(errors.message)}
+                            aria-describedby={
+                              errors.message
+                                ? "contact-error-message"
+                                : undefined
+                            }
+                            onInput={() => clearFieldError("message")}
+                            className={fieldClassName(
+                              Boolean(errors.message),
+                              textareaFieldClass,
+                            )}
                           />
-                        </svg>
-                      </span>
-                    </div>
-                  </Field>
+                        </Field>
 
-                  <Field
-                    label={t("contact.fields.message")}
-                    error={errors.message}
-                    errorId="contact-error-message"
-                  >
-                    <textarea
-                      ref={(el) => {
-                        fieldRefs.current.message = el
-                      }}
-                      name="message"
-                      rows={5}
-                      maxLength={MESSAGE_MAX}
-                      placeholder={t("contact.placeholders.message")}
-                      aria-invalid={Boolean(errors.message)}
-                      aria-describedby={
-                        errors.message ? "contact-error-message" : undefined
-                      }
-                      onInput={() => clearFieldError("message")}
-                      className={fieldClassName(
-                        Boolean(errors.message),
-                        textareaFieldClass,
-                      )}
-                    />
-                  </Field>
+                        <div className="mt-1 w-full">
+                          <button
+                            type="button"
+                            onClick={goToPersonal}
+                            className={cn(primaryBtnClass, "w-full")}
+                          >
+                            {t("contact.assessment.continue")}
+                            <NextIcon className="size-4 shrink-0" strokeWidth={2.5} />
+                          </button>
+                        </div>
+                      </motion.div>
+                    ) : null}
 
-                  <div ref={slideWrapRef} className="mt-2 w-full min-w-0 max-w-full overflow-hidden">
-                    <p className="mb-3 flex items-center gap-2 font-heading text-[13px] font-medium text-[var(--gym-muted)] sm:text-[14px]">
-                      <span className="contact-slide-hint inline-flex items-center gap-1.5">
-                        <span aria-hidden className="contact-slide-hint__chevron">
-                          →
-                        </span>
-                        {t("contact.slideHint")}
-                      </span>
-                    </p>
+                    {step === "personal" ? (
+                      <motion.div
+                        key="personal-step"
+                        {...stepMotion}
+                        className="flex flex-col gap-6 sm:gap-7 will-change-transform"
+                      >
+                        <p className="text-[14px] leading-relaxed text-[var(--gym-muted)] sm:text-[15px]">
+                          {t("contact.assessment.personal.hint")}
+                        </p>
 
-                    <div className="w-full min-w-0 max-w-full overflow-hidden">
-                      <SlideCommit
-                        key={slideWidth}
-                        label={t("contact.slideLabel")}
-                        doneLabel={t("contact.slideDone")}
-                        errorLabel={t("contact.slideError")}
-                        onConfirm={handleConfirm}
-                        onDone={() => {
-                          appToast.success(t("contact.toast.success"))
-                          window.setTimeout(() => setSubmitted(true), 900)
-                        }}
-                        trackColor="#24030c"
-                        handleColor="#fb5001"
-                        successColor="#fb5001"
-                        dangerColor="#e5484d"
-                        width={slideWidth}
-                        height={56}
-                        radius={28}
-                        holdMs={1100}
-                        landingDip={0}
-                        className="contact-slide w-full max-w-full"
-                      />
-                    </div>
+                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-5">
+                          <Field
+                            label={t("contact.assessment.fields.age")}
+                            error={errors.age}
+                            errorId="contact-error-age"
+                          >
+                            <input
+                              ref={(el) => {
+                                fieldRefs.current.age = el
+                              }}
+                              type="number"
+                              inputMode="numeric"
+                              min={12}
+                              max={100}
+                              value={assessment.age}
+                              placeholder={t(
+                                "contact.assessment.placeholders.age",
+                              )}
+                              aria-invalid={Boolean(errors.age)}
+                              onChange={(e) =>
+                                patchAssessment("age", e.target.value)
+                              }
+                              className={fieldClassName(
+                                Boolean(errors.age),
+                                inputFieldClass,
+                              )}
+                            />
+                          </Field>
+                          <Field
+                            label={t("contact.assessment.fields.sex")}
+                            error={errors.sex}
+                            errorId="contact-error-sex"
+                          >
+                            <div className="relative">
+                              <select
+                                ref={(el) => {
+                                  fieldRefs.current.sex = el
+                                }}
+                                value={assessment.sex}
+                                aria-invalid={Boolean(errors.sex)}
+                                onChange={(e) =>
+                                  patchAssessment(
+                                    "sex",
+                                    e.target.value as "" | AssessmentSex,
+                                  )
+                                }
+                                className={fieldClassName(
+                                  Boolean(errors.sex),
+                                  cn(inputFieldClass, "appearance-none pe-12"),
+                                )}
+                              >
+                                <option value="" disabled>
+                                  {t("contact.assessment.placeholders.sex")}
+                                </option>
+                                <option value="male">
+                                  {t("contact.assessment.options.sex.male")}
+                                </option>
+                                <option value="female">
+                                  {t("contact.assessment.options.sex.female")}
+                                </option>
+                              </select>
+                              <SelectChevron isRtl={isRtl} />
+                            </div>
+                          </Field>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-5">
+                          <Field
+                            label={t("contact.assessment.fields.heightCm")}
+                            error={errors.heightCm}
+                            errorId="contact-error-height"
+                          >
+                            <input
+                              ref={(el) => {
+                                fieldRefs.current.heightCm = el
+                              }}
+                              type="number"
+                              inputMode="decimal"
+                              min={100}
+                              max={250}
+                              value={assessment.heightCm}
+                              placeholder={t(
+                                "contact.assessment.placeholders.heightCm",
+                              )}
+                              aria-invalid={Boolean(errors.heightCm)}
+                              onChange={(e) =>
+                                patchAssessment("heightCm", e.target.value)
+                              }
+                              className={fieldClassName(
+                                Boolean(errors.heightCm),
+                                inputFieldClass,
+                              )}
+                            />
+                          </Field>
+                          <Field
+                            label={t("contact.assessment.fields.startingWeightKg")}
+                            error={errors.startingWeightKg}
+                            errorId="contact-error-weight"
+                          >
+                            <input
+                              ref={(el) => {
+                                fieldRefs.current.startingWeightKg = el
+                              }}
+                              type="number"
+                              inputMode="decimal"
+                              min={30}
+                              max={300}
+                              value={assessment.startingWeightKg}
+                              placeholder={t(
+                                "contact.assessment.placeholders.startingWeightKg",
+                              )}
+                              aria-invalid={Boolean(errors.startingWeightKg)}
+                              onChange={(e) =>
+                                patchAssessment(
+                                  "startingWeightKg",
+                                  e.target.value,
+                                )
+                              }
+                              className={fieldClassName(
+                                Boolean(errors.startingWeightKg),
+                                inputFieldClass,
+                              )}
+                            />
+                          </Field>
+                        </div>
+
+                        <Field
+                          label={t("contact.assessment.fields.targetWeightKg")}
+                          error={errors.targetWeightKg}
+                          errorId="contact-error-target"
+                          optional
+                          optionalLabel={t("contact.assessment.optional")}
+                        >
+                          <input
+                            ref={(el) => {
+                              fieldRefs.current.targetWeightKg = el
+                            }}
+                            type="number"
+                            inputMode="decimal"
+                            min={30}
+                            max={300}
+                            value={assessment.targetWeightKg}
+                            placeholder={t(
+                              "contact.assessment.placeholders.targetWeightKg",
+                            )}
+                            aria-invalid={Boolean(errors.targetWeightKg)}
+                            onChange={(e) =>
+                              patchAssessment("targetWeightKg", e.target.value)
+                            }
+                            className={fieldClassName(
+                              Boolean(errors.targetWeightKg),
+                              inputFieldClass,
+                            )}
+                          />
+                        </Field>
+
+                        <Field
+                          label={t("contact.assessment.fields.healthNotes")}
+                          error={errors.healthNotes}
+                          errorId="contact-error-health"
+                          optional
+                          optionalLabel={t("contact.assessment.optional")}
+                        >
+                          <textarea
+                            ref={(el) => {
+                              fieldRefs.current.healthNotes = el
+                            }}
+                            rows={3}
+                            maxLength={800}
+                            value={assessment.healthNotes}
+                            placeholder={t(
+                              "contact.assessment.placeholders.healthNotes",
+                            )}
+                            onChange={(e) =>
+                              patchAssessment("healthNotes", e.target.value)
+                            }
+                            className={fieldClassName(
+                              Boolean(errors.healthNotes),
+                              textareaFieldClass,
+                            )}
+                          />
+                        </Field>
+
+                        <div className="mt-1 flex w-full flex-col gap-3">
+                          <button
+                            type="button"
+                            onClick={goToFitness}
+                            className={cn(primaryBtnClass, "w-full")}
+                          >
+                            {t("contact.assessment.continue")}
+                            <NextIcon className="size-4 shrink-0" strokeWidth={2.5} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => goToStep("contact")}
+                            className={cn(secondaryBtnClass, "w-full")}
+                          >
+                            <BackIcon className="size-4 shrink-0" strokeWidth={2.5} />
+                            {t("contact.assessment.back")}
+                          </button>
+                        </div>
+                      </motion.div>
+                    ) : null}
+
+                    {step === "fitness" ? (
+                      <motion.div
+                        key="fitness-step"
+                        {...stepMotion}
+                        className="flex flex-col gap-6 sm:gap-7 will-change-transform"
+                      >
+                        <p className="text-[14px] leading-relaxed text-[var(--gym-muted)] sm:text-[15px]">
+                          {t("contact.assessment.fitness.hint")}
+                        </p>
+
+                        <Field
+                          label={t("contact.assessment.fields.fitnessExperience")}
+                          error={errors.fitnessExperience}
+                          errorId="contact-error-experience"
+                        >
+                          <div className="relative">
+                            <select
+                              ref={(el) => {
+                                fieldRefs.current.fitnessExperience = el
+                              }}
+                              value={assessment.fitnessExperience}
+                              aria-invalid={Boolean(errors.fitnessExperience)}
+                              onChange={(e) =>
+                                patchAssessment(
+                                  "fitnessExperience",
+                                  e.target.value as "" | FitnessExperience,
+                                )
+                              }
+                              className={fieldClassName(
+                                Boolean(errors.fitnessExperience),
+                                cn(inputFieldClass, "appearance-none pe-12"),
+                              )}
+                            >
+                              <option value="" disabled>
+                                {t("contact.assessment.placeholders.select")}
+                              </option>
+                              {FITNESS_EXPERIENCE_OPTIONS.map((opt) => (
+                                <option key={opt} value={opt}>
+                                  {t(
+                                    `contact.assessment.options.experience.${opt}`,
+                                  )}
+                                </option>
+                              ))}
+                            </select>
+                            <SelectChevron isRtl={isRtl} />
+                          </div>
+                        </Field>
+
+                        <Field
+                          label={t("contact.assessment.fields.activityLevel")}
+                          error={errors.activityLevel}
+                          errorId="contact-error-activity"
+                        >
+                          <div className="relative">
+                            <select
+                              ref={(el) => {
+                                fieldRefs.current.activityLevel = el
+                              }}
+                              value={assessment.activityLevel}
+                              aria-invalid={Boolean(errors.activityLevel)}
+                              onChange={(e) =>
+                                patchAssessment(
+                                  "activityLevel",
+                                  e.target.value as "" | ActivityLevel,
+                                )
+                              }
+                              className={fieldClassName(
+                                Boolean(errors.activityLevel),
+                                cn(inputFieldClass, "appearance-none pe-12"),
+                              )}
+                            >
+                              <option value="" disabled>
+                                {t("contact.assessment.placeholders.select")}
+                              </option>
+                              {ACTIVITY_LEVEL_OPTIONS.map((opt) => (
+                                <option key={opt} value={opt}>
+                                  {t(
+                                    `contact.assessment.options.activity.${opt}`,
+                                  )}
+                                </option>
+                              ))}
+                            </select>
+                            <SelectChevron isRtl={isRtl} />
+                          </div>
+                        </Field>
+
+                        <Field
+                          label={t("contact.assessment.fields.workoutFrequency")}
+                          error={errors.workoutFrequency}
+                          errorId="contact-error-frequency"
+                        >
+                          <div className="relative">
+                            <select
+                              ref={(el) => {
+                                fieldRefs.current.workoutFrequency = el
+                              }}
+                              value={assessment.workoutFrequency}
+                              aria-invalid={Boolean(errors.workoutFrequency)}
+                              onChange={(e) =>
+                                patchAssessment(
+                                  "workoutFrequency",
+                                  e.target.value as "" | WorkoutFrequency,
+                                )
+                              }
+                              className={fieldClassName(
+                                Boolean(errors.workoutFrequency),
+                                cn(inputFieldClass, "appearance-none pe-12"),
+                              )}
+                            >
+                              <option value="" disabled>
+                                {t("contact.assessment.placeholders.select")}
+                              </option>
+                              {WORKOUT_FREQUENCY_OPTIONS.map((opt) => (
+                                <option key={opt} value={opt}>
+                                  {t(
+                                    `contact.assessment.options.frequency.${opt}`,
+                                  )}
+                                </option>
+                              ))}
+                            </select>
+                            <SelectChevron isRtl={isRtl} />
+                          </div>
+                        </Field>
+
+                        <Field
+                          label={t("contact.assessment.fields.primaryGoal")}
+                          error={errors.primaryGoal}
+                          errorId="contact-error-primaryGoal"
+                        >
+                          <div className="relative">
+                            <select
+                              ref={(el) => {
+                                fieldRefs.current.primaryGoal = el
+                              }}
+                              value={assessment.primaryGoal}
+                              aria-invalid={Boolean(errors.primaryGoal)}
+                              onChange={(e) =>
+                                patchAssessment(
+                                  "primaryGoal",
+                                  e.target.value as "" | PrimaryFitnessGoal,
+                                )
+                              }
+                              className={fieldClassName(
+                                Boolean(errors.primaryGoal),
+                                cn(inputFieldClass, "appearance-none pe-12"),
+                              )}
+                            >
+                              <option value="" disabled>
+                                {t("contact.assessment.placeholders.select")}
+                              </option>
+                              {PRIMARY_GOAL_OPTIONS.map((opt) => (
+                                <option key={opt} value={opt}>
+                                  {t(`contact.assessment.options.goal.${opt}`)}
+                                </option>
+                              ))}
+                            </select>
+                            <SelectChevron isRtl={isRtl} />
+                          </div>
+                        </Field>
+
+                        <div
+                          ref={slideWrapRef}
+                          className="mt-1 w-full min-w-0 max-w-full"
+                        >
+                          <p className="mb-3 flex items-center gap-2 font-heading text-[13px] font-medium text-[var(--gym-muted)] sm:text-[14px]">
+                            <span className="contact-slide-hint inline-flex items-center gap-1.5">
+                              <span
+                                aria-hidden
+                                className="contact-slide-hint__chevron"
+                              >
+                                →
+                              </span>
+                              {t("contact.slideHint")}
+                            </span>
+                          </p>
+
+                          <div className="w-full min-w-0 max-w-full overflow-hidden">
+                            <SlideCommit
+                              key={`slide-${slideWidth}`}
+                              label={t("contact.slideLabel")}
+                              doneLabel={t("contact.slideDone")}
+                              errorLabel={t("contact.slideError")}
+                              onConfirm={handleConfirm}
+                              onDone={() => {
+                                appToast.success(t("contact.toast.success"))
+                                window.setTimeout(() => setSubmitted(true), 900)
+                              }}
+                              trackColor="#24030c"
+                              handleColor="#fb5001"
+                              successColor="#fb5001"
+                              dangerColor="#e5484d"
+                              width={slideWidth}
+                              height={56}
+                              radius={28}
+                              holdMs={1100}
+                              landingDip={0}
+                              className="contact-slide w-full max-w-full"
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => goToStep("personal")}
+                          className={cn(secondaryBtnClass, "w-full")}
+                        >
+                          <BackIcon className="size-4 shrink-0" strokeWidth={2.5} />
+                          {t("contact.assessment.back")}
+                        </button>
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
                   </div>
                 </form>
               </div>
@@ -549,20 +1319,53 @@ export function ContactSection() {
   )
 }
 
+function SelectChevron({ isRtl }: { isRtl: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "pointer-events-none absolute top-1/2 inline-flex size-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/70 text-[var(--gym-ink)]",
+        isRtl ? "left-3" : "right-3",
+      )}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path
+          d="M6 9l6 6 6-6"
+          stroke="currentColor"
+          strokeWidth="2.25"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </span>
+  )
+}
+
 function Field({
   label,
   error,
   errorId,
+  optional,
+  optionalLabel,
   children,
 }: {
   label: string
   error?: string
   errorId?: string
+  optional?: boolean
+  optionalLabel?: string
   children: ReactNode
 }) {
   return (
     <label className="block">
-      <span className={labelClass}>{label}</span>
+      <span className={labelClass}>
+        {label}
+        {optional ? (
+          <span className="ms-1.5 font-medium text-[var(--gym-muted)]/70">
+            ({optionalLabel})
+          </span>
+        ) : null}
+      </span>
       {children}
       {error ? (
         <span

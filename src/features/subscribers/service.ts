@@ -18,6 +18,7 @@ import {
   callCreateSubscriberAccount,
   callDeleteSubscriberAccount,
   callPurgeDemoSubscriberData,
+  callRecordSubscriberCheckIn,
   callRejectRegistrationRequest,
   callSetSubscriberAccountStatus,
   callUpdateMySubscriberProfile,
@@ -29,6 +30,10 @@ import {
   type RegistrationRequestStatus,
   type Subscriber,
 } from "@/features/subscribers/types"
+import {
+  normalizeRegistrationAssessment,
+  type RegistrationAssessment,
+} from "@/features/subscribers/assessment"
 import type { UserStatus } from "@/types/user"
 import type { SubscriberSubscription } from "@/types/subscription"
 import { fetchSubscriptions } from "@/features/subscriptions/service"
@@ -122,6 +127,10 @@ export function normalizeSubscriberDoc(
       typeof raw.registrationRequestId === "string"
         ? raw.registrationRequestId
         : undefined,
+    lastCheckInAt:
+      typeof raw.lastCheckInAt === "string" && raw.lastCheckInAt.trim()
+        ? raw.lastCheckInAt
+        : undefined,
   }
 }
 
@@ -155,6 +164,7 @@ function normalizeRequestDoc(
     locale: raw.locale === "en" ? "en" : "ar",
     packageId: typeof raw.packageId === "string" ? raw.packageId : null,
     goal: goalObj,
+    assessment: normalizeRegistrationAssessment(raw.assessment),
     source: raw.source === "manual" ? "manual" : "contact",
     status,
     subscriberId:
@@ -487,6 +497,7 @@ export type CreateRegistrationRequestInput = {
   locale: "en" | "ar"
   packageId: string | null
   goal: string | { en: string; ar: string }
+  assessment?: RegistrationAssessment
   source?: "contact" | "manual"
 }
 
@@ -523,6 +534,7 @@ export async function createRegistrationRequest(
     locale: input.locale,
     packageId: input.packageId || null,
     goal: goalObj,
+    assessment: normalizeRegistrationAssessment(input.assessment),
     source: input.source ?? "contact",
     status: "pending",
     createdAt: now,
@@ -631,6 +643,12 @@ export async function updateMySubscriberProfile(
     result.subscriber.id,
     result.subscriber as unknown as Record<string, unknown>,
   )
+}
+
+/** Stamp lastCheckInAt for the signed-in subscriber (login / session). */
+export async function recordSubscriberCheckIn(): Promise<string> {
+  const result = await callRecordSubscriberCheckIn()
+  return result.lastCheckInAt
 }
 
 export async function updateSubscriberCoachNotes(

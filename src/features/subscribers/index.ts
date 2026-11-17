@@ -19,6 +19,7 @@ export {
   subscribePendingRegistrationRequestCount,
   subscribeSubscriberById,
   updateMySubscriberProfile,
+  recordSubscriberCheckIn,
   updateSubscriberAccountStatus,
   deleteSubscriberAccount,
   createRegistrationRequest,

@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import {
   Check,
@@ -8,6 +8,7 @@ import {
   Layers,
   Play,
   Plus,
+  Repeat,
   ShieldAlert,
   Trash2,
   X,
@@ -29,6 +30,7 @@ import { cn } from "@/lib/utils"
 import type { ContentAsset } from "@/types/content"
 import type {
   BilingualText,
+  ExerciseAlternative,
   ProgramFormat,
   WorkoutDay,
   WorkoutExercise,
@@ -101,6 +103,7 @@ export function WorkoutProgramFormDialog({
   const [previewVideo, setPreviewVideo] = useState<ContentAsset | null>(null)
   const [busy, setBusy] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [expandedExerciseAlts, setExpandedExerciseAlts] = useState<Record<string, boolean>>({})
 
   // Form State
   const [titleEn, setTitleEn] = useState("")
@@ -260,6 +263,78 @@ export function WorkoutProgramFormDialog({
         return {
           ...d,
           exercises: d.exercises.filter((ex) => ex.id !== exerciseId),
+        }
+      }),
+    )
+  }
+
+  function addExerciseAlternative(exerciseId: string) {
+    const newAlt: ExerciseAlternative = {
+      id: allocateFirestoreId("workout_alts"),
+      name: {
+        en: "Alternative exercise",
+        ar: "تمرين بديل",
+      },
+      reason: { en: "", ar: "" },
+      notes: { en: "", ar: "" },
+      equipment: "",
+    }
+    setDays((prev) =>
+      prev.map((d) => {
+        if (d.weekday !== selectedWeekday) return d
+        return {
+          ...d,
+          exercises: d.exercises.map((ex) => {
+            if (ex.id !== exerciseId) return ex
+            return {
+              ...ex,
+              alternatives: [...(ex.alternatives || []), newAlt],
+            }
+          }),
+        }
+      }),
+    )
+    setExpandedExerciseAlts((prev) => ({ ...prev, [exerciseId]: true }))
+  }
+
+  function updateExerciseAlternative(
+    exerciseId: string,
+    altId: string,
+    field: keyof ExerciseAlternative,
+    value: unknown,
+  ) {
+    setDays((prev) =>
+      prev.map((d) => {
+        if (d.weekday !== selectedWeekday) return d
+        return {
+          ...d,
+          exercises: d.exercises.map((ex) => {
+            if (ex.id !== exerciseId) return ex
+            return {
+              ...ex,
+              alternatives: (ex.alternatives || []).map((alt) =>
+                alt.id === altId ? { ...alt, [field]: value } : alt,
+              ),
+            }
+          }),
+        }
+      }),
+    )
+  }
+
+  function removeExerciseAlternative(exerciseId: string, altId: string) {
+    setDays((prev) =>
+      prev.map((d) => {
+        if (d.weekday !== selectedWeekday) return d
+        return {
+          ...d,
+          exercises: d.exercises.map((ex) => {
+            if (ex.id !== exerciseId) return ex
+            return {
+              ...ex,
+              alternatives: (ex.alternatives || []).filter((a) => a.id !== altId),
+            }
+          }),
         }
       }),
     )
@@ -1081,6 +1156,216 @@ export function WorkoutProgramFormDialog({
                                   placeholder={isAr ? "ملاحظات إضافية (RPE، الحمل...)" : "Coaching note (e.g. RPE 8, drop set)..."}
                                   className="h-8 w-full rounded-lg border border-[#E0E0E0] px-2 text-[11px] text-[#8c8c8c] outline-none focus:border-black"
                                 />
+                              </div>
+
+                              {/* Approved exercise alternatives */}
+                              <div className="rounded-xl border border-black/5 bg-neutral-50/80 p-2.5">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setExpandedExerciseAlts((prev) => ({
+                                        ...prev,
+                                        [ex.id]: !prev[ex.id],
+                                      }))
+                                    }
+                                    className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[var(--gym-ink,#111111)] hover:text-[var(--gym-orange,#fb5001)]"
+                                  >
+                                    <Repeat className="size-3 text-[var(--gym-orange,#fb5001)]" />
+                                    <span>
+                                      {isAr
+                                        ? `بدائل التمرين المعتمدة (${ex.alternatives?.length || 0})`
+                                        : `Approved substitutes (${ex.alternatives?.length || 0})`}
+                                    </span>
+                                    <ChevronDown
+                                      className={cn(
+                                        "size-3 transition-transform",
+                                        expandedExerciseAlts[ex.id] && "rotate-180",
+                                      )}
+                                    />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => addExerciseAlternative(ex.id)}
+                                    className="inline-flex items-center gap-1 rounded-full bg-neutral-200 px-2.5 py-0.5 text-[10px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-neutral-300"
+                                  >
+                                    <Plus className="size-2.5" />
+                                    {isAr ? "إضافة بديل" : "Add alternative"}
+                                  </button>
+                                </div>
+
+                                {expandedExerciseAlts[ex.id] &&
+                                (ex.alternatives?.length || 0) > 0 ? (
+                                  <div className="mt-2 space-y-2 rounded-xl border border-black/10 bg-white p-2.5">
+                                    {(ex.alternatives || []).map((alt) => {
+                                      const altName =
+                                        typeof alt.name === "object"
+                                          ? activeLangTab === "ar"
+                                            ? alt.name.ar
+                                            : alt.name.en
+                                          : alt.name
+                                      const altReason =
+                                        typeof alt.reason === "object"
+                                          ? activeLangTab === "ar"
+                                            ? alt.reason.ar
+                                            : alt.reason.en
+                                          : alt.reason || ""
+                                      const altNotes =
+                                        typeof alt.notes === "object"
+                                          ? activeLangTab === "ar"
+                                            ? alt.notes.ar
+                                            : alt.notes.en
+                                          : alt.notes || ""
+
+                                      return (
+                                        <div
+                                          key={alt.id}
+                                          className="space-y-1.5 rounded-lg border border-black/5 bg-neutral-50 p-2"
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            <input
+                                              value={altName}
+                                              onChange={(e) => {
+                                                const val = e.target.value
+                                                const cur =
+                                                  typeof alt.name === "object"
+                                                    ? alt.name
+                                                    : {
+                                                        en: String(alt.name || ""),
+                                                        ar: String(alt.name || ""),
+                                                      }
+                                                updateExerciseAlternative(
+                                                  ex.id,
+                                                  alt.id,
+                                                  "name",
+                                                  {
+                                                    ...cur,
+                                                    [activeLangTab]: val,
+                                                  },
+                                                )
+                                              }}
+                                              placeholder={
+                                                isAr
+                                                  ? "اسم التمرين البديل"
+                                                  : "Alternative exercise name"
+                                              }
+                                              className="h-7 flex-1 rounded border border-[#E0E0E0] bg-white px-2 text-[11px] font-bold text-[var(--gym-ink,#111111)]"
+                                            />
+                                            <input
+                                              value={alt.equipment || ""}
+                                              onChange={(e) =>
+                                                updateExerciseAlternative(
+                                                  ex.id,
+                                                  alt.id,
+                                                  "equipment",
+                                                  e.target.value,
+                                                )
+                                              }
+                                              placeholder={
+                                                isAr ? "المعدة" : "Equipment"
+                                              }
+                                              className="h-7 w-24 rounded border border-[#E0E0E0] bg-white px-2 text-[11px] font-semibold"
+                                            />
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                removeExerciseAlternative(
+                                                  ex.id,
+                                                  alt.id,
+                                                )
+                                              }
+                                              className="flex size-6 shrink-0 items-center justify-center rounded text-red-500 hover:bg-red-50"
+                                            >
+                                              <Trash2 className="size-3" />
+                                            </button>
+                                          </div>
+                                          <input
+                                            value={altReason}
+                                            onChange={(e) => {
+                                              const val = e.target.value
+                                              const cur =
+                                                typeof alt.reason === "object"
+                                                  ? alt.reason
+                                                  : { en: "", ar: "" }
+                                              updateExerciseAlternative(
+                                                ex.id,
+                                                alt.id,
+                                                "reason",
+                                                {
+                                                  ...cur,
+                                                  [activeLangTab]: val,
+                                                },
+                                              )
+                                            }}
+                                            placeholder={
+                                              isAr
+                                                ? "متى يُستخدم هذا البديل؟"
+                                                : "When to use this substitute?"
+                                            }
+                                            className="h-6 w-full rounded border border-[#E0E0E0] bg-white px-2 text-[10.5px] text-[#6B7280]"
+                                          />
+                                          <div className="flex flex-col gap-1.5 sm:flex-row">
+                                            <input
+                                              value={altNotes}
+                                              onChange={(e) => {
+                                                const val = e.target.value
+                                                const cur =
+                                                  typeof alt.notes === "object"
+                                                    ? alt.notes
+                                                    : { en: "", ar: "" }
+                                                updateExerciseAlternative(
+                                                  ex.id,
+                                                  alt.id,
+                                                  "notes",
+                                                  {
+                                                    ...cur,
+                                                    [activeLangTab]: val,
+                                                  },
+                                                )
+                                              }}
+                                              placeholder={
+                                                isAr
+                                                  ? "ملاحظات إضافية للبديل"
+                                                  : "Extra notes for substitute"
+                                              }
+                                              className="h-6 flex-1 rounded border border-[#E0E0E0] bg-white px-2 text-[10.5px] text-[#6B7280]"
+                                            />
+                                            <select
+                                              value={alt.videoContentId || ""}
+                                              onChange={(e) =>
+                                                updateExerciseAlternative(
+                                                  ex.id,
+                                                  alt.id,
+                                                  "videoContentId",
+                                                  e.target.value || undefined,
+                                                )
+                                              }
+                                              className="h-6 min-w-[140px] rounded border border-[#E0E0E0] bg-white px-2 text-[10px] font-semibold text-[#525252]"
+                                            >
+                                              <option value="">
+                                                {isAr
+                                                  ? "فيديو (اختياري)"
+                                                  : "Video (optional)"}
+                                              </option>
+                                              {videoAssets.map((asset) => (
+                                                <option
+                                                  key={asset.id}
+                                                  value={asset.id}
+                                                >
+                                                  {typeof asset.title === "string"
+                                                    ? asset.title
+                                                    : asset.title?.en ||
+                                                      asset.title?.ar ||
+                                                      asset.id}
+                                                </option>
+                                              ))}
+                                            </select>
+                                          </div>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                ) : null}
                               </div>
                             </div>
                           )

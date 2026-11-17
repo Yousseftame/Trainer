@@ -245,17 +245,22 @@ export function SubscriberDetailPage() {
   })
   const week = latestAdherenceWeek(adherenceWeeks)
   const remaining = remainingDays(current?.endsAt)
-  const days = daysSince(latest?.recordedAt)
+  const currentWeightKg =
+    latest?.weightKg ?? subscriber.startingWeightKg ?? undefined
+  const weightFromLogs = latest?.weightKg != null
+  const checkInAt = subscriber.lastCheckInAt || latest?.recordedAt
+  const days = daysSince(checkInAt)
   const delta = weightDeltaFromList(measurements, subscriber.startingWeightKg)
-  const bmi = formatBmi(latest?.weightKg, subscriber.heightCm)
+  const bmi = formatBmi(currentWeightKg, subscriber.heightCm)
   const adherence = adherenceScoreFromWeeks(adherenceWeeks)
   const activePt =
     ptRecords.find((r) => r.status === "active" || r.status === "recovering") ??
     ptRecords[0]
+  const measurementDays = daysSince(latest?.recordedAt)
   const rosterBucket =
     !latest?.recordedAt
       ? "quiet"
-      : days != null && days > 14
+      : measurementDays != null && measurementDays > 14
         ? "attention"
         : adherence != null && adherence < 70
           ? "attention"
@@ -264,7 +269,7 @@ export function SubscriberDetailPage() {
     rosterBucket === "quiet"
       ? "muted"
       : rosterBucket === "attention"
-        ? days != null && days > 14
+        ? measurementDays != null && measurementDays > 14
           ? "danger"
           : "warning"
         : "success"
@@ -476,17 +481,32 @@ export function SubscriberDetailPage() {
       <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4 lg:gap-4">
         <StatCard
           label={t("admin.subscribers.weightNow")}
-          value={latest?.weightKg != null ? formatKg(latest.weightKg, locale) : "—"}
-          hint={delta != null ? `${signed(delta)} kg · ${t("admin.progress.sinceStart")}` : t("admin.progress.noLogs")}
+          value={
+            currentWeightKg != null ? formatKg(currentWeightKg, locale) : "—"
+          }
+          hint={
+            weightFromLogs && delta != null
+              ? `${signed(delta)} kg · ${t("admin.progress.sinceStart")}`
+              : currentWeightKg != null
+                ? locale === "ar"
+                  ? "من ملف المشترك"
+                  : "From profile"
+                : t("admin.progress.noLogs")
+          }
           icon={<Scale className="size-4" strokeWidth={1.8} />}
         />
         <StatCard
           label={t("admin.subscribers.lastCheckIn")}
-          value={latest ? formatDate(latest.recordedAt, locale) : "—"}
+          value={checkInAt ? formatDate(checkInAt, locale) : "—"}
           hint={
-            days != null
-              ? t("admin.progress.lastCheckIn", { date: formatDate(latest?.recordedAt, locale), days })
-              : t("admin.progress.noLogs")
+            days != null && checkInAt
+              ? t("admin.progress.lastCheckIn", {
+                  date: formatDate(checkInAt, locale),
+                  days,
+                })
+              : locale === "ar"
+                ? "لم يسجّل الدخول بعد"
+                : "No login yet"
           }
           icon={<Activity className="size-4" strokeWidth={1.8} />}
         />

@@ -9,6 +9,7 @@ import {
   Dumbbell,
   FileText,
   History,
+  Eye,
   MessageSquareWarning,
   Pencil,
   Play,
@@ -23,8 +24,10 @@ import {
 import { APP_ROUTES } from "@/config/constants"
 import { ConfirmActionDialog } from "@/components/dashboard/ConfirmActionDialog"
 import { ContentPreviewDialog } from "@/components/dashboard/ContentPreviewDialog"
+import { ExerciseChangeRequestDetailsDialog } from "@/components/dashboard/ExerciseChangeRequestDetailsDialog"
 import { ProgramHistoryDialog } from "@/components/dashboard/ProgramHistoryDialog"
 import { ProgramLogsDialog } from "@/components/dashboard/ProgramLogsDialog"
+import type { ExerciseChangeRequest } from "@/features/workouts/exercise-change-requests"
 import { FilterChip, StatCard } from "@/components/dashboard/StatCard"
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
 import {
@@ -106,6 +109,8 @@ export function WorkoutsPage() {
   }>({ open: false })
 
   const [previewAsset, setPreviewAsset] = useState<ContentAsset | null>(null)
+  const [detailsRequest, setDetailsRequest] =
+    useState<ExerciseChangeRequest | null>(null)
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean
     title: string
@@ -338,6 +343,8 @@ export function WorkoutsPage() {
 
   useEffect(() => {
     if (!focusRequestId || !pendingExerciseRequests.length) return
+    const focused = pendingExerciseRequests.find((r) => r.id === focusRequestId)
+    if (focused) setDetailsRequest(focused)
     const t = window.setTimeout(() => {
       focusRequestRef.current?.scrollIntoView({
         behavior: "smooth",
@@ -433,7 +440,7 @@ export function WorkoutsPage() {
                       : "border-amber-200/70",
                   )}
                 >
-                  <div className="min-w-0 space-y-1">
+                  <div className="min-w-0 space-y-1.5">
                     <p className="truncate text-[13px] font-bold text-[var(--gym-ink,#111111)]">
                       {req.subscriberName ||
                         req.subscriberEmail ||
@@ -443,6 +450,9 @@ export function WorkoutsPage() {
                       <strong className="text-[var(--gym-ink,#111111)]">
                         {req.exerciseName}
                       </strong>
+                      {req.substituteName
+                        ? ` → ${req.substituteName}`
+                        : ""}
                       {" · "}
                       {isAr ? "السبب: " : "Reason: "}
                       {req.reason}
@@ -457,12 +467,20 @@ export function WorkoutsPage() {
                       </p>
                     ) : null}
                     {req.notes ? (
-                      <p className="rounded-xl bg-[#F7F7F7] px-2.5 py-1.5 text-[12px] text-[#525252]">
+                      <p className="line-clamp-2 rounded-xl bg-[#F7F7F7] px-2.5 py-1.5 text-[12px] text-[#525252]">
                         {req.notes}
                       </p>
                     ) : null}
                   </div>
                   <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setDetailsRequest(req)}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-[var(--gym-orange,#fb5001)] px-3.5 py-1.5 text-[12px] font-bold text-white"
+                    >
+                      <Eye className="size-3.5" />
+                      {isAr ? "التفاصيل" : "Details"}
+                    </button>
                     <Link
                       to={APP_ROUTES.admin.subscriberDetail(req.subscriberId)}
                       className="rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-[12px] font-bold text-[#525252] hover:bg-black/[0.03]"
@@ -494,6 +512,9 @@ export function WorkoutsPage() {
                               decision: "reviewed",
                             })
                             if (focusRequestId === req.id) clearFocusParams()
+                            if (detailsRequest?.id === req.id) {
+                              setDetailsRequest(null)
+                            }
                             appToast.success(
                               isAr
                                 ? "تم تعليم الطلب كـ مُراجع"
@@ -513,6 +534,9 @@ export function WorkoutsPage() {
                               decision: "dismissed",
                             })
                             if (focusRequestId === req.id) clearFocusParams()
+                            if (detailsRequest?.id === req.id) {
+                              setDetailsRequest(null)
+                            }
                             appToast.success(
                               isAr ? "تم إغلاق الطلب" : "Request dismissed",
                             )
@@ -1227,6 +1251,62 @@ export function WorkoutsPage() {
           onClose={() => setPreviewAsset(null)}
         />
       ) : null}
+
+      <ExerciseChangeRequestDetailsDialog
+        open={Boolean(detailsRequest)}
+        request={detailsRequest}
+        busy={actionsBusy}
+        canManage={canManage}
+        onClose={() => {
+          setDetailsRequest(null)
+          if (focusRequestId) clearFocusParams()
+        }}
+        onOpenLogs={
+          detailsRequest
+            ? () => {
+                setLogsModal({
+                  open: true,
+                  subscriberId: detailsRequest.subscriberId,
+                  subscriberName:
+                    detailsRequest.subscriberName ||
+                    detailsRequest.subscriberEmail,
+                })
+              }
+            : undefined
+        }
+        onMarkReviewed={
+          detailsRequest && canManage
+            ? async () => {
+                const id = detailsRequest.id
+                await resolveExerciseMutation.mutateAsync({
+                  requestId: id,
+                  decision: "reviewed",
+                })
+                setDetailsRequest(null)
+                if (focusRequestId === id) clearFocusParams()
+                appToast.success(
+                  isAr ? "تم تعليم الطلب كـ مُراجع" : "Marked as reviewed",
+                )
+              }
+            : undefined
+        }
+        onDismiss={
+          detailsRequest && canManage
+            ? async () => {
+                const id = detailsRequest.id
+                await resolveExerciseMutation.mutateAsync({
+                  requestId: id,
+                  decision: "dismissed",
+                })
+                setDetailsRequest(null)
+                if (focusRequestId === id) clearFocusParams()
+                appToast.success(
+                  isAr ? "تم إغلاق الطلب" : "Request dismissed",
+                )
+              }
+            : undefined
+        }
+      />
 
       {/* Confirm Action Dialog */}
       {confirmDialog ? (

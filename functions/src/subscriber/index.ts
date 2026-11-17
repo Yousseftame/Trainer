@@ -18,3 +18,4 @@ export {requestSubscriptionChange} from "./requestSubscriptionChange.js";
 export {requestExerciseChange} from "./requestExerciseChange.js";
 export {requestMealChange} from "./requestMealChange.js";
 export {updateMySubscriberProfile} from "./updateMyProfile.js";
+export {recordSubscriberCheckIn} from "./recordCheckIn.js";

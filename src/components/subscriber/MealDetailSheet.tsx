@@ -176,11 +176,6 @@ export function MealDetailSheet({
                         {item.calories ? (
                           <span>{item.calories} kcal</span>
                         ) : null}
-                        {altCount > 0 ? (
-                          <span>
-                            {isAr ? `${altCount} بدائل` : `${altCount} alts`}
-                          </span>
-                        ) : null}
                       </div>
                       {(item.protein || item.carbs || item.fats) && (
                         <p className="text-[10px] font-extrabold text-[#8c8c8c]">
@@ -191,6 +186,54 @@ export function MealDetailSheet({
                       )}
                       {notes ? (
                         <p className="text-[11px] italic text-[#8c8c8c]">{notes}</p>
+                      ) : null}
+                      {!swapped && altCount > 0 ? (
+                        <div className="mt-2 space-y-1.5 rounded-xl border border-black/[0.06] bg-white p-2">
+                          <p className="px-0.5 text-[10px] font-extrabold uppercase tracking-wide text-[#8c8c8c]">
+                            {isAr
+                              ? `بدائل معتمدة (${altCount})`
+                              : `Approved alternatives (${altCount})`}
+                          </p>
+                          {item.alternatives!.map((alt) => {
+                            const altName = resolveBilingualText(alt.name, locale)
+                            const altQty = resolveBilingualText(alt.quantity, locale)
+                            const altReason = resolveBilingualText(alt.reason, locale)
+                            return (
+                              <div
+                                key={alt.id}
+                                className="rounded-lg border border-black/[0.05] bg-[#FAFAFA] px-2.5 py-2"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className="min-w-0 text-[12px] font-bold leading-snug text-[var(--gym-ink,#111111)]">
+                                    {altName}
+                                  </p>
+                                  {altQty ? (
+                                    <span className="shrink-0 rounded-md bg-black/5 px-1.5 py-0.5 text-[10px] font-bold text-[#555]">
+                                      {altQty}
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-bold text-[#6B7280]">
+                                  {alt.calories ? <span>{alt.calories} kcal</span> : null}
+                                  {alt.protein ? (
+                                    <span className="text-blue-700">P {alt.protein}g</span>
+                                  ) : null}
+                                  {alt.carbs ? (
+                                    <span className="text-amber-700">C {alt.carbs}g</span>
+                                  ) : null}
+                                  {alt.fats ? (
+                                    <span className="text-purple-700">F {alt.fats}g</span>
+                                  ) : null}
+                                </div>
+                                {altReason ? (
+                                  <p className="mt-1 text-[10px] leading-snug text-[#8c8c8c]">
+                                    {altReason}
+                                  </p>
+                                ) : null}
+                              </div>
+                            )
+                          })}
+                        </div>
                       ) : null}
                       <div className="flex flex-wrap items-center gap-2 pt-1">
                         <button

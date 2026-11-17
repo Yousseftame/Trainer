@@ -22,7 +22,10 @@ import {
 } from "@/features/auth/session"
 import { hasActiveEntitlement, type AuthState } from "@/features/auth/types"
 import { unregisterPushNotifications } from "@/features/notifications"
-import { updateMySubscriberProfile } from "@/features/subscribers/service"
+import {
+  recordSubscriberCheckIn,
+  updateMySubscriberProfile,
+} from "@/features/subscribers/service"
 import { useSubscriberSubscriptionsQuery } from "@/features/subscriptions/hooks"
 import {
   pickCurrentSubscription,
@@ -34,6 +37,31 @@ import { getFirebaseAuth } from "@/lib/firebase/auth"
 import { can } from "@/lib/permissions/can"
 import { isAdminRole, isSubscriberRole } from "@/lib/permissions/roles"
 import type { Permission } from "@/lib/permissions/permissions"
+
+const CHECK_IN_SESSION_KEY = "derpyfit:subscriber-checkin"
+
+function markSubscriberCheckIn(uid: string) {
+  // Fire-and-forget — never block login / session restore on check-in failures.
+  void recordSubscriberCheckIn().catch(() => undefined)
+  try {
+    sessionStorage.setItem(`${CHECK_IN_SESSION_KEY}:${uid}`, String(Date.now()))
+  } catch {
+    // Ignore storage failures (private mode, etc.).
+  }
+}
+
+function shouldRecordSessionCheckIn(uid: string): boolean {
+  try {
+    const raw = sessionStorage.getItem(`${CHECK_IN_SESSION_KEY}:${uid}`)
+    if (!raw) return true
+    const last = Number(raw)
+    if (!Number.isFinite(last)) return true
+    // Refresh / token remaps within 30 minutes reuse the same check-in stamp.
+    return Date.now() - last > 30 * 60 * 1000
+  } catch {
+    return true
+  }
+}
 
 const initialState: AuthState = {
   status: "loading",
@@ -98,6 +126,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const err = new Error("auth/user-disabled") as Error & { code?: string }
       err.code = "auth/user-disabled"
       throw err
+    }
+
+    if (isSubscriberRole(user.role) && user.status === "active") {
+      markSubscriberCheckIn(user.uid)
     }
 
     setState({
@@ -212,6 +244,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
               subscriptionStatus: null,
               error: null,
             })
+
+            // Subscribers: record check-in on login / restored session (throttled).
+            if (
+              isSubscriberRole(user.role) &&
+              user.status === "active" &&
+              shouldRecordSessionCheckIn(firebaseUser.uid)
+            ) {
+              markSubscriberCheckIn(firebaseUser.uid)
+            }
 
             // Soft-sync staff claims in the background (never blocks the spinner).
             // Never sign out on permission-denied / network — that kicked staff

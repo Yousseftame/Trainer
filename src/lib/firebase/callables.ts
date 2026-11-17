@@ -326,6 +326,15 @@ export async function callUpdateMySubscriberProfile(
   }
 }
 
+export async function callRecordSubscriberCheckIn() {
+  const fn = httpsCallable(getFirebaseFunctions(), "recordSubscriberCheckIn")
+  const result = await fn({})
+  return result.data as {
+    ok: boolean
+    lastCheckInAt: string
+  }
+}
+
 export async function callResolveSubscriptionChangeRequest(
   input: Record<string, unknown>,
 ) {

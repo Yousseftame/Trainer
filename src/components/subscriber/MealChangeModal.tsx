@@ -174,22 +174,38 @@ export function MealChangeModal({
                 const active = activeAlternativeId === alt.id
                 const name = resolveBilingualText(alt.name, locale)
                 const qty = resolveBilingualText(alt.quantity, locale)
+                const reason = resolveBilingualText(alt.reason, locale)
                 return (
                   <button
                     key={alt.id}
                     type="button"
                     onClick={() => setSelectedAlternativeId(alt.id)}
                     className={cn(
-                      "flex items-center justify-between gap-3 rounded-2xl border px-3.5 py-3 text-start transition",
+                      "flex items-start justify-between gap-3 rounded-2xl border px-3.5 py-3 text-start transition",
                       active
                         ? "border-[var(--gym-orange,#fb5001)] bg-[var(--gym-orange,#fb5001)]/[0.06]"
                         : "border-black/[0.07] bg-white hover:border-black/15",
                     )}
                   >
-                    <div className="min-w-0">
-                      <p className="text-[13px] font-bold truncate">{name}</p>
-                      {qty ? (
-                        <p className="text-[11px] text-[#8c8c8c]">{qty}</p>
+                    <div className="min-w-0 space-y-1">
+                      <p className="text-[13px] font-bold leading-snug">{name}</p>
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold text-[#8c8c8c]">
+                        {qty ? <span>{qty}</span> : null}
+                        {alt.calories ? <span>{alt.calories} kcal</span> : null}
+                        {alt.protein ? (
+                          <span className="text-blue-700">P {alt.protein}g</span>
+                        ) : null}
+                        {alt.carbs ? (
+                          <span className="text-amber-700">C {alt.carbs}g</span>
+                        ) : null}
+                        {alt.fats ? (
+                          <span className="text-purple-700">F {alt.fats}g</span>
+                        ) : null}
+                      </div>
+                      {reason ? (
+                        <p className="text-[11px] font-medium leading-snug text-[#8c8c8c]">
+                          {reason}
+                        </p>
                       ) : null}
                     </div>
                     {active ? (

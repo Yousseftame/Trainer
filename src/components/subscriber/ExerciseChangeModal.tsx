@@ -1,4 +1,4 @@
-﻿import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Check, Dumbbell, RefreshCw, X } from "lucide-react"
 import { useLocale } from "@/hooks/useLocale"
@@ -37,6 +37,14 @@ export function ExerciseChangeModal({
   const [customNotes, setCustomNotes] = useState("")
   const [selectedAlternativeId, setSelectedAlternativeId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) return
+    setSelectedReason(COMMON_REASONS[0].id)
+    setCustomNotes("")
+    setSelectedAlternativeId(null)
+    setIsSubmitting(false)
+  }, [isOpen, exercise?.id])
 
   if (!isOpen || !exercise) return null
 
@@ -175,6 +183,7 @@ export function ExerciseChangeModal({
               {alternatives.map((alt) => {
                 const altName = resolveBilingualText(alt.name, locale)
                 const altReason = resolveBilingualText(alt.reason, locale)
+                const altNotes = resolveBilingualText(alt.notes, locale)
                 const isSelected = selectedAlternativeId === alt.id
 
                 return (
@@ -188,8 +197,8 @@ export function ExerciseChangeModal({
                         : "border-black/[0.07] bg-[#FAFAFA] hover:bg-white hover:border-black/15",
                     )}
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Dumbbell className="size-3.5 text-[var(--gym-ink,#111111)]" />
                         <span className="font-heading text-[13px] font-bold text-[var(--gym-ink,#111111)]">
                           {altName}
@@ -202,7 +211,12 @@ export function ExerciseChangeModal({
                       </div>
                       {altReason ? (
                         <p className="text-[11px] text-[#6B7280]">
-                          💡 {altReason}
+                          {altReason}
+                        </p>
+                      ) : null}
+                      {altNotes ? (
+                        <p className="text-[11px] italic text-[#8c8c8c]">
+                          {altNotes}
                         </p>
                       ) : null}
                     </div>
