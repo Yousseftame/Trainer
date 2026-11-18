@@ -9,6 +9,7 @@ import {
   type SaveContentAssetInput,
   type UpdateContentAssociationsInput,
 } from "@/features/content/service"
+import type { ContentAsset } from "@/types/content"
 
 export const CONTENT_QUERY_KEYS = {
   all: ["content_assets"] as const,
@@ -51,11 +52,26 @@ function invalidateAllContentCaches(queryClient: ReturnType<typeof useQueryClien
   })
 }
 
+function upsertStaffContentAsset(
+  queryClient: ReturnType<typeof useQueryClient>,
+  saved: ContentAsset,
+) {
+  queryClient.setQueryData<ContentAsset[]>(CONTENT_QUERY_KEYS.all, (old) => {
+    if (!old) return [saved]
+    const index = old.findIndex((item) => item.id === saved.id)
+    if (index < 0) return [saved, ...old]
+    const next = [...old]
+    next[index] = saved
+    return next
+  })
+}
+
 export function useSaveContentAssetMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: SaveContentAssetInput) => saveContentAsset(input),
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      upsertStaffContentAsset(queryClient, saved)
       invalidateAllContentCaches(queryClient)
     },
   })
@@ -66,7 +82,8 @@ export function useUpdateContentAssociationsMutation() {
   return useMutation({
     mutationFn: (input: UpdateContentAssociationsInput) =>
       updateContentAssociations(input),
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      upsertStaffContentAsset(queryClient, saved)
       invalidateAllContentCaches(queryClient)
     },
   })

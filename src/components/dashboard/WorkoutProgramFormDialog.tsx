@@ -52,14 +52,15 @@ type WorkoutProgramFormDialogProps = {
   onAssignProgram: (input: AssignWorkoutInput) => Promise<unknown>
 }
 
-const WEEKDAY_NAMES_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-const WEEKDAY_NAMES_AR = ["الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"]
+const WEEKDAY_NAMES_EN = ["Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+const WEEKDAY_NAMES_AR = ["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"]
 
 function emptyWeek(): WorkoutDay[] {
   return Array.from({ length: 7 }, (_, weekday) => ({
     id: allocateFirestoreId("workout_days"),
     weekday,
-    isRest: weekday === 2 || weekday === 6, // default wed/sun rest
+    // Egypt week: 0=Sat … 6=Fri — default rest Sun (1) + Wed (4)
+    isRest: weekday === 1 || weekday === 4,
     exercises: [],
   }))
 }

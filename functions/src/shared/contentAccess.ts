@@ -85,6 +85,11 @@ export function evaluateSubscriberContentAccess(input: {
   linkedAssetIds?: Set<string> | string[];
   /** Program document ids currently/previously assigned to the subscriber */
   assignedProgramIds?: Set<string> | string[];
+  /**
+   * Template ids for assigned program copies.
+   * Admin "Link to program" stores template ids on content_assets.programIds.
+   */
+  assignedTemplateIds?: Set<string> | string[];
   /** Asset id being evaluated (for linkedAssetIds match) */
   assetId?: string;
 }): ContentAccessResult {
@@ -122,9 +127,12 @@ export function evaluateSubscriberContentAccess(input: {
 
   const linkedAssetIds = toIdSet(input.linkedAssetIds);
   const assignedProgramIds = toIdSet(input.assignedProgramIds);
+  const assignedTemplateIds = toIdSet(input.assignedTemplateIds);
   const linkedFromProgram =
     Boolean(input.assetId && linkedAssetIds.has(input.assetId)) ||
-    programIds.some((id) => assignedProgramIds.has(id));
+    programIds.some(
+      (id) => assignedProgramIds.has(id) || assignedTemplateIds.has(id),
+    );
 
   if (directlyAssigned) {
     return {allowed: true, reason: "direct_assignment"};

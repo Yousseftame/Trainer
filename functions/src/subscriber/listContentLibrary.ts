@@ -177,11 +177,15 @@ export const listSubscriberContentLibrary = onCall(async (request) => {
     .get();
 
   const assignedProgramIds = new Set<string>();
+  const assignedTemplateIds = new Set<string>();
   const linkedAssetIds = new Set<string>();
 
   for (const docSnap of workoutProgramsSnap.docs) {
     assignedProgramIds.add(docSnap.id);
     const raw = docSnap.data() as Record<string, unknown>;
+    if (typeof raw.templateId === "string" && raw.templateId) {
+      assignedTemplateIds.add(raw.templateId);
+    }
     if (typeof raw.pdfContentId === "string" && raw.pdfContentId) {
       linkedAssetIds.add(raw.pdfContentId);
     }
@@ -210,6 +214,9 @@ export const listSubscriberContentLibrary = onCall(async (request) => {
   for (const docSnap of nutritionProgramsSnap.docs) {
     assignedProgramIds.add(docSnap.id);
     const raw = docSnap.data() as Record<string, unknown>;
+    if (typeof raw.templateId === "string" && raw.templateId) {
+      assignedTemplateIds.add(raw.templateId);
+    }
     if (typeof raw.pdfContentId === "string" && raw.pdfContentId) {
       linkedAssetIds.add(raw.pdfContentId);
     }
@@ -252,6 +259,7 @@ export const listSubscriberContentLibrary = onCall(async (request) => {
       entitlements,
       linkedAssetIds,
       assignedProgramIds,
+      assignedTemplateIds,
       assetId: docSnap.id,
     });
 

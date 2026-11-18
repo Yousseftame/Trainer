@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { Check, Link2, ShieldCheck, Users, X } from "lucide-react"
-import { evaluateSubscriberContentAccess } from "@/features/content/access"
+import {
+  evaluateSubscriberContentAccess,
+  validateContentAssociationRules,
+} from "@/features/content/access"
 import { defaultEntitlementForCategory } from "@/features/content/paths"
 import type { UpdateContentAssociationsInput } from "@/features/content/service"
 import { useNutritionProgramsQuery } from "@/features/nutrition/hooks"
@@ -17,6 +20,7 @@ import type { CatalogPackage } from "@/features/subscriptions/types"
 import { useWorkoutProgramsQuery } from "@/features/workouts/hooks"
 import type { ContentAsset } from "@/types/content"
 import { useLocale } from "@/hooks/useLocale"
+import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 import type { ContentVisibility } from "@/types/content"
 import type { PackageEntitlementKey } from "@/types/subscription"
@@ -43,6 +47,15 @@ const ENTITLEMENT_OPTIONS: Array<{
   { id: "pdfDocuments", ar: "ملفات PDF والمستندات", en: "PDFs & educational docs" },
   { id: "progressTracking", ar: "تتبع التقدم", en: "Progress tracking" },
 ]
+
+type ProgramPickerItem = {
+  id: string
+  title: { en: string; ar: string }
+  domain: "workout" | "nutrition"
+  status: "template" | "active" | "archived"
+  subscriberId?: string
+  templateId?: string
+}
 
 export function ContentAssociationDialog({
   open,
@@ -73,24 +86,79 @@ export function ContentAssociationDialog({
   const [subscriberIds, setSubscriberIds] = useState<string[]>([])
   const [programIds, setProgramIds] = useState<string[]>([])
   const [exerciseNamesText, setExerciseNamesText] = useState("")
+  const [error, setError] = useState<string | null>(null)
 
-  const allPrograms = useMemo(
+  const allPrograms = useMemo<ProgramPickerItem[]>(
     () => [
       ...workoutPrograms.map((p) => ({
         id: p.id,
         title: p.title,
         domain: "workout" as const,
         status: p.status,
+        subscriberId: p.subscriberId,
+        templateId: p.templateId,
       })),
       ...nutritionPrograms.map((p) => ({
         id: p.id,
         title: p.title,
         domain: "nutrition" as const,
         status: p.status,
+        subscriberId: p.subscriberId,
+        templateId: p.templateId,
       })),
     ],
     [workoutPrograms, nutritionPrograms],
   )
+
+  /** Templates only — assigned copies unlock via templateId on the server. */
+  const templatePrograms = useMemo(
+    () =>
+      allPrograms.filter(
+        (p) => p.status === "template" && !p.subscriberId,
+      ),
+    [allPrograms],
+  )
+
+  const programById = useMemo(() => {
+    const map = new Map<string, ProgramPickerItem>()
+    for (const p of allPrograms) map.set(p.id, p)
+    return map
+  }, [allPrograms])
+
+  /** Keep previously selected non-template ids visible so admins can uncheck them. */
+  const pickerPrograms = useMemo(() => {
+    const selectedExtras = programIds
+      .map((id) => programById.get(id))
+      .filter((p): p is ProgramPickerItem => {
+        if (!p) return false
+        return !(p.status === "template" && !p.subscriberId)
+      })
+    const seen = new Set(templatePrograms.map((p) => p.id))
+    const extras = selectedExtras.filter((p) => {
+      if (seen.has(p.id)) return false
+      seen.add(p.id)
+      return true
+    })
+    return [...templatePrograms, ...extras]
+  }, [templatePrograms, programIds, programById])
+
+  const programsBySubscriber = useMemo(() => {
+    const map = new Map<
+      string,
+      { assignedProgramIds: string[]; assignedTemplateIds: string[] }
+    >()
+    for (const program of allPrograms) {
+      if (!program.subscriberId) continue
+      const entry = map.get(program.subscriberId) ?? {
+        assignedProgramIds: [],
+        assignedTemplateIds: [],
+      }
+      entry.assignedProgramIds.push(program.id)
+      if (program.templateId) entry.assignedTemplateIds.push(program.templateId)
+      map.set(program.subscriberId, entry)
+    }
+    return map
+  }, [allPrograms])
 
   useEffect(() => {
     if (!open || !asset) return
@@ -103,6 +171,7 @@ export function ContentAssociationDialog({
     setSubscriberIds(asset.subscriberIds ?? [])
     setProgramIds(asset.programIds ?? [])
     setExerciseNamesText((asset.exerciseNames ?? []).join(", "))
+    setError(null)
   }, [open, asset, initialTab])
 
   if (!open || !asset || typeof document === "undefined") return null
@@ -113,6 +182,32 @@ export function ContentAssociationDialog({
     setter: (v: string[]) => void,
   ) {
     setter(list.includes(id) ? list.filter((x) => x !== id) : [...list, id])
+  }
+
+  function ensureAssignedVisibility(nextProgramIds: string[], nextSubscriberIds: string[]) {
+    if (
+      visibility === "package" &&
+      packageIds.length === 0 &&
+      (nextProgramIds.length > 0 || nextSubscriberIds.length > 0)
+    ) {
+      setVisibility("assigned")
+    }
+  }
+
+  function toggleProgram(programId: string) {
+    const next = programIds.includes(programId)
+      ? programIds.filter((id) => id !== programId)
+      : [...programIds, programId]
+    setProgramIds(next)
+    ensureAssignedVisibility(next, subscriberIds)
+  }
+
+  function toggleSubscriber(subscriberId: string) {
+    const next = subscriberIds.includes(subscriberId)
+      ? subscriberIds.filter((id) => id !== subscriberId)
+      : [...subscriberIds, subscriberId]
+    setSubscriberIds(next)
+    ensureAssignedVisibility(programIds, next)
   }
 
   const draftAsset: ContentAsset = {
@@ -126,23 +221,55 @@ export function ContentAssociationDialog({
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
-    if (!asset) return
+    if (!asset || busy) return
+    setError(null)
 
-    await onSave({
-      assetId: asset.id,
-      visibility,
-      requiredEntitlement,
-      packageIds,
-      subscriberIds,
-      programIds,
-      exerciseNames:
-        asset.kind === "video"
-          ? exerciseNamesText
-              .split(/[,،]/)
-              .map((s) => s.trim())
-              .filter(Boolean)
-          : asset.exerciseNames,
-    })
+    const validationError = validateContentAssociationRules(
+      { visibility, packageIds, subscriberIds, programIds },
+      locale,
+    )
+    if (validationError) {
+      setError(validationError)
+      if (visibility === "assigned" || programIds.length > 0) {
+        setTab(
+          subscriberIds.length === 0 && programIds.length === 0
+            ? "subscribers"
+            : programIds.length === 0
+              ? "programs"
+              : "packages",
+        )
+      } else {
+        setTab("packages")
+      }
+      return
+    }
+
+    try {
+      await onSave({
+        assetId: asset.id,
+        visibility,
+        requiredEntitlement,
+        packageIds,
+        subscriberIds,
+        programIds,
+        exerciseNames:
+          asset.kind === "video"
+            ? exerciseNamesText
+                .split(/[,،]/)
+                .map((s) => s.trim())
+                .filter(Boolean)
+            : asset.exerciseNames,
+      })
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : isAr
+            ? "تعذر حفظ الارتباطات."
+            : "Could not save associations."
+      setError(message)
+      appToast.error(message)
+    }
   }
 
   return createPortal(
@@ -171,7 +298,8 @@ export function ContentAssociationDialog({
                   : "Associate content & manage access rules"}
               </h2>
               <p className="text-[12px] font-medium text-[#8c8c8c]">
-                {asset.title[locale]} · <span className="font-mono">{asset.storagePath}</span>
+                {asset.title[locale]} ·{" "}
+                <span className="font-mono">{asset.storagePath}</span>
               </p>
             </div>
           </div>
@@ -186,10 +314,9 @@ export function ContentAssociationDialog({
         </div>
 
         <form
-          onSubmit={handleSubmit}
+          onSubmit={(e) => void handleSubmit(e)}
           className="no-scrollbar flex-1 space-y-5 overflow-y-auto px-6 py-5 sm:px-7"
         >
-          {/* Access Rule & Required Entitlement */}
           <div className="grid gap-3 rounded-2xl bg-[#F4F4F4] p-4 sm:grid-cols-2">
             <label className="flex flex-col gap-1">
               <span className="text-[11px] font-bold text-[#6B7280]">
@@ -243,7 +370,6 @@ export function ContentAssociationDialog({
             </label>
           </div>
 
-          {/* Section Switcher Tabs */}
           <div className="flex flex-wrap gap-2">
             {(
               [
@@ -280,8 +406,19 @@ export function ContentAssociationDialog({
             ))}
           </div>
 
+          {error ? (
+            <p className="rounded-2xl bg-[#FFE8E4] px-3.5 py-2.5 text-[12px] font-bold text-[#C44536]">
+              {error}
+            </p>
+          ) : null}
+
           {tab === "programs" ? (
             <div className="space-y-4">
+              <p className="rounded-2xl bg-[#FAFAFA] px-3.5 py-2.5 text-[12px] font-medium text-[#6B7280]">
+                {isAr
+                  ? "اربط المحتوى بقوالب البرامج. أي مشترك يحصل على نسخة من هذا القالب سيفتح المحتوى تلقائياً (مع صلاحية الباقة)."
+                  : "Link content to program templates. Any subscriber assigned a copy of that template unlocks this file automatically (with package entitlement)."}
+              </p>
               {asset.kind === "video" ? (
                 <label className="flex flex-col gap-1.5">
                   <span className="text-[12px] font-bold text-[#6B7280]">
@@ -298,57 +435,70 @@ export function ContentAssociationDialog({
                 </label>
               ) : null}
 
-              <div className="grid gap-2 sm:grid-cols-2">
-                {allPrograms.map((prog) => {
-                  const selected = programIds.includes(prog.id)
-                  return (
-                    <button
-                      key={prog.id}
-                      type="button"
-                      onClick={() =>
-                        toggleItem(programIds, prog.id, setProgramIds)
-                      }
-                      className={cn(
-                        "flex items-center justify-between gap-3 rounded-2xl border p-3.5 text-start transition",
-                        selected
-                          ? "border-[var(--gym-ink,#111111)] bg-[var(--gym-ink,#111111)] text-white"
-                          : "border-black/8 bg-[#F4F4F4] text-[var(--gym-ink,#111111)] hover:bg-black/5",
-                      )}
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-[13px] font-bold">
-                          {prog.title[locale]}
-                        </p>
-                        <p
-                          className={cn(
-                            "text-[11px] font-medium",
-                            selected ? "text-white/70" : "text-[#8c8c8c]",
-                          )}
-                        >
-                          {prog.domain === "workout"
-                            ? isAr
-                              ? "برنامج تمارين"
-                              : "Workout program"
-                            : isAr
-                              ? "برنامج تغذية"
-                              : "Nutrition program"}{" "}
-                          · {prog.status}
-                        </p>
-                      </div>
-                      <span
+              {pickerPrograms.length === 0 ? (
+                <p className="rounded-2xl bg-[#F4F4F4] px-4 py-8 text-center text-[13px] font-medium text-[#8c8c8c]">
+                  {isAr
+                    ? "لا توجد قوالب برامج بعد. أنشئ قالباً من صفحة التمارين أو التغذية أولاً."
+                    : "No program templates yet. Create a template from Workouts or Nutrition first."}
+                </p>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {pickerPrograms.map((prog) => {
+                    const selected = programIds.includes(prog.id)
+                    const isTemplate =
+                      prog.status === "template" && !prog.subscriberId
+                    return (
+                      <button
+                        key={prog.id}
+                        type="button"
+                        onClick={() => toggleProgram(prog.id)}
                         className={cn(
-                          "inline-flex size-5 shrink-0 items-center justify-center rounded-md border",
+                          "flex items-center justify-between gap-3 rounded-2xl border p-3.5 text-start transition",
                           selected
-                            ? "border-[var(--gym-lime,#fb5001)] bg-[var(--gym-lime,#fb5001)] text-white"
-                            : "border-black/20 bg-white text-transparent",
+                            ? "border-[var(--gym-ink,#111111)] bg-[var(--gym-ink,#111111)] text-white"
+                            : "border-black/8 bg-[#F4F4F4] text-[var(--gym-ink,#111111)] hover:bg-black/5",
                         )}
                       >
-                        <Check className="size-3" strokeWidth={3} />
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-[13px] font-bold">
+                            {prog.title[locale]}
+                          </p>
+                          <p
+                            className={cn(
+                              "text-[11px] font-medium",
+                              selected ? "text-white/70" : "text-[#8c8c8c]",
+                            )}
+                          >
+                            {prog.domain === "workout"
+                              ? isAr
+                                ? "برنامج تمارين"
+                                : "Workout program"
+                              : isAr
+                                ? "برنامج تغذية"
+                                : "Nutrition program"}{" "}
+                            ·{" "}
+                            {isTemplate
+                              ? isAr
+                                ? "قالب"
+                                : "template"
+                              : prog.status}
+                          </p>
+                        </div>
+                        <span
+                          className={cn(
+                            "inline-flex size-5 shrink-0 items-center justify-center rounded-md border",
+                            selected
+                              ? "border-[var(--gym-lime,#fb5001)] bg-[var(--gym-lime,#fb5001)] text-white"
+                              : "border-black/20 bg-white text-transparent",
+                          )}
+                        >
+                          <Check className="size-3" strokeWidth={3} />
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           ) : null}
 
@@ -358,14 +508,15 @@ export function ContentAssociationDialog({
                 <ShieldCheck className="size-4 shrink-0 text-emerald-600" />
                 <span>
                   {isAr
-                    ? "معاينة حية لصلاحيات الوصول: توضح حالة وصول كل مشترك بناءً على حسابه واشتراكه وباقته الحالية."
-                    : "Live entitlement inspector: shows each subscriber's effective access based on their active subscription and package."}
+                    ? "تعيين مباشر يفتح الملف لهذا المشترك. المعاينة تعكس أيضاً روابط البرامج والباقات."
+                    : "Direct assign unlocks this file for the subscriber. The inspector also reflects program links and packages."}
                 </span>
               </div>
               <div className="grid gap-2">
                 {subscribers.map((sub) => {
                   const selected = subscriberIds.includes(sub.id)
                   const subRec = currentSubscriptionFor(sub.id)
+                  const programCtx = programsBySubscriber.get(sub.id)
                   const access = evaluateSubscriberContentAccess({
                     asset: draftAsset,
                     subscriber: sub,
@@ -373,6 +524,8 @@ export function ContentAssociationDialog({
                     pkg: getPackageById(subRec?.packageId) as
                       | CatalogPackage
                       | undefined,
+                    assignedProgramIds: programCtx?.assignedProgramIds,
+                    assignedTemplateIds: programCtx?.assignedTemplateIds,
                   })
                   return (
                     <div
@@ -412,9 +565,7 @@ export function ContentAssociationDialog({
                       </div>
                       <button
                         type="button"
-                        onClick={() =>
-                          toggleItem(subscriberIds, sub.id, setSubscriberIds)
-                        }
+                        onClick={() => toggleSubscriber(sub.id)}
                         className={cn(
                           "inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[12px] font-bold transition",
                           selected
@@ -512,4 +663,3 @@ export function ContentAssociationDialog({
     document.body,
   )
 }
-

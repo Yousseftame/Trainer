@@ -25,6 +25,7 @@ import {
   ENTITLEMENT_KEYS,
   pickCurrentSubscription,
   resolveEffectiveSubscriptionStatus,
+  subscriptionDaysRemaining,
 } from "@/features/subscriptions/entitlements"
 import {
   usePackagesQuery,
@@ -34,7 +35,8 @@ import {
 } from "@/features/subscriptions/hooks"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
-import { daysUntil, formatDate } from "@/lib/format"
+import { useNowTick } from "@/hooks/useNowTick"
+import { formatDate } from "@/lib/format"
 import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 import type { PackageEntitlementKey } from "@/types/subscription"
@@ -97,6 +99,8 @@ export function SubscriptionPage() {
     [allPackages],
   )
 
+  const now = useNowTick()
+
   const subscriberHistory = useMemo(() => {
     return [...scopedSubscriptions].sort(
       (a, b) =>
@@ -104,10 +108,10 @@ export function SubscriptionPage() {
     )
   }, [scopedSubscriptions])
 
-  const current = pickCurrentSubscription(subscriberHistory)
+  const current = pickCurrentSubscription(subscriberHistory, now)
   const currentPackage = current ? packageMap.get(current.packageId) : undefined
-  const effectiveStatus = resolveEffectiveSubscriptionStatus(current)
-  const remaining = daysUntil(current?.endsAt)
+  const effectiveStatus = resolveEffectiveSubscriptionStatus(current, now)
+  const remaining = subscriptionDaysRemaining(current?.endsAt, now)
 
   const [selectedTargetPackageId, setSelectedTargetPackageId] = useState("")
   const [upgradeNote, setUpgradeNote] = useState("")
@@ -246,6 +250,29 @@ export function SubscriptionPage() {
                   </dd>
                 </div>
               ) : null}
+              <div className="flex items-center justify-between border-b border-black/[0.06] pb-3">
+                <dt className="text-[#6B7280]">
+                  {isAr ? "المتبقي من الاشتراك" : "Time remaining"}
+                </dt>
+                <dd
+                  className={cn(
+                    "font-bold",
+                    remaining != null && remaining <= 7
+                      ? "text-[var(--gym-lime,#fb5001)]"
+                      : "text-[#111111]",
+                  )}
+                >
+                  {remaining == null
+                    ? "—"
+                    : remaining < 0
+                      ? t("admin.subscribers.endedAgo", {
+                          count: Math.abs(remaining),
+                        })
+                      : remaining === 0
+                        ? t("admin.subscribers.endsToday")
+                        : t("admin.subscribers.daysLeft", { count: remaining })}
+                </dd>
+              </div>
               {currentPackage?.price ? (
                 <div className="flex items-center justify-between border-b border-black/[0.06] pb-3">
                   <dt className="text-[#6B7280]">

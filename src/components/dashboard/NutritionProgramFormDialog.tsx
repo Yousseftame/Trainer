@@ -55,8 +55,8 @@ type NutritionProgramFormDialogProps = {
   onAssignProgram: (input: AssignNutritionInput) => Promise<unknown>
 }
 
-const WEEKDAY_NAMES_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-const WEEKDAY_NAMES_AR = ["الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"]
+const WEEKDAY_NAMES_EN = ["Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+const WEEKDAY_NAMES_AR = ["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"]
 
 const MEAL_SLOT_LABELS: Record<MealSlotKey, { en: string; ar: string }> = {
   breakfast: { en: "Breakfast", ar: "وجبة الإفطار" },

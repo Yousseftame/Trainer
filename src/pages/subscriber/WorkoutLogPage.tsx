@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { memo, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import {
   CheckCircle2,
@@ -19,10 +19,16 @@ import { formatDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { WorkoutSessionLog } from "@/types/program"
 
-export function WorkoutLogPage({
+export const WorkoutLogPage = memo(function WorkoutLogPage({
   subscriberId: explicitSubId,
   embedded = false,
-}: { subscriberId?: string; embedded?: boolean } = {}) {
+  logs: logsProp,
+}: {
+  subscriberId?: string
+  embedded?: boolean
+  /** When provided (History embed), skip local loading flash and use parent cache */
+  logs?: WorkoutSessionLog[]
+} = {}) {
   const { t } = useTranslation()
   const { locale } = useLocale()
   const isAr = locale === "ar"
@@ -30,15 +36,17 @@ export function WorkoutLogPage({
   useDocumentTitle(embedded ? null : t("nav.workoutLog"))
 
   const targetSubscriberId = explicitSubId || panelSubscriberId
+  const useParentLogs = logsProp !== undefined
   const {
-    data: logs = [],
-    isLoading,
+    data,
+    isPending,
     isError,
     refetch,
   } = useWorkoutLogsQuery({
     subscriberId: targetSubscriberId,
-    enabled: Boolean(targetSubscriberId),
+    enabled: Boolean(targetSubscriberId) && !useParentLogs,
   })
+  const logs = useParentLogs ? logsProp : (data ?? [])
 
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
   const [selectedModalLog, setSelectedModalLog] = useState<WorkoutSessionLog | null>(null)
@@ -54,7 +62,8 @@ export function WorkoutLogPage({
     return { totalSessions, totalMinutes, totalVolume, avgRpe }
   }, [logs])
 
-  if (!targetSubscriberId || isLoading) {
+  // Only block on first standalone load — never flash when parent already has logs
+  if (!useParentLogs && (!targetSubscriberId || (isPending && !data))) {
     return (
       <div className="flex min-h-60 flex-col items-center justify-center rounded-[28px] bg-white p-8 text-center shadow-xs">
         <Dumbbell className="size-10 mb-3 animate-pulse text-[var(--gym-orange,#fb5001)] stroke-1" />
@@ -65,7 +74,7 @@ export function WorkoutLogPage({
     )
   }
 
-  if (isError) {
+  if (!useParentLogs && isError) {
     return (
       <div className="flex min-h-60 flex-col items-center justify-center gap-3 rounded-[28px] bg-white p-8 text-center shadow-xs">
         <p className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
@@ -83,7 +92,7 @@ export function WorkoutLogPage({
   }
 
   return (
-    <div className="flex flex-col gap-5 pb-10">
+    <div className={cn("flex flex-col gap-5", !embedded && "pb-10")}>
       {/* 1. Stat Cards Grid */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard
@@ -155,7 +164,7 @@ export function WorkoutLogPage({
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--gym-ink,#111111)] text-[var(--gym-orange,#fb5001)]">
+                      <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--gym-orange,#fb5001)]/12 text-[var(--gym-orange,#fb5001)]">
                         <CheckCircle2 className="size-6" />
                       </div>
                       <div>
@@ -275,4 +284,4 @@ export function WorkoutLogPage({
       )}
     </div>
   )
-}
+})

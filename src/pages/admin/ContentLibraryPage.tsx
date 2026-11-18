@@ -610,13 +610,25 @@ export function ContentLibraryPage() {
             setAssocModal({ open: false, asset: null, tab: "programs" })
           }
           onSave={async (payload) => {
-            await associateMutation.mutateAsync(payload)
-            setAssocModal({ open: false, asset: null, tab: "programs" })
-            appToast.success(
-              isAr
-                ? "تم تحديث ارتباطات المحتوى وصلاحيات الوصول"
-                : "Content associations & access rules updated",
-            )
+            try {
+              const saved = await associateMutation.mutateAsync(payload)
+              setSelectedId(saved.id)
+              setAssocModal({ open: false, asset: null, tab: "programs" })
+              appToast.success(
+                isAr
+                  ? "تم تحديث ارتباطات المحتوى وصلاحيات الوصول"
+                  : "Content associations & access rules updated",
+              )
+            } catch (error) {
+              appToast.error(
+                error instanceof Error
+                  ? error.message
+                  : isAr
+                    ? "تعذر حفظ ارتباطات المحتوى"
+                    : "Could not save content associations",
+              )
+              throw error
+            }
           }}
         />
       ) : null}

@@ -66,6 +66,9 @@ import {
 import {
   ENTITLEMENT_KEYS,
   normalizeEntitlements,
+  pickCurrentSubscription,
+  resolveEffectiveSubscriptionStatus,
+  subscriptionDaysRemaining,
 } from "@/features/subscriptions/entitlements"
 import {
   useAssignSubscriptionMutation,
@@ -214,11 +217,9 @@ export function SubscriberDetailPage() {
     )
   }
 
-  const current =
-    history.find(
-      (item) => item.status === "active" || item.status === "suspended",
-    ) ?? history[0]
+  const current = pickCurrentSubscription(history)
   const currentPackage = current ? packageMap.get(current.packageId) : undefined
+  const effectiveSubStatus = resolveEffectiveSubscriptionStatus(current)
   const currentEntitlements = current
     ? normalizeEntitlements(
         currentPackage?.entitlements ?? current.entitlementsSnapshot,
@@ -245,7 +246,7 @@ export function SubscriberDetailPage() {
     nutritionPrograms: programs.nutrition,
   })
   const week = latestAdherenceWeek(adherenceWeeks)
-  const remaining = remainingDays(current?.endsAt)
+  const remaining = subscriptionDaysRemaining(current?.endsAt)
   const currentWeightKg =
     latest?.weightKg ?? subscriber.startingWeightKg ?? undefined
   const weightFromLogs = latest?.weightKg != null
@@ -461,7 +462,7 @@ export function SubscriberDetailPage() {
                       mode: "manage",
                       subscription: current,
                       initialAction:
-                        current.status === "active" ? "renew" : "activate",
+                        effectiveSubStatus === "active" ? "renew" : "activate",
                     })
                   } else {
                     setSubDialogState({
@@ -629,12 +630,12 @@ export function SubscriberDetailPage() {
                     mode: "manage",
                     subscription: current,
                     initialAction:
-                      current.status === "active" ? "renew" : "activate",
+                      effectiveSubStatus === "active" ? "renew" : "activate",
                   })
                 }
                 className="text-[12px] font-bold text-[var(--gym-lime,#fb5001)] hover:underline"
               >
-                {current.status === "active"
+                {effectiveSubStatus === "active"
                   ? t("admin.subscriptions.renew")
                   : t("admin.subscriptions.activate")}
               </button>
@@ -653,8 +654,8 @@ export function SubscriberDetailPage() {
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-[#8c8c8c]">{t("admin.subscribers.columns.subscription")}</dt>
                 <StatusBadge
-                  label={t(`admin.status.${current.status}`)}
-                  tone={subscriptionStatusTone(current.status)}
+                  label={t(`admin.status.${effectiveSubStatus ?? current.status}`)}
+                  tone={subscriptionStatusTone(effectiveSubStatus ?? current.status)}
                 />
               </div>
               <DetailRow label={t("admin.subscriptions.columns.starts")} value={formatDate(current.startsAt, locale)} />
@@ -672,7 +673,8 @@ export function SubscriberDetailPage() {
                   <dd className="flex flex-wrap gap-1.5">
                     {ENTITLEMENT_KEYS.map((key) => {
                       const allowed =
-                        current.status === "active" && currentEntitlements[key]
+                        effectiveSubStatus === "active" &&
+                        currentEntitlements[key]
                       return (
                         <span
                           key={key}
@@ -1175,11 +1177,6 @@ export function SubscriberDetailPage() {
       ) : null}
     </div>
   )
-}
-
-function remainingDays(endsAt: string | null | undefined) {
-  if (!endsAt) return null
-  return Math.ceil((new Date(endsAt).getTime() - Date.now()) / 86_400_000)
 }
 
 function remainingLabel(days: number | null, t: (key: string, options?: Record<string, unknown>) => string) {

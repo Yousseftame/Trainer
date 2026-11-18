@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_STALE_TIMES } from "@/config/constants"
 import {
   assignSubscription,
+  deletePackage,
   fetchPackageById,
   fetchPackages,
   fetchSubscriptions,
@@ -97,6 +98,23 @@ export function useTogglePackageActiveMutation() {
       togglePackageActive(packageId, isActive),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: SUBSCRIPTION_QUERY_KEYS.packages })
+      invalidateSubscriberContentLibrary(queryClient)
+    },
+  })
+}
+
+export function useDeletePackageMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (packageId: string) => deletePackage(packageId),
+    onSuccess: (_result, packageId) => {
+      void queryClient.invalidateQueries({
+        queryKey: SUBSCRIPTION_QUERY_KEYS.packages,
+      })
+      void queryClient.removeQueries({
+        queryKey: SUBSCRIPTION_QUERY_KEYS.package(packageId),
+      })
       invalidateSubscriberContentLibrary(queryClient)
     },
   })

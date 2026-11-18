@@ -23,7 +23,9 @@ import { MealChangeModal } from "@/components/subscriber/MealChangeModal"
 import { MealDetailSheet } from "@/components/subscriber/MealDetailSheet"
 import { MealPhotoUploadDialog } from "@/components/subscriber/MealPhotoUploadDialog"
 import { MealSlotSubstituteModal } from "@/components/subscriber/MealSlotSubstituteModal"
+import { APP_ROUTES } from "@/config/constants"
 import { useContentAssetsQuery } from "@/features/content/hooks"
+import { startOfUtcWeek } from "@/features/progress/adherence"
 import {
   useLogNutritionAdherenceMutation,
   useNutritionLogsQuery,
@@ -36,7 +38,13 @@ import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatDate } from "@/lib/format"
-import { dayMacros, resolveBilingualText } from "@/lib/program-text"
+import {
+  dayMacros,
+  planDayHeading,
+  planWeekdayShortName,
+  resolveBilingualText,
+  sortPlanDaysByWeekday,
+} from "@/lib/program-text"
 import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 import type {
@@ -45,9 +53,6 @@ import type {
   MealSlot,
   NutritionDay,
 } from "@/types/program"
-
-const WEEKDAY_NAMES_EN = ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"]
-const WEEKDAY_NAMES_AR = ["يوم 1", "يوم 2", "يوم 3", "يوم 4", "يوم 5", "يوم 6", "يوم 7"]
 
 export function NutritionPlanPage() {
   const { t } = useTranslation()
@@ -120,7 +125,7 @@ export function NutritionPlanPage() {
 
   useEffect(() => {
     if (!activePlan?.days?.length || didAutoSelectToday) return
-    const todayWeekday = (new Date().getDay() + 6) % 7
+    const todayWeekday = (new Date().getDay() + 1) % 7 // Egypt: Sat=0
     const idx = activePlan.days.findIndex((d) => d.weekday === todayWeekday)
     if (idx >= 0) setSelectedDayIdx(idx)
     setDidAutoSelectToday(true)
@@ -143,8 +148,11 @@ export function NutritionPlanPage() {
     existingPhotoUrl?: string
   } | null>(null)
 
-  // Selected Day resolution
-  const programDays = activePlan?.days ?? []
+  // Selected Day resolution — same Mon→Sun order as workout
+  const programDays = useMemo(
+    () => sortPlanDaysByWeekday(activePlan?.days ?? []),
+    [activePlan?.days],
+  )
   const rawSelectedDay: NutritionDay | undefined =
     programDays[selectedDayIdx] ?? programDays[0]
 
@@ -185,6 +193,8 @@ export function NutritionPlanPage() {
     return entitledAssets.find((a) => a.id === activePlan.pdfContentId) ?? null
   }, [activePlan?.pdfContentId, entitledAssets])
 
+  const currentWeekStart = startOfUtcWeek(new Date().toISOString())
+  // Mark "Done" only for adherence logged in the current calendar week
   const loggedDayIds = useMemo(() => {
     if (!activePlan) return new Set<string>()
     return new Set(
@@ -192,12 +202,13 @@ export function NutritionPlanPage() {
         .filter(
           (l) =>
             l.programId === activePlan.id &&
-            (l.status === "adhered" || l.status === "mostly"),
+            (l.status === "adhered" || l.status === "mostly") &&
+            startOfUtcWeek(l.date || l.loggedAt) === currentWeekStart,
         )
         .map((l) => l.dayId)
         .filter((id): id is string => Boolean(id)),
     )
-  }, [logs, activePlan])
+  }, [logs, activePlan, currentWeekStart])
 
   const isTodayLogged = Boolean(
     activePlan &&
@@ -701,11 +712,30 @@ export function NutritionPlanPage() {
 
           {/* 3. Days Horizontal Strip */}
           {!isPdfPlan ? (
+          <>
+          <div className="flex items-center justify-between gap-2">
+            <p className="px-0.5 text-[11px] font-bold uppercase tracking-wide text-[#8c8c8c]">
+              {isAr
+                ? `جدول الأسبوع · ${planDayHeading(selectedDay?.weekday, selectedDayIdx, locale)}`
+                : `Weekly schedule · ${planDayHeading(selectedDay?.weekday, selectedDayIdx, locale)}`}
+            </p>
+            <Link
+              to={`${APP_ROUTES.subscriber.history}?tab=weekly`}
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-[#fb5001] hover:underline"
+            >
+              <History className="size-3.5" />
+              {isAr ? "سجل الأسابيع" : "Weekly history"}
+            </Link>
+          </div>
           <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5 no-scrollbar">
             {programDays.map((d, idx) => {
               const active = idx === selectedDayIdx
               const dayDone = Boolean(d.id && loggedDayIds.has(d.id))
-              const dayTitle = isAr ? WEEKDAY_NAMES_AR[idx] : WEEKDAY_NAMES_EN[idx]
+              const weekdayName = planWeekdayShortName(d.weekday, idx, locale)
+              const dayNumber =
+                typeof d.weekday === "number" && d.weekday >= 0 && d.weekday <= 6
+                  ? d.weekday + 1
+                  : idx + 1
 
               return (
                 <button
@@ -713,7 +743,7 @@ export function NutritionPlanPage() {
                   type="button"
                   onClick={() => setSelectedDayIdx(idx)}
                   className={cn(
-                    "relative flex min-w-[74px] sm:min-w-[88px] h-[78px] sm:h-[86px] shrink-0 flex-col items-center justify-center rounded-2xl p-2 text-center transition shadow-2xs border select-none",
+                    "relative flex min-w-[74px] sm:min-w-[88px] h-[84px] sm:h-[92px] shrink-0 flex-col items-center justify-center rounded-2xl p-2 text-center transition shadow-2xs border select-none",
                     active
                       ? "bg-[#fb5001] border-[#fb5001] text-white shadow-md scale-[1.02]"
                       : dayDone
@@ -729,11 +759,11 @@ export function NutritionPlanPage() {
                       )}
                     />
                   ) : null}
-                  <span className="text-[11px] font-bold uppercase tracking-wider opacity-80">
-                    {dayTitle}
+                  <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">
+                    {weekdayName}
                   </span>
-                  <span className="font-heading text-[20px] sm:text-[22px] font-black leading-tight text-white">
-                    {idx + 1}
+                  <span className="font-heading text-[13px] font-extrabold leading-tight text-white/95">
+                    {isAr ? `يوم ${dayNumber}` : `Day ${dayNumber}`}
                   </span>
                   <span
                     className={cn(
@@ -751,6 +781,7 @@ export function NutritionPlanPage() {
               )
             })}
           </div>
+          </>
           ) : null}
 
           {/* 4. Day Adherence Tracker Bar */}

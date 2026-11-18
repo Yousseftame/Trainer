@@ -9,16 +9,17 @@ import { SubscriberMobileMenuDrawer } from "@/components/subscriber/SubscriberMo
 import { SubscriberMobileNavbar } from "@/components/subscriber/SubscriberMobileNavbar"
 import { APP_ROUTES } from "@/config/constants"
 import { env } from "@/config/env"
-import { flattenNavItems, subscriberNav } from "@/config/navigation"
+import { flattenNavItems, type NavItem } from "@/config/navigation"
 import { useAuth } from "@/features/auth/auth-context"
 import { firebaseAuthErrorKey } from "@/features/auth/errors"
+import { useSubscriberEntitlementAccess } from "@/features/subscriptions/use-subscriber-entitlement-access"
 import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 
 const COLLAPSE_KEY = "trainer.subscriber.sidebar.collapsed"
 
-function resolveTitle(pathname: string, fallback: string) {
-  const match = [...flattenNavItems(subscriberNav)]
+function resolveTitle(pathname: string, items: NavItem[], fallback: string) {
+  const match = [...flattenNavItems(items)]
     .sort((a, b) => b.to.length - a.to.length)
     .find((item) => pathname === item.to || pathname.startsWith(`${item.to}/`))
   return match?.labelKey ?? fallback
@@ -37,6 +38,7 @@ export function SubscriberLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const { signOut } = useAuth()
+  const { navItems } = useSubscriberEntitlementAccess()
 
   // Fetch-on-need: do NOT warm packages/programs/progress here.
   // AuthProvider already loads the subscriber's own subscriptions for gates;
@@ -59,8 +61,8 @@ export function SubscriberLayout() {
   }, [])
 
   const titleKey = useMemo(
-    () => resolveTitle(location.pathname, "nav.overview"),
-    [location.pathname],
+    () => resolveTitle(location.pathname, navItems, "nav.overview"),
+    [location.pathname, navItems],
   )
 
   const handleToggleDrawer = useCallback(() => {
@@ -103,7 +105,7 @@ export function SubscriberLayout() {
     <div className={cn("subscriber-layout flex h-dvh max-h-dvh overflow-hidden bg-[#F4F4F4] text-[var(--gym-ink,#111111)]")}>
       {/* Desktop Sidebar (hidden on mobile, managed by GlassSurface on mobile) */}
       <DashboardSidebar
-        items={subscriberNav}
+        items={navItems}
         brand={env.appName}
         areaLabel={t("dashboard.subscriberArea")}
         homeTo={APP_ROUTES.subscriber.root}

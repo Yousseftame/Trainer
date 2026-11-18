@@ -55,6 +55,8 @@ export type WorkoutProgram = {
   subscriberId?: string
   templateId?: string
   previousVersionId?: string
+  /** Egypt calendar: weekday 0 = Saturday. Legacy docs omit this (treated as Monday). */
+  weekStartsOn?: "saturday" | "monday"
   days: WorkoutDay[]
   pdfContentId?: string
   pdfName?: BilingualText
@@ -138,6 +140,8 @@ export type NutritionProgram = {
   subscriberId?: string
   templateId?: string
   previousVersionId?: string
+  /** Egypt calendar: weekday 0 = Saturday. Legacy docs omit this (treated as Monday). */
+  weekStartsOn?: "saturday" | "monday"
   days: NutritionDay[]
   targetCalories?: number
   targetWaterLiters?: number

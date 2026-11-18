@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -389,6 +390,64 @@ export async function togglePackageActive(
     current.map((item) => (item.id === packageId ? updated : item)),
   )
   return updated
+}
+
+const LIVE_SUBSCRIPTION_STATUSES = new Set([
+  "active",
+  "pending",
+  "suspended",
+])
+
+export class PackageDeleteBlockedError extends Error {
+  readonly liveCount: number
+
+  constructor(liveCount: number) {
+    super(
+      `Cannot delete package while ${liveCount} live subscription(s) still use it.`,
+    )
+    this.name = "PackageDeleteBlockedError"
+    this.liveCount = liveCount
+  }
+}
+
+/**
+ * Permanently delete a catalog package.
+ * Blocked while any active / pending / suspended subscription still references it.
+ * Past cancelled/expired subscriptions keep their name + entitlements snapshot.
+ */
+export async function deletePackage(
+  packageId: string,
+): Promise<{ deletedId: string }> {
+  const id = String(packageId ?? "").trim()
+  if (!id) throw new Error("Package id is required")
+
+  const db = getDb()
+  const ref = doc(db, PACKAGES_COLLECTION, id)
+  const snap = await getDoc(ref)
+  if (!snap.exists()) {
+    throw new Error("Package not found")
+  }
+
+  const subsSnap = await getDocs(
+    query(
+      collection(db, SUBSCRIPTIONS_COLLECTION),
+      where("packageId", "==", id),
+    ),
+  )
+  const liveCount = subsSnap.docs.filter((d) =>
+    LIVE_SUBSCRIPTION_STATUSES.has(String(d.data().status ?? "")),
+  ).length
+
+  if (liveCount > 0) {
+    throw new PackageDeleteBlockedError(liveCount)
+  }
+
+  await deleteDoc(ref)
+
+  const current = await fetchPackages()
+  syncPackagesCache(current.filter((item) => item.id !== id))
+
+  return { deletedId: id }
 }
 
 export type AssignSubscriptionInput = {

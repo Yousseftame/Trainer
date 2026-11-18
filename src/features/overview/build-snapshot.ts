@@ -122,14 +122,16 @@ function packageRows(
     .sort((a, b) => b.active - a.active)
 }
 
+/** Saturday 00:00 UTC — Egypt week (Sat–Fri). */
 function startOfUtcWeek(iso: string): string {
   const date = new Date(iso)
-  const day = date.getUTCDay() || 7
-  const monday = new Date(
+  const day = date.getUTCDay() // Sun=0 … Sat=6
+  const daysSinceSaturday = (day + 1) % 7
+  const saturday = new Date(
     Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
   )
-  monday.setUTCDate(monday.getUTCDate() - (day - 1))
-  return monday.toISOString()
+  saturday.setUTCDate(saturday.getUTCDate() - daysSinceSaturday)
+  return saturday.toISOString()
 }
 
 function studioAdherenceTrend(input: {
@@ -207,8 +209,9 @@ function checkInTrend(measurements: BodyMeasurement[], now: Date) {
     const start = new Date(
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
     )
-    const day = start.getUTCDay() || 7
-    start.setUTCDate(start.getUTCDate() - (day - 1) - i * 7)
+    const day = start.getUTCDay() // Sun=0 … Sat=6
+    const daysSinceSaturday = (day + 1) % 7
+    start.setUTCDate(start.getUTCDate() - daysSinceSaturday - i * 7)
     buckets.set(start.toISOString(), 0)
   }
 

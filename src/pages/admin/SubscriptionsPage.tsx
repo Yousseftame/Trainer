@@ -28,6 +28,8 @@ import { useSubscribersQuery } from "@/features/subscribers/hooks"
 import {
   ENTITLEMENT_KEYS,
   normalizeEntitlements,
+  resolveEffectiveSubscriptionStatus,
+  subscriptionDaysRemaining,
 } from "@/features/subscriptions/entitlements"
 import {
   useAssignSubscriptionMutation,
@@ -40,7 +42,7 @@ import {
 import type { UpdateSubscriptionLifecycleInput } from "@/features/subscriptions/service"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
-import { daysUntil, formatDate, initials } from "@/lib/format"
+import { formatDate, initials } from "@/lib/format"
 import { appToast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 import type {
@@ -145,11 +147,15 @@ export function SubscriptionsPage() {
 
     return scoped.filter((row) => {
       if (status === "expiring") {
-        if (row.status !== "active") return false
-        const d = daysUntil(row.endsAt)
+        const effective =
+          resolveEffectiveSubscriptionStatus(row) ?? row.status
+        if (effective !== "active") return false
+        const d = subscriptionDaysRemaining(row.endsAt)
         if (d === null || d < 0 || d > 21) return false
-      } else if (status !== "all" && row.status !== status) {
-        return false
+      } else if (status !== "all") {
+        const effective =
+          resolveEffectiveSubscriptionStatus(row) ?? row.status
+        if (effective !== status) return false
       }
 
       if (!q) return true
@@ -184,15 +190,20 @@ export function SubscriptionsPage() {
   ])
 
   const stats = useMemo(() => {
-    const active = allSubscriptions.filter((item) => item.status === "active")
-      .length
-    const pending = allSubscriptions.filter((item) => item.status === "pending")
-      .length
-    const expired = allSubscriptions.filter((item) => item.status === "expired")
-      .length
+    const effectiveOf = (item: SubscriberSubscription) =>
+      resolveEffectiveSubscriptionStatus(item) ?? item.status
+    const active = allSubscriptions.filter(
+      (item) => effectiveOf(item) === "active",
+    ).length
+    const pending = allSubscriptions.filter(
+      (item) => effectiveOf(item) === "pending",
+    ).length
+    const expired = allSubscriptions.filter(
+      (item) => effectiveOf(item) === "expired",
+    ).length
     const expiring = allSubscriptions.filter((item) => {
-      if (item.status !== "active") return false
-      const days = daysUntil(item.endsAt)
+      if (effectiveOf(item) !== "active") return false
+      const days = subscriptionDaysRemaining(item.endsAt)
       return days !== null && days >= 0 && days <= 21
     }).length
     return { active, pending, expired, expiring }
@@ -713,19 +724,26 @@ export function SubscriptionsPage() {
               id: "status",
               header: t("admin.subscribers.columns.subscription"),
               cell: (row) => {
-                const remaining = daysUntil(row.endsAt)
+                const effective =
+                  resolveEffectiveSubscriptionStatus(row) ?? row.status
+                const remaining = subscriptionDaysRemaining(row.endsAt)
                 return (
                   <div className="flex flex-wrap items-center gap-1.5">
                     <StatusBadge
-                      label={t(`admin.status.${row.status}`)}
-                      tone={subscriptionStatusTone(row.status)}
+                      label={t(`admin.status.${effective}`)}
+                      tone={subscriptionStatusTone(effective)}
                     />
-                    {row.status === "active" &&
+                    {effective === "active" &&
                     remaining !== null &&
                     remaining >= 0 &&
                     remaining <= 21 ? (
                       <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">
                         {t("admin.subscribers.daysLeft", { count: remaining })}
+                      </span>
+                    ) : null}
+                    {effective === "expired" ? (
+                      <span className="rounded-full bg-black/5 px-2 py-0.5 text-[11px] font-bold text-[#8c8c8c]">
+                        {t("admin.status.expired")}
                       </span>
                     ) : null}
                   </div>

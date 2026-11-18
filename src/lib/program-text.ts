@@ -55,3 +55,107 @@ export const NUTRITION_DISCLAIMER: BilingualText = {
   en: "This nutrition plan is coach-approved guidance for training goals. It is not a medical or therapeutic dietary prescription.",
   ar: "خطة التغذية هذه توجيهات معتمدة من المدرب لأهداف التدريب، وليست وصفة طبية أو علاجية.",
 }
+
+/**
+ * Shared Egypt calendar for workout + nutrition plans.
+ * weekday 0 = Saturday … 6 = Friday (Day 1 … Day 7).
+ */
+export type PlanWeekStartsOn = "saturday" | "monday"
+
+/** Canonical week start for this product (Egypt). */
+export const PLAN_WEEK_STARTS_ON: PlanWeekStartsOn = "saturday"
+
+export const PLAN_WEEKDAY_SHORT: Record<"en" | "ar", string[]> = {
+  en: ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"],
+  ar: ["السبت", "الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"],
+}
+
+export const PLAN_WEEKDAY_LONG: Record<"en" | "ar", string[]> = {
+  en: [
+    "Saturday",
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+  ],
+  ar: [
+    "السبت",
+    "الأحد",
+    "الإثنين",
+    "الثلاثاء",
+    "الأربعاء",
+    "الخميس",
+    "الجمعة",
+  ],
+}
+
+/**
+ * Convert JS `Date#getDay()` (Sun=0 … Sat=6) → plan weekday (Sat=0 … Fri=6).
+ */
+export function jsDayToPlanWeekday(jsDay: number): number {
+  return (jsDay + 1) % 7
+}
+
+/** Today's plan weekday in the local timezone. */
+export function planWeekdayToday(now = new Date()): number {
+  return jsDayToPlanWeekday(now.getDay())
+}
+
+/**
+ * Legacy programs used Mon=0 … Sun=6. Remap once to Egypt Sat=0 … Fri=6.
+ * `(old + 2) % 7` — e.g. Mon0→2, Sat5→0, Sun6→1.
+ */
+export function mondayWeekdayToEgypt(weekday: number): number {
+  return (Math.max(0, Math.min(6, weekday)) + 2) % 7
+}
+
+/** Normalize stored days onto the Egypt week when `weekStartsOn` is missing/legacy. */
+export function migratePlanDaysToEgyptWeek<T extends { weekday: number }>(
+  days: T[],
+  weekStartsOn?: PlanWeekStartsOn | string | null,
+): { days: T[]; weekStartsOn: PlanWeekStartsOn } {
+  const remapped =
+    weekStartsOn === "saturday"
+      ? days
+      : days.map((d) => ({
+          ...d,
+          weekday: mondayWeekdayToEgypt(Number(d.weekday) || 0),
+        }))
+  return {
+    days: [...remapped].sort((a, b) => a.weekday - b.weekday),
+    weekStartsOn: "saturday",
+  }
+}
+
+export function planWeekdayIndex(weekday: number | undefined, fallbackIdx: number) {
+  if (typeof weekday === "number" && weekday >= 0 && weekday <= 6) return weekday
+  return Math.min(6, Math.max(0, fallbackIdx))
+}
+
+/** Always show Sat → Fri so workout and nutrition stay aligned. */
+export function sortPlanDaysByWeekday<T extends { weekday: number }>(days: T[]): T[] {
+  return [...days].sort((a, b) => a.weekday - b.weekday)
+}
+
+/** Chip label: "Mon" / "الإثنين" */
+export function planWeekdayShortName(
+  weekday: number | undefined,
+  fallbackIdx: number,
+  locale: "en" | "ar",
+) {
+  const idx = planWeekdayIndex(weekday, fallbackIdx)
+  return PLAN_WEEKDAY_SHORT[locale][idx]
+}
+
+/** Detail title: "Saturday · Day 1" / "السبت · يوم 1" */
+export function planDayHeading(
+  weekday: number | undefined,
+  fallbackIdx: number,
+  locale: "en" | "ar",
+) {
+  const idx = planWeekdayIndex(weekday, fallbackIdx)
+  const name = PLAN_WEEKDAY_LONG[locale][idx]
+  return locale === "ar" ? `${name} · يوم ${idx + 1}` : `${name} · Day ${idx + 1}`
+}

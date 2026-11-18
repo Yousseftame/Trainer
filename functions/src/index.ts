@@ -53,5 +53,6 @@ export {
   unregisterFcmToken,
   onRegistrationRequestCreated,
   onSubscriptionWritten,
+  expirePastDueSubscriptionsJob,
   scanExpiringSubscriptions,
 } from "./notifications/index.js";

@@ -18,6 +18,7 @@ import {
 } from "@/components/dashboard/SubscriptionActionDialog"
 import { APP_ROUTES } from "@/config/constants"
 import { useAuth } from "@/features/auth/auth-context"
+import { formatHealthNotesForDisplay } from "@/features/subscribers/assessment"
 import {
   buildSubscriberRow,
   subscriberDisplayName,
@@ -255,15 +256,26 @@ export function SubscribersPage() {
                   </p>
                 </div>
               ) : null}
-              {row.healthNotes?.[locale] ? (
+              {row.healthNotes?.[locale] ||
+              row.healthNotes?.en ||
+              row.healthNotes?.ar ? (
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#8c8c8c]">
                     {locale === "ar"
                       ? "ملاحظات صحية أو إصابات"
                       : "Health / injury notes"}
                   </p>
-                  <p className="mt-1 text-[13px] font-medium text-[#C44536]">
-                    {row.healthNotes[locale]}
+                  <p
+                    className="mt-1 text-[13px] font-medium text-[#C44536]"
+                    dir={locale === "ar" ? "rtl" : "ltr"}
+                  >
+                    {formatHealthNotesForDisplay(
+                      row.healthNotes?.[locale] ||
+                        row.healthNotes?.en ||
+                        row.healthNotes?.ar ||
+                        "",
+                      locale,
+                    )}
                   </p>
                 </div>
               ) : null}
@@ -279,6 +291,8 @@ export function SubscribersPage() {
               ) : null}
               {!row.goal?.[locale] &&
               !row.healthNotes?.[locale] &&
+              !row.healthNotes?.en &&
+              !row.healthNotes?.ar &&
               !row.coachNotes?.[locale] ? (
                 <p className="text-[13px] font-medium text-[#8c8c8c]">
                   {locale === "ar"

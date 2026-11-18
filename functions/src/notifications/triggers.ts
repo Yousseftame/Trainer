@@ -3,6 +3,11 @@ import {onSchedule} from "firebase-functions/v2/scheduler";
 import {COLLECTIONS} from "../config/collections.js";
 import {db} from "../config/firebase.js";
 import {enqueueNotice} from "../shared/notices.js";
+import {
+  daysUntilEndsAt,
+  EXPIRATION_REMINDER_DAYS,
+  expirePastDueSubscriptions,
+} from "../shared/subscriptionExpiry.js";
 
 function bilingual(en: string, ar: string) {
   return {en, ar};
@@ -160,13 +165,22 @@ export const onSubscriptionWritten = onDocumentWritten(
   },
 );
 
-function daysUntil(endsAt: string, now: Date) {
-  return Math.ceil(
-    (new Date(endsAt).getTime() - now.getTime()) / 86_400_000,
-  );
-}
+/**
+ * Hourly — flip past-due active seats to expired, notify subscriber + staff,
+ * and refresh subscriber profile markers. Access is already date-gated client/server;
+ * this keeps Firestore status, admin lists, and notices in sync.
+ */
+export const expirePastDueSubscriptionsJob = onSchedule(
+  {
+    schedule: "every 1 hours",
+    timeZone: "Africa/Cairo",
+  },
+  async () => {
+    await expirePastDueSubscriptions(new Date());
+  },
+);
 
-/** Daily scan — queue 14-day and 7-day expiration reminders. */
+/** Daily scan — expire anything overdue, then queue 14/7/3/1-day reminders. */
 export const scanExpiringSubscriptions = onSchedule(
   {
     schedule: "every day 07:00",
@@ -174,6 +188,8 @@ export const scanExpiringSubscriptions = onSchedule(
   },
   async () => {
     const now = new Date();
+    await expirePastDueSubscriptions(now);
+
     const snap = await db
       .collection(COLLECTIONS.subscriptions)
       .where("status", "==", "active")
@@ -183,8 +199,10 @@ export const scanExpiringSubscriptions = onSchedule(
       const data = docSnap.data();
       const endsAt = data.endsAt ? String(data.endsAt) : "";
       if (!endsAt) continue;
-      const days = daysUntil(endsAt, now);
-      if (days !== 14 && days !== 7) continue;
+      const days = daysUntilEndsAt(endsAt, now);
+      if (!(EXPIRATION_REMINDER_DAYS as readonly number[]).includes(days)) {
+        continue;
+      }
 
       const subscriberId = String(data.subscriberId ?? "");
       let toEmail = String(data.subscriberEmail ?? "").trim().toLowerCase();
@@ -224,8 +242,12 @@ export const scanExpiringSubscriptions = onSchedule(
         subscriptionId: docSnap.id,
         dedupeKey: `expiration:${docSnap.id}:${days}d`,
         subject: bilingual(
-          `${packageName} ends in ${days} days`,
-          `باقة ${packageName} تنتهي خلال ${days} يوماً`,
+          days === 1
+            ? `${packageName} ends tomorrow`
+            : `${packageName} ends in ${days} days`,
+          days === 1
+            ? `باقة ${packageName} تنتهي غداً`
+            : `باقة ${packageName} تنتهي خلال ${days} يوماً`,
         ),
         detail: bilingual(
           `Renew before ${endsAt.slice(0, 10)} so assigned programs stay live.`,

@@ -10,6 +10,7 @@ import {
   writeBatch,
 } from "firebase/firestore"
 import { getDb } from "@/lib/firebase/firestore"
+import { migratePlanDaysToEgyptWeek } from "@/lib/program-text"
 import type {
   BilingualText,
   NutritionAdherenceLog,
@@ -60,6 +61,10 @@ function normalizeNutritionProgram(
   raw: Record<string, unknown>,
 ): NutritionProgram {
   const titleRaw = (raw.title ?? {}) as Record<string, string>
+  const migrated = migratePlanDaysToEgyptWeek(
+    Array.isArray(raw.days) ? (raw.days as NutritionDay[]) : [],
+    typeof raw.weekStartsOn === "string" ? raw.weekStartsOn : undefined,
+  )
   return {
     id,
     title: {
@@ -94,7 +99,8 @@ function normalizeNutritionProgram(
       typeof raw.previousVersionId === "string"
         ? raw.previousVersionId
         : undefined,
-    days: Array.isArray(raw.days) ? (raw.days as NutritionDay[]) : [],
+    weekStartsOn: migrated.weekStartsOn,
+    days: migrated.days,
     targetCalories:
       typeof raw.targetCalories === "number" ? raw.targetCalories : undefined,
     targetWaterLiters:
@@ -387,6 +393,7 @@ export async function saveNutritionProgram(
       subscriberId: input.subscriberId || existing.subscriberId,
       templateId: input.templateId || existing.templateId,
       previousVersionId: existing.id,
+      weekStartsOn: "saturday",
       days: cloneDays(input.days),
       targetCalories: input.targetCalories,
       targetWaterLiters: input.targetWaterLiters,
@@ -425,6 +432,7 @@ export async function saveNutritionProgram(
       status: input.status,
       subscriberId: input.subscriberId ?? existing.subscriberId,
       templateId: input.templateId ?? existing.templateId,
+      weekStartsOn: "saturday",
       days: cloneDays(input.days),
       targetCalories: input.targetCalories ?? existing.targetCalories,
       targetWaterLiters: input.targetWaterLiters ?? existing.targetWaterLiters,
@@ -480,6 +488,7 @@ export async function saveNutritionProgram(
     status: input.status,
     subscriberId: input.subscriberId,
     templateId: input.templateId,
+    weekStartsOn: "saturday",
     days: cloneDays(input.days),
     targetCalories: input.targetCalories,
     targetWaterLiters: input.targetWaterLiters,
@@ -616,6 +625,7 @@ export async function assignNutritionProgram(
     subscriberId: input.subscriberId,
     templateId: input.templateId,
     previousVersionId,
+    weekStartsOn: "saturday",
     days,
     targetCalories,
     targetWaterLiters,

@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { memo, useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import {
   Apple,
@@ -16,11 +16,18 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { formatDate } from "@/lib/format"
 import { NUTRITION_DISCLAIMER } from "@/lib/program-text"
+import type { NutritionAdherenceLog } from "@/types/program"
 
-export function NutritionLogPage({
+export const NutritionLogPage = memo(function NutritionLogPage({
   subscriberId: explicitSubId,
   embedded = false,
-}: { subscriberId?: string; embedded?: boolean } = {}) {
+  logs: logsProp,
+}: {
+  subscriberId?: string
+  embedded?: boolean
+  /** When provided (History embed), skip local loading flash and use parent cache */
+  logs?: NutritionAdherenceLog[]
+} = {}) {
   const { t } = useTranslation()
   const { locale } = useLocale()
   const isAr = locale === "ar"
@@ -28,15 +35,17 @@ export function NutritionLogPage({
   useDocumentTitle(embedded ? null : t("nav.nutritionLog"))
 
   const targetSubscriberId = explicitSubId || panelSubscriberId
+  const useParentLogs = logsProp !== undefined
   const {
-    data: logs = [],
-    isLoading,
+    data,
+    isPending,
     isError,
     refetch,
   } = useNutritionLogsQuery({
     subscriberId: targetSubscriberId,
-    enabled: Boolean(targetSubscriberId),
+    enabled: Boolean(targetSubscriberId) && !useParentLogs,
   })
+  const logs = useParentLogs ? logsProp : (data ?? [])
 
   const stats = useMemo(() => {
     const totalLoggedDays = logs.length
@@ -56,7 +65,8 @@ export function NutritionLogPage({
     return { totalLoggedDays, fullAdherence, rate, avgCalories }
   }, [logs])
 
-  if (!targetSubscriberId || isLoading) {
+  // Only block on first standalone load — never flash when parent already has logs
+  if (!useParentLogs && (!targetSubscriberId || (isPending && !data))) {
     return (
       <div className="flex min-h-60 flex-col items-center justify-center rounded-[28px] bg-white p-8 text-center shadow-xs">
         <Apple className="size-10 mb-3 animate-pulse text-[var(--gym-orange,#fb5001)] stroke-1" />
@@ -67,7 +77,7 @@ export function NutritionLogPage({
     )
   }
 
-  if (isError) {
+  if (!useParentLogs && isError) {
     return (
       <div className="flex min-h-60 flex-col items-center justify-center gap-3 rounded-[28px] bg-white p-8 text-center shadow-xs">
         <p className="font-heading text-[16px] font-extrabold text-[var(--gym-ink,#111111)]">
@@ -210,4 +220,4 @@ export function NutritionLogPage({
       </div>
     </div>
   )
-}
+})

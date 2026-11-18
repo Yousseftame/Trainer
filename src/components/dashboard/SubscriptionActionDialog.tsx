@@ -254,26 +254,45 @@ export function SubscriptionActionDialog({
     if (state.mode === "assign") {
       if (!subscriberId || !selectedPackage) return
       const subPerson = subscribers.find((s) => s.id === subscriberId)
+      const startsAt =
+        assignStatus === "active"
+          ? fromDateInputValue(startDate) || new Date().toISOString()
+          : null
+      const endsAt =
+        assignStatus === "active"
+          ? fromDateInputValue(endDate) ||
+            computeEndsAtIso(
+              startsAt || new Date().toISOString(),
+              selectedPackage.durationDays,
+            )
+          : null
       await onAssign({
         subscriberId,
         subscriberName: subPerson?.displayName,
         subscriberEmail: subPerson?.email,
         packageId: selectedPackage.id,
         status: assignStatus,
-        startsAt: assignStatus === "active" ? fromDateInputValue(startDate) : null,
-        endsAt: assignStatus === "active" ? fromDateInputValue(endDate) : null,
+        startsAt,
+        endsAt,
         activatedBy: adminName,
         notes: cleanEn || undefined,
         notesLocalized,
       })
     } else {
+      const startsAt =
+        fromDateInputValue(startDate) || state.subscription.startsAt
+      const endsAt =
+        fromDateInputValue(endDate) ||
+        (startsAt && selectedPackage
+          ? computeEndsAtIso(startsAt, selectedPackage.durationDays)
+          : state.subscription.endsAt)
       await onLifecycle({
         subscriptionId: state.subscription.id,
         action: manageAction,
         packageId: selectedPackage?.id ?? packageId,
         status: manageAction === "edit" ? editStatus : undefined,
-        startsAt: fromDateInputValue(startDate),
-        endsAt: fromDateInputValue(endDate),
+        startsAt,
+        endsAt,
         activatedBy: adminName,
         notes: cleanEn || undefined,
         notesLocalized,

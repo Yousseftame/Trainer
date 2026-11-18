@@ -67,9 +67,12 @@ export async function createInitialSubscription(input: {
   const startsAt = input.startsAt || now;
   let endsAt = input.endsAt || null;
   if (!endsAt && pkg?.durationDays) {
+    // Match assign/lifecycle: start + durationDays in ms (not calendar setUTCDate).
     const start = new Date(startsAt);
-    start.setUTCDate(start.getUTCDate() + Number(pkg.durationDays));
-    endsAt = start.toISOString();
+    const base = Number.isNaN(start.getTime()) ? new Date() : start;
+    endsAt = new Date(
+      base.getTime() + Math.max(1, Number(pkg.durationDays) || 30) * 86_400_000,
+    ).toISOString();
   }
 
   const subId = db.collection(COLLECTIONS.subscriptions).doc().id;

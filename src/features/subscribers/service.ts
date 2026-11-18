@@ -36,6 +36,7 @@ import {
 } from "@/features/subscribers/assessment"
 import type { UserStatus } from "@/types/user"
 import type { SubscriberSubscription } from "@/types/subscription"
+import { pickCurrentSubscription } from "@/features/subscriptions/entitlements"
 import { fetchSubscriptions } from "@/features/subscriptions/service"
 
 const SUBSCRIBERS_COLLECTION = "subscribers"
@@ -685,14 +686,10 @@ export function currentSubscriptionForSubscriber(
   subscriberId: string,
   subscriptions: SubscriberSubscription[],
 ): SubscriberSubscription | undefined {
-  return (
-    subscriptions.find(
-      (item) =>
-        item.subscriberId === subscriberId &&
-        (item.status === "active" || item.status === "suspended"),
-    ) ??
-    subscriptions.find((item) => item.subscriberId === subscriberId)
+  const scoped = subscriptions.filter(
+    (item) => item.subscriberId === subscriberId,
   )
+  return pickCurrentSubscription(scoped) ?? undefined
 }
 
 export async function subscriberRow(

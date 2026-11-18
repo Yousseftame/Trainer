@@ -10,6 +10,7 @@ import {
   writeBatch,
 } from "firebase/firestore"
 import { getDb } from "@/lib/firebase/firestore"
+import { migratePlanDaysToEgyptWeek } from "@/lib/program-text"
 import type {
   BilingualText,
   ProgramFormat,
@@ -49,6 +50,10 @@ function normalizeWorkoutProgram(
   raw: Record<string, unknown>,
 ): WorkoutProgram {
   const titleRaw = (raw.title ?? {}) as Record<string, string>
+  const migrated = migratePlanDaysToEgyptWeek(
+    Array.isArray(raw.days) ? (raw.days as WorkoutDay[]) : [],
+    typeof raw.weekStartsOn === "string" ? raw.weekStartsOn : undefined,
+  )
   return {
     id,
     title: {
@@ -83,7 +88,8 @@ function normalizeWorkoutProgram(
       typeof raw.previousVersionId === "string"
         ? raw.previousVersionId
         : undefined,
-    days: Array.isArray(raw.days) ? (raw.days as WorkoutDay[]) : [],
+    weekStartsOn: migrated.weekStartsOn,
+    days: migrated.days,
     pdfContentId:
       typeof raw.pdfContentId === "string" ? raw.pdfContentId : undefined,
     pdfName:
@@ -249,6 +255,7 @@ export async function saveWorkoutProgram(
       subscriberId: input.subscriberId || existing.subscriberId,
       templateId: input.templateId || existing.templateId,
       previousVersionId: existing.id,
+      weekStartsOn: "saturday",
       days: cloneDays(input.days),
       pdfContentId: input.pdfContentId,
       pdfName: input.pdfName,
@@ -287,6 +294,7 @@ export async function saveWorkoutProgram(
       status: input.status,
       subscriberId: input.subscriberId ?? existing.subscriberId,
       templateId: input.templateId ?? existing.templateId,
+      weekStartsOn: "saturday",
       days: cloneDays(input.days),
       pdfContentId: input.pdfContentId ?? existing.pdfContentId,
       pdfName: input.pdfName ?? existing.pdfName,
@@ -343,6 +351,7 @@ export async function saveWorkoutProgram(
     status: input.status,
     subscriberId: input.subscriberId,
     templateId: input.templateId,
+    weekStartsOn: "saturday",
     days: cloneDays(input.days),
     pdfContentId: input.pdfContentId,
     pdfName: input.pdfName,
@@ -505,6 +514,7 @@ export async function assignWorkoutProgram(
     subscriberId: input.subscriberId,
     templateId: input.templateId,
     previousVersionId,
+    weekStartsOn: "saturday",
     days,
     pdfContentId,
     pdfName,

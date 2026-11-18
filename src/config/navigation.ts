@@ -28,6 +28,7 @@ import {
   Video,
 } from "lucide-react"
 import type { Permission } from "@/lib/permissions/permissions"
+import type { PackageEntitlementKey } from "@/types/subscription"
 import { APP_ROUTES } from "@/config/constants"
 
 export type NavItem = {
@@ -36,6 +37,11 @@ export type NavItem = {
   icon: LucideIcon
   /** If set, item is shown only when the user has this permission */
   permission?: Permission
+  /**
+   * Subscriber package entitlement gate.
+   * Array = show when the subscriber has ANY of the listed keys.
+   */
+  entitlement?: PackageEntitlementKey | PackageEntitlementKey[]
   /** Nested links shown under an expandable group */
   children?: NavItem[]
   /** Non-clickable sidebar note / separator for content modules */
@@ -270,16 +276,19 @@ export const subscriberNav: NavItem[] = [
     labelKey: "nav.workoutSection",
     to: APP_ROUTES.subscriber.workout,
     icon: Dumbbell,
+    entitlement: "workoutProgram",
     children: [
       {
         labelKey: "nav.workoutPlan",
         to: APP_ROUTES.subscriber.workout,
         icon: Dumbbell,
+        entitlement: "workoutProgram",
       },
       {
         labelKey: "nav.workoutLog",
         to: APP_ROUTES.subscriber.workoutLog,
         icon: ClipboardList,
+        entitlement: "workoutProgram",
       },
     ],
   },
@@ -287,21 +296,39 @@ export const subscriberNav: NavItem[] = [
     labelKey: "nav.nutritionSection",
     to: APP_ROUTES.subscriber.nutrition,
     icon: Apple,
+    entitlement: "nutritionProgram",
     children: [
       {
         labelKey: "nav.nutritionPlan",
         to: APP_ROUTES.subscriber.nutrition,
         icon: Apple,
+        entitlement: "nutritionProgram",
       },
       {
         labelKey: "nav.nutritionLog",
         to: APP_ROUTES.subscriber.nutritionLog,
         icon: NotebookPen,
+        entitlement: "nutritionProgram",
       },
     ],
   },
-  { labelKey: "nav.library", to: APP_ROUTES.subscriber.library, icon: Library },
-  { labelKey: "nav.progress", to: APP_ROUTES.subscriber.progress, icon: TrendingUp },
+  {
+    labelKey: "nav.library",
+    to: APP_ROUTES.subscriber.library,
+    icon: Library,
+    entitlement: [
+      "pdfDocuments",
+      "exerciseVideos",
+      "workoutProgram",
+      "nutritionProgram",
+    ],
+  },
+  {
+    labelKey: "nav.progress",
+    to: APP_ROUTES.subscriber.progress,
+    icon: TrendingUp,
+    entitlement: "progressTracking",
+  },
   { labelKey: "nav.physicalTherapy", to: APP_ROUTES.subscriber.physicalTherapy, icon: Activity },
   { labelKey: "nav.history", to: APP_ROUTES.subscriber.history, icon: History },
   { labelKey: "nav.subscription", to: APP_ROUTES.subscriber.subscription, icon: CreditCard },

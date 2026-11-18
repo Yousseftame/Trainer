@@ -1,3 +1,4 @@
+import { useMemo } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import {
   Dumbbell,
@@ -8,6 +9,7 @@ import {
 } from "lucide-react"
 import GlassSurface from "@/components/GlassSurface"
 import { APP_ROUTES } from "@/config/constants"
+import { useSubscriberEntitlementAccess } from "@/features/subscriptions/use-subscriber-entitlement-access"
 import { useLocale } from "@/hooks/useLocale"
 import { cn } from "@/lib/utils"
 
@@ -25,6 +27,10 @@ export function SubscriberMobileNavbar({
   const { locale } = useLocale()
   const isAr = locale === "ar"
   const pathname = location.pathname
+  const { canAccess } = useSubscriberEntitlementAccess()
+
+  const canWorkout = canAccess("workoutProgram")
+  const canNutrition = canAccess("nutritionProgram")
 
   const isHomeActive = pathname === APP_ROUTES.subscriber.root
   const isWorkoutActive =
@@ -38,59 +44,82 @@ export function SubscriberMobileNavbar({
   // Any other secondary subscriber page (profile, subscription, progress, physical therapy, etc.)
   const isOtherActive =
     !isHomeActive &&
-    !isWorkoutActive &&
+    !(canWorkout && isWorkoutActive) &&
     !isCommunityActive &&
-    !isNutritionActive
+    !(canNutrition && isNutritionActive)
 
-  const navItems = [
-    {
-      id: "home",
-      label: isAr ? "الرئيسية" : "Home",
-      icon: Home,
-      isActive: isHomeActive && !isMenuOpen,
-      onClick: () => {
-        if (isMenuOpen) onToggleMenu()
-        navigate(APP_ROUTES.subscriber.root)
+  const navItems = useMemo(() => {
+    const items = [
+      {
+        id: "home",
+        label: isAr ? "الرئيسية" : "Home",
+        icon: Home,
+        isActive: isHomeActive && !isMenuOpen,
+        onClick: () => {
+          if (isMenuOpen) onToggleMenu()
+          navigate(APP_ROUTES.subscriber.root)
+        },
       },
-    },
-    {
-      id: "workout",
-      label: isAr ? "التمارين" : "Workout",
-      icon: Dumbbell,
-      isActive: isWorkoutActive && !isMenuOpen,
-      onClick: () => {
-        if (isMenuOpen) onToggleMenu()
-        navigate(APP_ROUTES.subscriber.workout)
+      ...(canWorkout
+        ? [
+            {
+              id: "workout",
+              label: isAr ? "التمارين" : "Workout",
+              icon: Dumbbell,
+              isActive: isWorkoutActive && !isMenuOpen,
+              onClick: () => {
+                if (isMenuOpen) onToggleMenu()
+                navigate(APP_ROUTES.subscriber.workout)
+              },
+            },
+          ]
+        : []),
+      {
+        id: "community",
+        label: isAr ? "المجتمع" : "Community",
+        icon: Users,
+        isActive: isCommunityActive && !isMenuOpen,
+        onClick: () => {
+          if (isMenuOpen) onToggleMenu()
+          navigate(APP_ROUTES.subscriber.community)
+        },
       },
-    },
-    {
-      id: "community",
-      label: isAr ? "المجتمع" : "Community",
-      icon: Users,
-      isActive: isCommunityActive && !isMenuOpen,
-      onClick: () => {
-        if (isMenuOpen) onToggleMenu()
-        navigate(APP_ROUTES.subscriber.community)
+      ...(canNutrition
+        ? [
+            {
+              id: "nutrition",
+              label: isAr ? "التغذية" : "Nutrition",
+              icon: UtensilsCrossed,
+              isActive: isNutritionActive && !isMenuOpen,
+              onClick: () => {
+                if (isMenuOpen) onToggleMenu()
+                navigate(APP_ROUTES.subscriber.nutrition)
+              },
+            },
+          ]
+        : []),
+      {
+        id: "menu",
+        label: isAr ? "المزيد" : "Menu",
+        icon: LayoutGrid,
+        isActive: isMenuOpen || isOtherActive,
+        onClick: onToggleMenu,
       },
-    },
-    {
-      id: "nutrition",
-      label: isAr ? "التغذية" : "Nutrition",
-      icon: UtensilsCrossed,
-      isActive: isNutritionActive && !isMenuOpen,
-      onClick: () => {
-        if (isMenuOpen) onToggleMenu()
-        navigate(APP_ROUTES.subscriber.nutrition)
-      },
-    },
-    {
-      id: "menu",
-      label: isAr ? "المزيد" : "Menu",
-      icon: LayoutGrid,
-      isActive: isMenuOpen || isOtherActive,
-      onClick: onToggleMenu,
-    },
-  ]
+    ]
+    return items
+  }, [
+    canNutrition,
+    canWorkout,
+    isAr,
+    isCommunityActive,
+    isHomeActive,
+    isMenuOpen,
+    isNutritionActive,
+    isOtherActive,
+    isWorkoutActive,
+    navigate,
+    onToggleMenu,
+  ])
 
   return (
     <nav

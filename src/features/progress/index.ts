@@ -8,7 +8,12 @@ export type {
 export {
   computeAdherenceWeeks,
   adherenceScoreFromWeeks,
+  adherenceWeekPercent,
+  endOfUtcWeek,
+  isSameUtcWeek,
   latestAdherenceWeek,
+  startOfUtcWeek,
+  trimLeadingEmptyAdherenceWeeks,
 } from "@/features/progress/adherence"
 
 export {

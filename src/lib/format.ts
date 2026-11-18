@@ -11,12 +11,15 @@ export function formatDate(value: string | null | undefined, locale: AppLocale):
   }).format(date)
 }
 
-export function daysUntil(value: string | null | undefined): number | null {
+/** Days until ISO timestamp (negative if past). Prefer subscriptionDaysRemaining for seats. */
+export function daysUntil(
+  value: string | null | undefined,
+  now: Date = new Date(),
+): number | null {
   if (!value) return null
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return null
-  const diff = date.getTime() - Date.now()
-  return Math.ceil(diff / (1000 * 60 * 60 * 24))
+  return Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 }
 
 export function formatChartDate(value: string, locale: AppLocale): string {

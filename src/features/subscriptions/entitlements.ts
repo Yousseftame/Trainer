@@ -50,19 +50,57 @@ export function resolveEffectiveSubscriptionStatus(
   return status
 }
 
-/** Prefer active → suspended → latest by updatedAt. */
+/**
+ * Whole days left until `endsAt` (negative if already past).
+ * Driven by the seat window — never by package catalog `durationDays`.
+ */
+export function subscriptionDaysRemaining(
+  endsAt: string | null | undefined,
+  now: Date = new Date(),
+): number | null {
+  if (!endsAt) return null
+  const endMs = new Date(endsAt).getTime()
+  if (Number.isNaN(endMs)) return null
+  return Math.ceil((endMs - now.getTime()) / 86_400_000)
+}
+
+/** Elapsed progress 0–100 across startsAt → endsAt (min visual 4%). */
+export function subscriptionProgressPercent(
+  startsAt: string | null | undefined,
+  endsAt: string | null | undefined,
+  now: Date = new Date(),
+): number {
+  if (!startsAt || !endsAt) return 4
+  const startMs = new Date(startsAt).getTime()
+  const endMs = new Date(endsAt).getTime()
+  if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) return 4
+  const elapsed = Math.min(Math.max(0, now.getTime() - startMs), endMs - startMs)
+  return Math.min(100, Math.max(4, Math.round((elapsed / (endMs - startMs)) * 100)))
+}
+
+/**
+ * Prefer effectively-active → suspended → pending → latest by updatedAt.
+ * Honors past `endsAt` even when Firestore still says `active`.
+ */
 export function pickCurrentSubscription(
   items: SubscriberSubscription[] | undefined | null,
+  now: Date = new Date(),
 ): SubscriberSubscription | null {
   if (!items?.length) return null
-  const active = items.find((s) => s.status === "active")
-  if (active) return active
-  const suspended = items.find((s) => s.status === "suspended")
-  if (suspended) return suspended
-  return [...items].sort(
+  const ranked = [...items].sort(
     (a, b) =>
       new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-  )[0]
+  )
+  const scored = ranked.map((s) => ({
+    s,
+    effective: resolveEffectiveSubscriptionStatus(s, now),
+  }))
+  return (
+    scored.find((row) => row.effective === "active")?.s ??
+    scored.find((row) => row.effective === "suspended")?.s ??
+    scored.find((row) => row.effective === "pending")?.s ??
+    ranked[0]
+  )
 }
 
 /**
@@ -89,6 +127,51 @@ export function canAccessPackageEntitlement(
     pkg?.entitlements ?? subscription?.entitlementsSnapshot,
   )
   return Boolean(entitlements[key])
+}
+
+/** True when the subscriber may access ANY of the given entitlement keys. */
+export function canAccessAnyPackageEntitlement(
+  subscription: SubscriberSubscription | null | undefined,
+  pkg: SubscriptionPackage | null | undefined,
+  keys: PackageEntitlementKey | PackageEntitlementKey[],
+  now: Date = new Date(),
+): boolean {
+  const list = Array.isArray(keys) ? keys : [keys]
+  return list.some((key) =>
+    canAccessPackageEntitlement(subscription, pkg, key, now),
+  )
+}
+
+/**
+ * Filter subscriber nav by package entitlements.
+ * Untagged items always stay visible; groups hide when all children are gated out.
+ */
+export function filterNavByEntitlement<
+  T extends {
+    entitlement?: PackageEntitlementKey | PackageEntitlementKey[]
+    children?: T[]
+    kind?: string
+  },
+>(
+  items: T[],
+  subscription: SubscriberSubscription | null | undefined,
+  pkg: SubscriptionPackage | null | undefined,
+): T[] {
+  return items
+    .map((item) => {
+      if (item.kind === "divider") return item
+      if (!item.children?.length) return item
+      return {
+        ...item,
+        children: filterNavByEntitlement(item.children, subscription, pkg),
+      }
+    })
+    .filter((item) => {
+      if (item.kind === "divider") return true
+      if (item.children) return item.children.length > 0
+      if (!item.entitlement) return true
+      return canAccessAnyPackageEntitlement(subscription, pkg, item.entitlement)
+    })
 }
 
 /**

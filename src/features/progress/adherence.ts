@@ -7,20 +7,40 @@ import type {
 
 export type AdherenceWeek = {
   weekStart: string
+  weekEnd: string
   workoutDone: number
   workoutTotal: number
   nutritionDone: number
   nutritionTotal: number
 }
 
-function startOfUtcWeek(iso: string): string {
+/** Saturday 00:00 UTC ISO for the Egypt week containing `iso` (Sat–Fri). */
+export function startOfUtcWeek(iso: string): string {
   const date = new Date(iso)
-  const day = date.getUTCDay() || 7
-  const monday = new Date(
+  const day = date.getUTCDay() // Sun=0 … Sat=6
+  const daysSinceSaturday = (day + 1) % 7
+  const saturday = new Date(
     Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
   )
-  monday.setUTCDate(monday.getUTCDate() - (day - 1))
-  return monday.toISOString()
+  saturday.setUTCDate(saturday.getUTCDate() - daysSinceSaturday)
+  return saturday.toISOString()
+}
+
+export function endOfUtcWeek(weekStartIso: string): string {
+  const end = new Date(weekStartIso)
+  end.setUTCDate(end.getUTCDate() + 6)
+  end.setUTCHours(23, 59, 59, 999)
+  return end.toISOString()
+}
+
+export function isSameUtcWeek(a: string, b: string): boolean {
+  return startOfUtcWeek(a) === startOfUtcWeek(b)
+}
+
+export function adherenceWeekPercent(week: AdherenceWeek): number | null {
+  const total = week.workoutTotal + week.nutritionTotal
+  if (!total) return null
+  return Math.round(((week.workoutDone + week.nutritionDone) / total) * 100)
 }
 
 function rate(done: number, total: number) {
@@ -52,6 +72,7 @@ function expectedNutritionDays(programs: NutritionProgram[]): number {
 /**
  * Build weekly adherence from live workout/nutrition logs.
  * Totals default to active program day counts (or observed maxima).
+ * Pass a large `weeks` (e.g. 52) for year-long history — rebuilt from logs, no separate store.
  */
 export function computeAdherenceWeeks(input: {
   workoutLogs: WorkoutSessionLog[]
@@ -60,7 +81,7 @@ export function computeAdherenceWeeks(input: {
   nutritionPrograms?: NutritionProgram[]
   weeks?: number
 }): AdherenceWeek[] {
-  const weekCount = input.weeks ?? 8
+  const weekCount = Math.max(1, Math.min(input.weeks ?? 8, 104))
   const now = new Date()
   const currentWeekStart = startOfUtcWeek(now.toISOString())
   const weeks: AdherenceWeek[] = []
@@ -68,8 +89,10 @@ export function computeAdherenceWeeks(input: {
   for (let i = weekCount - 1; i >= 0; i -= 1) {
     const start = new Date(currentWeekStart)
     start.setUTCDate(start.getUTCDate() - i * 7)
+    const weekStart = start.toISOString()
     weeks.push({
-      weekStart: start.toISOString(),
+      weekStart,
+      weekEnd: endOfUtcWeek(weekStart),
       workoutDone: 0,
       workoutTotal: 0,
       nutritionDone: 0,
@@ -106,6 +129,23 @@ export function computeAdherenceWeeks(input: {
   }
 
   return weeks
+}
+
+/** Drop leading empty weeks so history starts at the first activity (keeps current week). */
+export function trimLeadingEmptyAdherenceWeeks(
+  weeks: AdherenceWeek[],
+): AdherenceWeek[] {
+  if (weeks.length <= 1) return weeks
+  const firstActive = weeks.findIndex(
+    (w) => w.workoutDone > 0 || w.nutritionDone > 0,
+  )
+  if (firstActive <= 0) return weeks
+  // Always keep the current (last) week even if empty
+  const trimmed = weeks.slice(firstActive)
+  if (trimmed[trimmed.length - 1]?.weekStart !== weeks[weeks.length - 1]?.weekStart) {
+    return [...trimmed, weeks[weeks.length - 1]]
+  }
+  return trimmed
 }
 
 export function adherenceScoreFromWeeks(weeks: AdherenceWeek[]) {

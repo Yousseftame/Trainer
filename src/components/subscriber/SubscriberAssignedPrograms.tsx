@@ -12,21 +12,22 @@ import {
 import { APP_ROUTES } from "@/config/constants"
 import { useSubscriberOverviewDashboard } from "@/features/subscriber-overview/use-overview-dashboard"
 import { useLocale } from "@/hooks/useLocale"
-import { trainingDayCount } from "@/lib/program-text"
+import { planDayHeading, trainingDayCount } from "@/lib/program-text"
 import { cn } from "@/lib/utils"
 
-/** Program weekdays are Mon=0 … Sun=6 */
+/** Program weekdays are Sat=0 … Fri=6 (Egypt week). */
 function programWeekdayToday(): number {
-  return (new Date().getDay() + 6) % 7
+  return (new Date().getDay() + 1) % 7
 }
 
 function startOfUtcWeekIso(now = new Date()): string {
-  const day = now.getUTCDay() || 7
-  const monday = new Date(
+  const day = now.getUTCDay() // Sun=0 … Sat=6
+  const daysSinceSaturday = (day + 1) % 7
+  const saturday = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
   )
-  monday.setUTCDate(monday.getUTCDate() - (day - 1))
-  return monday.toISOString().slice(0, 10)
+  saturday.setUTCDate(saturday.getUTCDate() - daysSinceSaturday)
+  return saturday.toISOString().slice(0, 10)
 }
 
 export function SubscriberAssignedPrograms() {
@@ -63,9 +64,7 @@ export function SubscriberAssignedPrograms() {
         ? isAr
           ? "اليوم راحة واستشفاء"
           : "Rest & recovery day"
-        : isAr
-          ? `يوم ${todayIdx + 1} — ${(todayDay?.exercises.length ?? 0)} تمارين`
-          : `Day ${todayIdx + 1} — ${todayDay?.exercises.length ?? 0} exercises`)
+        : `${planDayHeading(todayDay?.weekday ?? todayIdx, todayIdx, locale)} — ${(todayDay?.exercises.length ?? 0)} ${isAr ? "تمارين" : "exercises"}`)
 
     const weekStart = startOfUtcWeekIso()
     const weekLogs = workoutLogs.filter(

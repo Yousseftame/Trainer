@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react"
-import { Link, useSearchParams } from "react-router-dom"
+import { useMemo, useState } from "react"
+import { Link } from "react-router-dom"
 import {
   Area,
   AreaChart,
@@ -14,6 +14,7 @@ import {
   Archive,
   ArrowRight,
   ArrowLeft,
+  CalendarDays,
   Camera,
   CreditCard,
   Dumbbell,
@@ -27,6 +28,7 @@ import {
 import { ProgramHistoryDialog } from "@/components/dashboard/ProgramHistoryDialog"
 import { ProgressPhotoImage } from "@/components/dashboard/ProgressPhotoImage"
 import { StatCard } from "@/components/dashboard/StatCard"
+import { SubscriberWeeklyHistory } from "@/components/subscriber/SubscriberWeeklyHistory"
 import { APP_ROUTES } from "@/config/constants"
 import {
   useNutritionLogsQuery,
@@ -62,6 +64,7 @@ import { WorkoutLogPage } from "./WorkoutLogPage"
 
 type HistoryTab =
   | "programs"
+  | "weekly"
   | "workoutLogs"
   | "nutritionLogs"
   | "progress"
@@ -70,6 +73,7 @@ type HistoryTab =
 
 const HISTORY_TABS: HistoryTab[] = [
   "programs",
+  "weekly",
   "workoutLogs",
   "nutritionLogs",
   "progress",
@@ -105,11 +109,16 @@ export function HistoryPage() {
   useDocumentTitle(isAr ? "السجل التاريخي الشامل" : "Comprehensive History & Archives")
 
   const { subscriberId: activeSubscriberId, subscriber } = usePanelSubscriber()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const tabParam = searchParams.get("tab")
-  const [activeTab, setActiveTab] = useState<HistoryTab>(
-    isHistoryTab(tabParam) ? tabParam : "programs",
-  )
+  // Read ?tab= once for deep links — do NOT use useSearchParams for switching
+  // (router updates were re-rendering the whole page and flashing cards).
+  const [activeTab, setActiveTab] = useState<HistoryTab>(() => {
+    try {
+      const initial = new URLSearchParams(window.location.search).get("tab")
+      return isHistoryTab(initial) ? initial : "programs"
+    } catch {
+      return "programs"
+    }
+  })
   const [programFilter, setProgramFilter] = useState<"all" | "workout" | "nutrition">(
     "all",
   )
@@ -121,22 +130,17 @@ export function HistoryPage() {
     programs: Array<WorkoutProgram | NutritionProgram>
   } | null>(null)
 
-  useEffect(() => {
-    if (isHistoryTab(tabParam) && tabParam !== activeTab) {
-      setActiveTab(tabParam)
-    }
-  }, [tabParam, activeTab])
-
   function selectTab(tab: HistoryTab) {
+    if (tab === activeTab) return
     setActiveTab(tab)
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev)
-        next.set("tab", tab)
-        return next
-      },
-      { replace: true },
-    )
+    // Bookmarkable URL without triggering React Router re-renders
+    try {
+      const url = new URL(window.location.href)
+      url.searchParams.set("tab", tab)
+      window.history.replaceState(window.history.state, "", url)
+    } catch {
+      // ignore
+    }
   }
 
   const {
@@ -322,9 +326,15 @@ export function HistoryPage() {
     [archivedPrograms, workoutLogs, nutritionLogs, measurements],
   )
 
-  const pageLoading =
+  // Only the first empty load — never tear down tab panels on background refetch
+  const pageBootstrapping =
     Boolean(activeSubscriberId) &&
-    (workoutsLoading || nutritionLoading || measurementsLoading || ptLoading)
+    ((workoutsLoading && subscriberWorkouts.length === 0) ||
+      (nutritionLoading && subscriberNutrition.length === 0)) &&
+    workoutLogs.length === 0 &&
+    nutritionLogs.length === 0 &&
+    measurements.length === 0
+  const pageLoading = pageBootstrapping
   const pageError = workoutsError || nutritionError || measurementsError || ptError
 
   function refetchAll() {
@@ -418,6 +428,12 @@ export function HistoryPage() {
                 count: unifiedPrograms.length,
               },
               {
+                id: "weekly" as const,
+                icon: CalendarDays,
+                label: isAr ? "الأسابيع" : "Weekly",
+                count: null as number | null,
+              },
+              {
                 id: "workoutLogs" as const,
                 icon: Dumbbell,
                 label: isAr ? "سجل الحصص" : "Workout Sessions",
@@ -454,7 +470,7 @@ export function HistoryPage() {
               type="button"
               onClick={() => selectTab(tab.id)}
               className={cn(
-                "inline-flex shrink-0 select-none items-center gap-2 rounded-full border px-4 py-2 text-[12.5px] font-bold transition",
+                "inline-flex shrink-0 select-none items-center gap-2 rounded-full border px-4 py-2 text-[12.5px] font-bold",
                 activeTab === tab.id
                   ? "border-transparent bg-[var(--gym-ink,#111111)] text-white shadow-xs"
                   : "border-black/10 bg-white text-[var(--gym-ink,#111111)] hover:bg-neutral-50",
@@ -462,16 +478,18 @@ export function HistoryPage() {
             >
               <tab.icon className="size-4" />
               <span>{tab.label}</span>
-              <span
-                className={cn(
-                  "rounded-full px-1.5 text-[10.5px] font-bold",
-                  activeTab === tab.id
-                    ? "bg-white/20 text-white"
-                    : "bg-black/5 text-[#8c8c8c]",
-                )}
-              >
-                {tab.count}
-              </span>
+              {tab.count != null ? (
+                <span
+                  className={cn(
+                    "rounded-full px-1.5 text-[10.5px] font-bold",
+                    activeTab === tab.id
+                      ? "bg-white/20 text-white"
+                      : "bg-black/5 text-[#8c8c8c]",
+                  )}
+                >
+                  {tab.count}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>
@@ -503,6 +521,17 @@ export function HistoryPage() {
             {isAr ? "إعادة المحاولة" : "Retry"}
           </button>
         </div>
+      ) : null}
+
+      {activeSubscriberId && !pageLoading && !pageError && activeTab === "weekly" ? (
+        <SubscriberWeeklyHistory
+          workoutLogs={workoutLogs}
+          nutritionLogs={nutritionLogs}
+          workoutPrograms={subscriberWorkouts}
+          nutritionPrograms={subscriberNutrition}
+          canWorkout={canWorkout}
+          canNutrition={canNutrition}
+        />
       ) : null}
 
       {activeSubscriberId && !pageLoading && !pageError && activeTab === "programs" ? (
@@ -679,12 +708,33 @@ export function HistoryPage() {
         </div>
       ) : null}
 
-      {activeSubscriberId && !pageLoading && !pageError && activeTab === "workoutLogs" ? (
-        <WorkoutLogPage subscriberId={activeSubscriberId} embedded />
-      ) : null}
-
-      {activeSubscriberId && !pageLoading && !pageError && activeTab === "nutritionLogs" ? (
-        <NutritionLogPage subscriberId={activeSubscriberId} embedded />
+      {/* Dual-mount only these two tabs so switching them never remounts or hits the router */}
+      {activeSubscriberId &&
+      !pageLoading &&
+      !pageError &&
+      (activeTab === "workoutLogs" || activeTab === "nutritionLogs") ? (
+        <div className="min-h-[50vh]">
+          <div
+            className={cn(activeTab !== "workoutLogs" && "hidden")}
+            aria-hidden={activeTab !== "workoutLogs"}
+          >
+            <WorkoutLogPage
+              subscriberId={activeSubscriberId}
+              embedded
+              logs={workoutLogs}
+            />
+          </div>
+          <div
+            className={cn(activeTab !== "nutritionLogs" && "hidden")}
+            aria-hidden={activeTab !== "nutritionLogs"}
+          >
+            <NutritionLogPage
+              subscriberId={activeSubscriberId}
+              embedded
+              logs={nutritionLogs}
+            />
+          </div>
+        </div>
       ) : null}
 
       {activeSubscriberId && !pageLoading && !pageError && activeTab === "progress" ? (

@@ -20,13 +20,10 @@ import {
 } from "lucide-react"
 import { APP_ROUTES } from "@/config/constants"
 import { useAuth } from "@/features/auth/auth-context"
-import { pickCurrentSubscription } from "@/features/subscriptions/entitlements"
-import {
-  usePackageByIdQuery,
-  useSubscriberSubscriptionsQuery,
-} from "@/features/subscriptions/hooks"
+import { useSubscriberEntitlementAccess } from "@/features/subscriptions/use-subscriber-entitlement-access"
 import { useLocale } from "@/hooks/useLocale"
 import { initials } from "@/lib/format"
+import type { PackageEntitlementKey } from "@/types/subscription"
 import { cn } from "@/lib/utils"
 
 type SubscriberMobileMenuDrawerProps = {
@@ -46,13 +43,7 @@ export function SubscriberMobileMenuDrawer({
   const location = useLocation()
   const navigate = useNavigate()
   const { user } = useAuth()
-
-  const { data: subscriptions = [] } = useSubscriberSubscriptionsQuery(user?.uid)
-  const sub = useMemo(
-    () => pickCurrentSubscription(subscriptions),
-    [subscriptions],
-  )
-  const { data: pkg } = usePackageByIdQuery(sub?.packageId)
+  const { canAccess, pkg } = useSubscriberEntitlementAccess()
 
   // Close only on genuine route change
   const lastPathRef = useRef(location.pathname)
@@ -78,73 +69,117 @@ export function SubscriberMobileMenuDrawer({
     }
   }, [open, onClose])
 
-  if (!open || typeof document === "undefined") return null
+  const menuSections = useMemo(() => {
+    type DrawerItem = {
+      label: string
+      desc: string
+      to: string
+      icon: typeof HeartPulse
+      entitlement?: PackageEntitlementKey | PackageEntitlementKey[]
+    }
 
-  const menuSections = [
-    {
-      title: isAr ? "الصحة والتقدم" : "Health & Progress",
-      items: [
-        {
-          label: isAr ? "العلاج الطبيعي والتأهيل" : "Physical Therapy & Rehab",
-          desc: isAr ? "تمارين الاستشفاء والتعافي من الإصابات" : "Injury rehab & recovery exercises",
-          to: APP_ROUTES.subscriber.physicalTherapy,
-          icon: HeartPulse,
-        },
-        {
-          label: isAr ? "تتبع التقدم والقياسات" : "Progress & Body Metrics",
-          desc: isAr ? "سجل الوزن، القياسات، وصور التحول" : "Weight, body measurements & photos",
-          to: APP_ROUTES.subscriber.progress,
-          icon: TrendingUp,
-        },
-      ],
-    },
-    {
-      title: isAr ? "سجلات اليوميات" : "Daily Logs",
-      items: [
-        {
-          label: isAr ? "سجل التمارين اليومية" : "Workout Daily Log",
-          desc: isAr ? "تسجيل أوزان وجولات التمرين" : "Log sets, reps & weights",
-          to: APP_ROUTES.subscriber.workoutLog,
-          icon: ClipboardList,
-        },
-        {
-          label: isAr ? "سجل ومفكرة الوجبات" : "Nutrition Daily Log",
-          desc: isAr ? "متابعة السعرات والماكروز اليومية" : "Track calories & daily macros",
-          to: APP_ROUTES.subscriber.nutritionLog,
-          icon: NotebookPen,
-        },
-      ],
-    },
-    {
-      title: isAr ? "الحساب والمحتوى" : "Account & Resources",
-      items: [
-        {
-          label: isAr ? "باقتي واشتراكي" : "My Subscription & Plan",
-          desc: isAr ? "تفاصيل الباقة، المزايا، وتاريخ التجديد" : "Plan details, benefits & renewal date",
-          to: APP_ROUTES.subscriber.subscription,
-          icon: CreditCard,
-        },
-        {
-          label: isAr ? "مكتبة المحتوى والملفات" : "PDFs & Video Library",
-          desc: isAr ? "أدلة التدريب وملفات التغذية" : "Training guides & nutrition PDFs",
-          to: APP_ROUTES.subscriber.library,
-          icon: BookOpen,
-        },
-        {
-          label: isAr ? "الأرشيف والبرامج السابقة" : "History & Past Programs",
-          desc: isAr ? "سجل الخطط والبرامج المكتملة" : "Past cycles & completed programs",
-          to: APP_ROUTES.subscriber.history,
-          icon: History,
-        },
-        {
-          label: isAr ? "الملف الشخصي والحساب" : "Profile & Account Settings",
-          desc: isAr ? "البيانات الشخصية، الهاتف، والأمان" : "Personal info, phone & security",
-          to: APP_ROUTES.subscriber.profile,
-          icon: User,
-        },
-      ],
-    },
-  ]
+    const sections: Array<{ title: string; items: DrawerItem[] }> = [
+      {
+        title: isAr ? "الصحة والتقدم" : "Health & Progress",
+        items: [
+          {
+            label: isAr ? "العلاج الطبيعي والتأهيل" : "Physical Therapy & Rehab",
+            desc: isAr
+              ? "تمارين الاستشفاء والتعافي من الإصابات"
+              : "Injury rehab & recovery exercises",
+            to: APP_ROUTES.subscriber.physicalTherapy,
+            icon: HeartPulse,
+          },
+          {
+            label: isAr ? "تتبع التقدم والقياسات" : "Progress & Body Metrics",
+            desc: isAr
+              ? "سجل الوزن، القياسات، وصور التحول"
+              : "Weight, body measurements & photos",
+            to: APP_ROUTES.subscriber.progress,
+            icon: TrendingUp,
+            entitlement: "progressTracking",
+          },
+        ],
+      },
+      {
+        title: isAr ? "سجلات اليوميات" : "Daily Logs",
+        items: [
+          {
+            label: isAr ? "سجل التمارين اليومية" : "Workout Daily Log",
+            desc: isAr
+              ? "تسجيل أوزان وجولات التمرين"
+              : "Log sets, reps & weights",
+            to: APP_ROUTES.subscriber.workoutLog,
+            icon: ClipboardList,
+            entitlement: "workoutProgram",
+          },
+          {
+            label: isAr ? "سجل ومفكرة الوجبات" : "Nutrition Daily Log",
+            desc: isAr
+              ? "متابعة السعرات والماكروز اليومية"
+              : "Track calories & daily macros",
+            to: APP_ROUTES.subscriber.nutritionLog,
+            icon: NotebookPen,
+            entitlement: "nutritionProgram",
+          },
+        ],
+      },
+      {
+        title: isAr ? "الحساب والمحتوى" : "Account & Resources",
+        items: [
+          {
+            label: isAr ? "باقتي واشتراكي" : "My Subscription & Plan",
+            desc: isAr
+              ? "تفاصيل الباقة، المزايا، وتاريخ التجديد"
+              : "Plan details, benefits & renewal date",
+            to: APP_ROUTES.subscriber.subscription,
+            icon: CreditCard,
+          },
+          {
+            label: isAr ? "مكتبة المحتوى والملفات" : "PDFs & Video Library",
+            desc: isAr
+              ? "أدلة التدريب وملفات التغذية"
+              : "Training guides & nutrition PDFs",
+            to: APP_ROUTES.subscriber.library,
+            icon: BookOpen,
+            entitlement: [
+              "pdfDocuments",
+              "exerciseVideos",
+              "workoutProgram",
+              "nutritionProgram",
+            ],
+          },
+          {
+            label: isAr ? "الأرشيف والبرامج السابقة" : "History & Past Programs",
+            desc: isAr
+              ? "سجل الخطط والبرامج المكتملة"
+              : "Past cycles & completed programs",
+            to: APP_ROUTES.subscriber.history,
+            icon: History,
+          },
+          {
+            label: isAr ? "الملف الشخصي والحساب" : "Profile & Account Settings",
+            desc: isAr
+              ? "البيانات الشخصية، الهاتف، والأمان"
+              : "Personal info, phone & security",
+            to: APP_ROUTES.subscriber.profile,
+            icon: User,
+          },
+        ],
+      },
+    ]
+
+    return sections
+      .map((section) => ({
+        ...section,
+        items: section.items.filter(
+          (item) => !item.entitlement || canAccess(item.entitlement),
+        ),
+      }))
+      .filter((section) => section.items.length > 0)
+  }, [canAccess, isAr])
+
+  if (!open || typeof document === "undefined") return null
 
   const Chevron = isRtl ? ChevronLeft : ChevronRight
 

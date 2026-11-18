@@ -8,6 +8,7 @@ import {
   Package,
   PackagePlus,
   Search,
+  Trash2,
   UserPlus,
   Users,
 } from "lucide-react"
@@ -32,13 +33,17 @@ import {
 } from "@/features/subscriptions/entitlements"
 import {
   useAssignSubscriptionMutation,
+  useDeletePackageMutation,
   usePackagesQuery,
   useSavePackageMutation,
   useSubscriptionsQuery,
   useTogglePackageActiveMutation,
   useUpdateSubscriptionLifecycleMutation,
 } from "@/features/subscriptions/hooks"
-import type { SavePackageInput } from "@/features/subscriptions/service"
+import {
+  PackageDeleteBlockedError,
+  type SavePackageInput,
+} from "@/features/subscriptions/service"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle"
 import { useLocale } from "@/hooks/useLocale"
 import { appToast } from "@/lib/toast"
@@ -81,6 +86,7 @@ export function PackagesPage() {
     useSubscriptionsQuery()
   const savePackageMutation = useSavePackageMutation()
   const toggleActiveMutation = useTogglePackageActiveMutation()
+  const deletePackageMutation = useDeletePackageMutation()
   const assignMutation = useAssignSubscriptionMutation()
   const lifecycleMutation = useUpdateSubscriptionLifecycleMutation()
 
@@ -102,6 +108,7 @@ export function PackagesPage() {
   const actionsBusy =
     savePackageMutation.isPending ||
     toggleActiveMutation.isPending ||
+    deletePackageMutation.isPending ||
     assignMutation.isPending ||
     lifecycleMutation.isPending
 
@@ -109,6 +116,20 @@ export function PackagesPage() {
     const counts: Record<string, number> = {}
     for (const sub of allSubscriptions) {
       if (sub.status === "active") {
+        counts[sub.packageId] = (counts[sub.packageId] ?? 0) + 1
+      }
+    }
+    return counts
+  }, [allSubscriptions])
+
+  const liveCountsByPackage = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const sub of allSubscriptions) {
+      if (
+        sub.status === "active" ||
+        sub.status === "pending" ||
+        sub.status === "suspended"
+      ) {
         counts[sub.packageId] = (counts[sub.packageId] ?? 0) + 1
       }
     }
@@ -202,6 +223,81 @@ export function PackagesPage() {
               ? `Restored "${pkg.name.en}"`
               : `Archived "${pkg.name.en}"`,
         )
+      },
+    })
+  }
+
+  function handleDeletePackage(pkg: DemoPackage) {
+    if (actionsBusy) return
+    const name = pkg.name[locale]
+    const liveCount = liveCountsByPackage[pkg.id] ?? 0
+
+    if (liveCount > 0) {
+      setConfirmDialog({
+        open: true,
+        title:
+          locale === "ar" ? "لا يمكن حذف الباقة" : "Cannot delete package",
+        description:
+          locale === "ar"
+            ? `باقة "${name}" مرتبطة بـ ${liveCount} اشتراك نشط/معلق. أعد تعيين المشتركين أو أرشِف الباقة بدل الحذف النهائي.`
+            : `"${name}" still has ${liveCount} live subscription(s). Reassign subscribers or archive the package instead of deleting it.`,
+        confirmLabel:
+          pkg.isActive
+            ? locale === "ar"
+              ? "أرشفة الباقة"
+              : "Archive package"
+            : locale === "ar"
+              ? "حسناً"
+              : "OK",
+        tone: "warning",
+        onConfirm: async () => {
+          if (!pkg.isActive) return
+          await toggleActiveMutation.mutateAsync({
+            packageId: pkg.id,
+            isActive: false,
+          })
+          appToast.success(
+            locale === "ar"
+              ? `تمت أرشفة باقة "${pkg.name.ar}"`
+              : `Archived "${pkg.name.en}"`,
+          )
+        },
+      })
+      return
+    }
+
+    setConfirmDialog({
+      open: true,
+      title: locale === "ar" ? "حذف الباقة نهائياً" : "Delete package permanently",
+      description:
+        locale === "ar"
+          ? `حذف باقة "${name}" نهائياً من الكتالوج والموقع؟ لا يمكن التراجع. سجل الاشتراكات السابقة يحتفظ بلقطة الاسم والصلاحيات.`
+          : `Permanently delete "${name}" from the catalog and public site? This cannot be undone. Past subscriptions keep their name and entitlements snapshot.`,
+      confirmLabel: locale === "ar" ? "حذف نهائي" : "Delete forever",
+      tone: "danger",
+      onConfirm: async () => {
+        try {
+          await deletePackageMutation.mutateAsync(pkg.id)
+          if (editingPackage?.id === pkg.id) {
+            setFormOpen(false)
+            setEditingPackage(null)
+          }
+          appToast.success(
+            locale === "ar"
+              ? `تم حذف باقة "${pkg.name.ar}" نهائياً`
+              : `Permanently deleted "${pkg.name.en}"`,
+          )
+        } catch (error) {
+          if (error instanceof PackageDeleteBlockedError) {
+            appToast.error(
+              locale === "ar"
+                ? `لا يمكن الحذف: يوجد ${error.liveCount} اشتراك مرتبط بالباقة.`
+                : `Cannot delete: ${error.liveCount} live subscription(s) still use this package.`,
+            )
+            return
+          }
+          throw error
+        }
       },
     })
   }
@@ -328,6 +424,7 @@ export function PackagesPage() {
                     : undefined
                 }
                 onToggleArchive={() => handleToggleArchive(pkg)}
+                onDelete={() => handleDeletePackage(pkg)}
               />
             ))}
           </div>
@@ -402,6 +499,7 @@ function PackageCard({
   onEdit,
   onAssign,
   onToggleArchive,
+  onDelete,
 }: {
   pkg: DemoPackage
   subscribers: number
@@ -411,6 +509,7 @@ function PackageCard({
   onEdit: () => void
   onAssign?: () => void
   onToggleArchive: () => void
+  onDelete: () => void
 }) {
   const { t } = useTranslation()
   const isDark = pkg.tone === "dark"
@@ -605,6 +704,21 @@ function PackageCard({
           )}
         >
           {pkg.isActive ? t("admin.packages.archive") : t("admin.packages.restore")}
+        </button>
+        <button
+          type="button"
+          disabled={actionsBusy}
+          onClick={onDelete}
+          className={cn(
+            "inline-flex h-10 items-center justify-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold transition-colors disabled:opacity-60",
+            isDark
+              ? "bg-red-500/20 text-red-200 hover:bg-red-500/30"
+              : "bg-red-50 text-red-700 hover:bg-red-100",
+          )}
+          title={locale === "ar" ? "حذف نهائي" : "Delete forever"}
+        >
+          <Trash2 className="size-3.5" strokeWidth={2} />
+          {locale === "ar" ? "حذف" : "Delete"}
         </button>
       </div>
     </article>

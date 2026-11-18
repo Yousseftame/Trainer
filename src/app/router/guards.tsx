@@ -6,7 +6,10 @@ import {
   usePackageByIdQuery,
   useSubscriberSubscriptionsQuery,
 } from "@/features/subscriptions/hooks"
-import { canAccessPackageEntitlement } from "@/features/subscriptions/entitlements"
+import {
+  canAccessPackageEntitlement,
+  pickCurrentSubscription,
+} from "@/features/subscriptions/entitlements"
 import { FullPageSpinner } from "@/components/feedback/FullPageSpinner"
 import { APP_ROUTES } from "@/config/constants"
 import {
@@ -14,21 +17,7 @@ import {
   resolveAdminLandingPath,
 } from "@/lib/permissions/can"
 import type { Permission } from "@/lib/permissions/permissions"
-import type {
-  PackageEntitlementKey,
-  SubscriberSubscription,
-} from "@/types/subscription"
-
-function pickCurrentSubscription(
-  list: SubscriberSubscription[] | undefined,
-): SubscriberSubscription | null {
-  if (!list?.length) return null
-  return (
-    list.find((item) => item.status === "active" || item.status === "suspended") ??
-    list[0] ??
-    null
-  )
-}
+import type { PackageEntitlementKey } from "@/types/subscription"
 
 export function RequireAuth() {
   const { status, user } = useAuth()

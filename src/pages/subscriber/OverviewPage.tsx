@@ -33,44 +33,47 @@ export function OverviewPage() {
   const Chevron = isRtl ? ChevronLeft : ChevronRight
 
   const quickActions = useMemo(
-    () => [
-      {
-        id: "workout",
-        title: isAr ? "برنامج التمارين" : "Workout Plan",
-        to: canWorkout
-          ? APP_ROUTES.subscriber.workout
-          : APP_ROUTES.subscriber.subscription,
-        icon: Dumbbell,
-      },
-      {
-        id: "nutrition",
-        title: isAr ? "الخطة الغذائية" : "Nutrition Plan",
-        to: canNutrition
-          ? APP_ROUTES.subscriber.nutrition
-          : APP_ROUTES.subscriber.subscription,
-        icon: UtensilsCrossed,
-      },
-      {
-        id: "community",
-        title: isAr ? "مجتمع المشتركين" : "Community Hub",
-        to: APP_ROUTES.subscriber.community,
-        icon: Users,
-      },
-      {
-        id: "progress",
-        title: isAr ? "سجل القياسات" : "Body Metrics",
-        to: canProgress
-          ? APP_ROUTES.subscriber.progress
-          : APP_ROUTES.subscriber.subscription,
-        icon: TrendingUp,
-      },
-      {
-        id: "physicalTherapy",
-        title: isAr ? "العلاج الطبيعي" : "Physical Therapy",
-        to: APP_ROUTES.subscriber.physicalTherapy,
-        icon: HeartPulse,
-      },
-    ],
+    () =>
+      [
+        canWorkout
+          ? {
+              id: "workout",
+              title: isAr ? "برنامج التمارين" : "Workout Plan",
+              to: APP_ROUTES.subscriber.workout,
+              icon: Dumbbell,
+            }
+          : null,
+        canNutrition
+          ? {
+              id: "nutrition",
+              title: isAr ? "الخطة الغذائية" : "Nutrition Plan",
+              to: APP_ROUTES.subscriber.nutrition,
+              icon: UtensilsCrossed,
+            }
+          : null,
+        {
+          id: "community",
+          title: isAr ? "مجتمع المشتركين" : "Community Hub",
+          to: APP_ROUTES.subscriber.community,
+          icon: Users,
+        },
+        canProgress
+          ? {
+              id: "progress",
+              title: isAr ? "سجل القياسات" : "Body Metrics",
+              to: APP_ROUTES.subscriber.progress,
+              icon: TrendingUp,
+            }
+          : null,
+        {
+          id: "physicalTherapy",
+          title: isAr ? "العلاج الطبيعي" : "Physical Therapy",
+          to: APP_ROUTES.subscriber.physicalTherapy,
+          icon: HeartPulse,
+        },
+      ].filter(
+        (item): item is NonNullable<typeof item> => item != null,
+      ),
     [isAr, canWorkout, canNutrition, canProgress],
   )
 

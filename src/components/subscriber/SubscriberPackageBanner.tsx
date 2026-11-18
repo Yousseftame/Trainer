@@ -8,12 +8,15 @@ import { useAuth } from "@/features/auth/auth-context"
 import {
   pickCurrentSubscription,
   resolveEffectiveSubscriptionStatus,
+  subscriptionDaysRemaining,
+  subscriptionProgressPercent,
 } from "@/features/subscriptions/entitlements"
 import {
   usePackageByIdQuery,
   useSubscriberSubscriptionsQuery,
 } from "@/features/subscriptions/hooks"
 import { useLocale } from "@/hooks/useLocale"
+import { useNowTick } from "@/hooks/useNowTick"
 import { cn } from "@/lib/utils"
 
 export function SubscriberPackageBanner() {
@@ -21,16 +24,17 @@ export function SubscriberPackageBanner() {
   const isAr = locale === "ar"
   const { user } = useAuth()
   const subscriberId = user?.uid
+  const now = useNowTick()
 
   const { data: subscriptions = [] } = useSubscriberSubscriptionsQuery(
     subscriberId,
   )
   const sub = useMemo(
-    () => pickCurrentSubscription(subscriptions),
-    [subscriptions],
+    () => pickCurrentSubscription(subscriptions, now),
+    [subscriptions, now],
   )
   const { data: pkg } = usePackageByIdQuery(sub?.packageId)
-  const effectiveStatus = resolveEffectiveSubscriptionStatus(sub)
+  const effectiveStatus = resolveEffectiveSubscriptionStatus(sub, now)
 
   const { packageName, formattedStart, daysRemainingLabel, progressPercent, statusTone } =
     useMemo(() => {
@@ -50,25 +54,13 @@ export function SubscriberPackageBanner() {
       }
 
       const startDate = new Date(sub.startsAt)
-      const endDate = new Date(sub.endsAt)
-      const now = new Date()
-
       const day = String(startDate.getDate()).padStart(2, "0")
       const month = String(startDate.getMonth() + 1).padStart(2, "0")
       const year = startDate.getFullYear()
       const formatted = `${day}-${month}-${year}`
 
-      const startMs = startDate.getTime()
-      const endMs = endDate.getTime()
-      const nowMs = now.getTime()
-      const totalDuration = Math.max(1, endMs - startMs)
-      const elapsed = Math.min(Math.max(0, nowMs - startMs), totalDuration)
-      const pct = Math.min(
-        100,
-        Math.max(4, Math.round((elapsed / totalDuration) * 100)),
-      )
-
-      const remainingDays = Math.ceil((endMs - nowMs) / (1000 * 60 * 60 * 24))
+      const pct = subscriptionProgressPercent(sub.startsAt, sub.endsAt, now)
+      const remainingDays = subscriptionDaysRemaining(sub.endsAt, now) ?? 0
       let remainingLabel: string
       let tone: "active" | "warning" | "muted" = "active"
 
@@ -85,6 +77,9 @@ export function SubscriberPackageBanner() {
             ? "غير نشط"
             : "Inactive"
         tone = "muted"
+      } else if (remainingDays === 0) {
+        remainingLabel = isAr ? "ينتهي اليوم" : "Ends today"
+        tone = "warning"
       } else {
         if (isAr) {
           if (remainingDays === 1) remainingLabel = "يوم واحد متبقي"
@@ -105,7 +100,7 @@ export function SubscriberPackageBanner() {
         progressPercent: pct,
         statusTone: tone,
       }
-    }, [sub, pkg, locale, isAr, effectiveStatus])
+    }, [sub, pkg, locale, isAr, effectiveStatus, now])
 
   return (
     <Link

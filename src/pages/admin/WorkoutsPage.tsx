@@ -61,8 +61,8 @@ import { cn } from "@/lib/utils"
 import type { ContentAsset } from "@/types/content"
 import type { WorkoutProgram } from "@/types/program"
 
-const WEEKDAY_NAMES_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-const WEEKDAY_NAMES_AR = ["الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"]
+const WEEKDAY_NAMES_EN = ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]
+const WEEKDAY_NAMES_AR = ["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"]
 
 type Scope = "template" | "active" | "archived"
 type FormatFilter = "all" | "interactive" | "pdf"
@@ -318,12 +318,13 @@ export function WorkoutsPage() {
 
   const selectedWeekSessionCount = useMemo(() => {
     const now = new Date()
-    const day = now.getUTCDay() || 7
-    const monday = new Date(
+    const day = now.getUTCDay() // Sun=0 … Sat=6
+    const daysSinceSaturday = (day + 1) % 7
+    const saturday = new Date(
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
     )
-    monday.setUTCDate(monday.getUTCDate() - (day - 1))
-    const weekStart = monday.toISOString().slice(0, 10)
+    saturday.setUTCDate(saturday.getUTCDate() - daysSinceSaturday)
+    const weekStart = saturday.toISOString().slice(0, 10)
     return programLogs.filter(
       (l) => (l.date || l.completedAt).slice(0, 10) >= weekStart,
     ).length

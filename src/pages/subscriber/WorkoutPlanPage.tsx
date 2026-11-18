@@ -29,9 +29,13 @@ import {
   useWorkoutLogsQuery,
   useWorkoutProgramsQuery,
 } from "@/features/workouts/hooks"
+import { startOfUtcWeek } from "@/features/progress/adherence"
 import {
   formatRest,
+  planDayHeading,
+  planWeekdayShortName,
   resolveBilingualText,
+  sortPlanDaysByWeekday,
   trainingDayCount,
 } from "@/lib/program-text"
 import { useSubscriberPTQuery } from "@/features/physicalTherapy/hooks"
@@ -48,9 +52,6 @@ import type {
   WorkoutDay,
   WorkoutExercise,
 } from "@/types/program"
-
-const WEEKDAY_NAMES_EN = ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"]
-const WEEKDAY_NAMES_AR = ["يوم 1", "يوم 2", "يوم 3", "يوم 4", "يوم 5", "يوم 6", "يوم 7"]
 
 export function WorkoutPlanPage() {
   const { t } = useTranslation()
@@ -145,7 +146,7 @@ export function WorkoutPlanPage() {
 
   useEffect(() => {
     if (!activeProgram?.days?.length || didAutoSelectToday) return
-    const todayWeekday = (new Date().getDay() + 6) % 7
+    const todayWeekday = (new Date().getDay() + 1) % 7 // Egypt: Sat=0
     const idx = activeProgram.days.findIndex((d) => d.weekday === todayWeekday)
     if (idx >= 0) setSelectedDayIdx(idx)
     setDidAutoSelectToday(true)
@@ -171,7 +172,10 @@ export function WorkoutPlanPage() {
     notes?: string
   } | null>(null)
 
-  const programDays = activeProgram?.days ?? []
+  const programDays = useMemo(
+    () => sortPlanDaysByWeekday(activeProgram?.days ?? []),
+    [activeProgram?.days],
+  )
   const rawSelectedDay = programDays[selectedDayIdx] ?? programDays[0]
 
   // Construct active day with any local substituted exercises
@@ -186,15 +190,21 @@ export function WorkoutPlanPage() {
   }, [rawSelectedDay, exerciseOverrides])
 
   const todayIso = new Date().toISOString().slice(0, 10)
+  const currentWeekStart = startOfUtcWeek(new Date().toISOString())
+  // Mark "Done" only for sessions logged in the current calendar week
   const completedDayIds = useMemo(() => {
     if (!activeProgram) return new Set<string>()
     return new Set(
       logs
-        .filter((l) => l.programId === activeProgram.id)
+        .filter(
+          (l) =>
+            l.programId === activeProgram.id &&
+            startOfUtcWeek(l.date || l.completedAt) === currentWeekStart,
+        )
         .map((l) => l.dayId)
         .filter(Boolean),
     )
-  }, [logs, activeProgram])
+  }, [logs, activeProgram, currentWeekStart])
 
   const isSelectedDayLogged = Boolean(
     activeProgram &&
@@ -692,13 +702,29 @@ export function WorkoutPlanPage() {
             </div>
           ) : null}
 
-          {/* 1. Days Carousel / Tabs Strip (Matching Images 1 & 2) */}
+          {/* 1. Days Carousel / Tabs Strip */}
+          <div className="flex items-center justify-between gap-2">
+            <p className="px-0.5 text-[11px] font-bold uppercase tracking-wide text-[#8c8c8c]">
+              {isAr ? "جدول الأسبوع (يتكرر كل أسبوع)" : "Weekly schedule (repeats every week)"}
+            </p>
+            <Link
+              to={`${APP_ROUTES.subscriber.history}?tab=weekly`}
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--gym-orange,#fb5001)] hover:underline"
+            >
+              <History className="size-3.5" />
+              {isAr ? "سجل الأسابيع" : "Weekly history"}
+            </Link>
+          </div>
           <div className="flex items-center gap-2.5 overflow-x-auto pb-1 pt-0.5 no-scrollbar">
             {programDays.map((d, idx) => {
               const active = idx === selectedDayIdx
               const isTrained = !d.isRest && d.exercises.length > 0
               const dayCompleted = Boolean(d.id && completedDayIds.has(d.id))
-              const dayTitle = isAr ? WEEKDAY_NAMES_AR[idx] : WEEKDAY_NAMES_EN[idx]
+              const weekdayName = planWeekdayShortName(d.weekday, idx, locale)
+              const dayNumber =
+                typeof d.weekday === "number" && d.weekday >= 0 && d.weekday <= 6
+                  ? d.weekday + 1
+                  : idx + 1
 
               return (
                 <button
@@ -706,7 +732,7 @@ export function WorkoutPlanPage() {
                   type="button"
                   onClick={() => setSelectedDayIdx(idx)}
                   className={cn(
-                    "relative flex min-w-[76px] sm:min-w-[90px] h-[82px] sm:h-[90px] shrink-0 flex-col items-center justify-center rounded-2xl p-2 text-center transition shadow-2xs border select-none",
+                    "relative flex min-w-[76px] sm:min-w-[90px] h-[86px] sm:h-[94px] shrink-0 flex-col items-center justify-center rounded-2xl p-2 text-center transition shadow-2xs border select-none",
                     active
                       ? "bg-[var(--gym-orange,#fb5001)] border-[var(--gym-orange,#fb5001)] text-white shadow-md scale-[1.02]"
                       : dayCompleted
@@ -722,13 +748,11 @@ export function WorkoutPlanPage() {
                       )}
                     />
                   ) : null}
-                  <span className="text-[11px] font-bold uppercase tracking-wider opacity-80">
-                    {dayTitle}
+                  <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">
+                    {weekdayName}
                   </span>
-                  <span
-                    className="font-heading text-[20px] sm:text-[22px] font-black leading-tight text-white"
-                  >
-                    {idx + 1}
+                  <span className="font-heading text-[13px] font-extrabold leading-tight text-white/95">
+                    {isAr ? `يوم ${dayNumber}` : `Day ${dayNumber}`}
                   </span>
                   <span
                     className={cn(
@@ -758,9 +782,7 @@ export function WorkoutPlanPage() {
               <div>
                 <h2 className="font-heading text-[19px] sm:text-[21px] font-black text-[var(--gym-ink,#111111)]">
                   {resolveBilingualText(selectedDay?.label, locale) ||
-                    (isAr
-                      ? `يوم ${selectedDayIdx + 1} (${selectedDay?.exercises.length ?? 0} تمارين)`
-                      : `Day ${selectedDayIdx + 1} (${selectedDay?.exercises.length ?? 0} exercises)`)}
+                    `${planDayHeading(selectedDay?.weekday, selectedDayIdx, locale)} (${selectedDay?.exercises.length ?? 0} ${isAr ? "تمارين" : "exercises"})`}
                 </h2>
                 {selectedDay?.focus ? (
                   <p className="mt-0.5 text-[12.5px] font-medium text-[#8c8c8c]">

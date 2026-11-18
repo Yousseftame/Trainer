@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react"
+import { validateContentAssociationRules } from "@/features/content/access"
 import {
   buildCanonicalStoragePath,
   CONTENT_UPLOAD_LIMITS,
@@ -162,21 +163,30 @@ export function ContentAssetFormDialog({
   const [uploadPercent, setUploadPercent] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const allPrograms = useMemo(
-    () => [
+  const allPrograms = useMemo(() => {
+    const mapped = [
       ...workoutPrograms.map((p) => ({
         id: p.id,
         title: p.title,
         domain: "workout" as const,
+        status: p.status,
+        subscriberId: p.subscriberId,
       })),
       ...nutritionPrograms.map((p) => ({
         id: p.id,
         title: p.title,
         domain: "nutrition" as const,
+        status: p.status,
+        subscriberId: p.subscriberId,
       })),
-    ],
-    [workoutPrograms, nutritionPrograms],
-  )
+    ]
+    // Prefer templates for linking; keep already-selected assigned copies visible.
+    return mapped.filter(
+      (p) =>
+        (p.status === "template" && !p.subscriberId) ||
+        programIds.includes(p.id),
+    )
+  }, [workoutPrograms, nutritionPrograms, programIds])
 
   useEffect(() => {
     if (!open) return
@@ -349,6 +359,35 @@ export function ContentAssetFormDialog({
     setter(list.includes(id) ? list.filter((x) => x !== id) : [...list, id])
   }
 
+  function ensureAssignedVisibility(
+    nextProgramIds: string[],
+    nextSubscriberIds: string[],
+  ) {
+    if (
+      visibility === "package" &&
+      packageIds.length === 0 &&
+      (nextProgramIds.length > 0 || nextSubscriberIds.length > 0)
+    ) {
+      setVisibility("assigned")
+    }
+  }
+
+  function toggleProgram(programId: string) {
+    const next = programIds.includes(programId)
+      ? programIds.filter((id) => id !== programId)
+      : [...programIds, programId]
+    setProgramIds(next)
+    ensureAssignedVisibility(next, subscriberIds)
+  }
+
+  function toggleSubscriber(subscriberId: string) {
+    const next = subscriberIds.includes(subscriberId)
+      ? subscriberIds.filter((id) => id !== subscriberId)
+      : [...subscriberIds, subscriberId]
+    setSubscriberIds(next)
+    ensureAssignedVisibility(programIds, next)
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     const cleanAr = titleAr.trim() || titleEn.trim()
@@ -391,25 +430,12 @@ export function ContentAssetFormDialog({
       }
     }
 
-    if (visibility === "package" && packageIds.length === 0) {
-      setError(
-        isAr
-          ? "حدّد باقة واحدةً على الأقل للمحتوى المرتبط بالباقات."
-          : "Select at least one package for package-gated content.",
-      )
-      return
-    }
-
-    if (
-      visibility === "assigned" &&
-      subscriberIds.length === 0 &&
-      programIds.length === 0
-    ) {
-      setError(
-        isAr
-          ? "المحتوى المخصص يحتاج مشتركاً أو برنامجاً مرتبطاً."
-          : "Assigned content needs at least one subscriber or program link.",
-      )
+    const associationError = validateContentAssociationRules(
+      { visibility, packageIds, subscriberIds, programIds },
+      locale,
+    )
+    if (associationError) {
+      setError(associationError)
       return
     }
 
@@ -963,9 +989,7 @@ export function ContentAssetFormDialog({
                       <button
                         key={prog.id}
                         type="button"
-                        onClick={() =>
-                          toggleItem(programIds, prog.id, setProgramIds)
-                        }
+                        onClick={() => toggleProgram(prog.id)}
                         className={cn(
                           "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
                           checked
@@ -997,9 +1021,7 @@ export function ContentAssetFormDialog({
                     <button
                       key={sub.id}
                       type="button"
-                      onClick={() =>
-                        toggleItem(subscriberIds, sub.id, setSubscriberIds)
-                      }
+                      onClick={() => toggleSubscriber(sub.id)}
                       className={cn(
                         "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
                         checked

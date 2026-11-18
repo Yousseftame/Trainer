@@ -5,7 +5,7 @@ import {
 } from "@/features/subscriptions/entitlements"
 import type { CatalogPackage } from "@/features/subscriptions/types"
 import type { Subscriber } from "@/features/subscribers/types"
-import type { ContentAsset } from "@/types/content"
+import type { ContentAsset, ContentVisibility } from "@/types/content"
 import type { NutritionProgram, WorkoutProgram } from "@/types/program"
 import type { SubscriberSubscription } from "@/types/subscription"
 
@@ -76,7 +76,9 @@ export function getContentLinks(
     }
 
     const matchesVideo = matchedExercises.length > 0
-    const matchesExplicit = explicitProgramIds.has(program.id)
+    const matchesExplicit =
+      explicitProgramIds.has(program.id) ||
+      Boolean(program.templateId && explicitProgramIds.has(program.templateId))
     if ((matchesVideo || matchesExplicit) && !seenPrograms.has(program.id)) {
       seenPrograms.add(program.id)
       programs.push({
@@ -91,7 +93,9 @@ export function getContentLinks(
   }
 
   for (const program of nutritionPrograms) {
-    const matchesExplicit = explicitProgramIds.has(program.id)
+    const matchesExplicit =
+      explicitProgramIds.has(program.id) ||
+      Boolean(program.templateId && explicitProgramIds.has(program.templateId))
     const matchesPdf = Boolean(
       asset.id && program.pdfContentId === asset.id,
     )
@@ -124,12 +128,19 @@ export function getContentLinks(
 /**
  * Docs: access by package entitlement + assignment/visibility.
  * Pass live subscriber + subscription + package (no demo lookups).
+ * Optional program link inputs mirror the Cloud Function gate.
  */
 export function evaluateSubscriberContentAccess(input: {
   asset: ContentAsset
   subscriber: Subscriber | null | undefined
   subscription: SubscriberSubscription | null | undefined
   pkg: CatalogPackage | null | undefined
+  /** Assigned program document ids for this subscriber */
+  assignedProgramIds?: Iterable<string>
+  /** templateId values from those assigned copies */
+  assignedTemplateIds?: Iterable<string>
+  /** Asset ids embedded on the subscriber's programs (video/pdf links) */
+  linkedAssetIds?: Iterable<string>
 }): ContentAccessCheckResult {
   const { asset, subscriber, subscription, pkg } = input
 
@@ -201,6 +212,14 @@ export function evaluateSubscriberContentAccess(input: {
 
   const directlyAssigned = (asset.subscriberIds ?? []).includes(subscriber.id)
   const inPackage = (asset.packageIds ?? []).includes(subscription.packageId)
+  const assignedProgramIds = toIdSet(input.assignedProgramIds)
+  const assignedTemplateIds = toIdSet(input.assignedTemplateIds)
+  const linkedAssetIds = toIdSet(input.linkedAssetIds)
+  const linkedFromProgram =
+    linkedAssetIds.has(asset.id) ||
+    (asset.programIds ?? []).some(
+      (id) => assignedProgramIds.has(id) || assignedTemplateIds.has(id),
+    )
 
   if (directlyAssigned) {
     return {
@@ -208,6 +227,16 @@ export function evaluateSubscriberContentAccess(input: {
       reason: {
         en: "Assigned directly to subscriber",
         ar: "معيّن مباشرة للمشترك",
+      },
+    }
+  }
+
+  if (linkedFromProgram) {
+    return {
+      allowed: true,
+      reason: {
+        en: "Unlocked via linked workout / nutrition program",
+        ar: "متاح عبر برنامج تمارين / تغذية مرتبط",
       },
     }
   }
@@ -249,4 +278,48 @@ export function evaluateSubscriberContentAccess(input: {
       ar: "غير مخصص لباقة/برنامج هذا المشترك",
     },
   }
+}
+
+function toIdSet(value?: Iterable<string>): Set<string> {
+  if (!value) return new Set()
+  return new Set([...value].map(String).filter(Boolean))
+}
+
+/**
+ * Shared create/update validation for content access fields.
+ * Mirrors server unlock order: direct assign / program link / package / library.
+ */
+export function validateContentAssociationRules(
+  input: {
+    visibility: ContentVisibility
+    packageIds: string[]
+    subscriberIds: string[]
+    programIds: string[]
+  },
+  locale: "en" | "ar",
+): string | null {
+  const isAr = locale === "ar"
+  const packages = input.packageIds.length
+  const subscribers = input.subscriberIds.length
+  const programs = input.programIds.length
+
+  if (input.visibility === "library") return null
+
+  if (input.visibility === "assigned") {
+    if (subscribers === 0 && programs === 0) {
+      return isAr
+        ? "المحتوى المخصص يحتاج مشتركاً أو برنامجاً مرتبطاً."
+        : "Assigned content needs at least one subscriber or program link."
+    }
+    return null
+  }
+
+  // package-gated: need a package and/or an explicit unlock path
+  if (packages === 0 && subscribers === 0 && programs === 0) {
+    return isAr
+      ? "حدّد باقة أو برنامجاً أو مشتركاً واحداً على الأقل لصلاحية الوصول."
+      : "Select at least one package, program, or subscriber for access."
+  }
+
+  return null
 }
