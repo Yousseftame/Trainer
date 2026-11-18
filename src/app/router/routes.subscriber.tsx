@@ -98,7 +98,17 @@ export const subscriberRoutes: RouteObject[] = [
                     element: <RequirePackageEntitlement entitlement="progressTracking" />,
                     children: [{ path: "progress", element: <ProgressPage /> }],
                   },
-                  { path: "physical-therapy", element: <PhysicalTherapyPage /> },
+                  {
+                    element: (
+                      <RequirePackageEntitlement entitlement="physicalTherapy" />
+                    ),
+                    children: [
+                      {
+                        path: "physical-therapy",
+                        element: <PhysicalTherapyPage />,
+                      },
+                    ],
+                  },
                 ],
               },
             ],

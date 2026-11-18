@@ -67,6 +67,7 @@ const ENTITLEMENT_BADGE_LABELS: Record<
   exerciseVideos: { ar: "فيديوهات", en: "Videos" },
   pdfDocuments: { ar: "PDF", en: "PDFs" },
   progressTracking: { ar: "تتبع التقدم", en: "Progress" },
+  physicalTherapy: { ar: "علاج طبيعي", en: "PT / Rehab" },
 }
 
 export function PackagesPage() {

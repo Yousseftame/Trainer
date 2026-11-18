@@ -100,6 +100,7 @@ const ENTITLEMENT_LABELS: Record<
   exerciseVideos: { ar: "الفيديوهات", en: "Videos" },
   pdfDocuments: { ar: "ملفات PDF", en: "PDFs" },
   progressTracking: { ar: "التقدم", en: "Progress" },
+  physicalTherapy: { ar: "العلاج الطبيعي", en: "PT / Rehab" },
 }
 
 export function SubscriberDetailPage() {

@@ -222,13 +222,15 @@ export const listSubscriberContentLibrary = onCall(async (request) => {
     }
   }
 
-  for (const docSnap of physicalTherapySnap.docs) {
-    const raw = docSnap.data() as Record<string, unknown>;
-    const rehab = Array.isArray(raw.rehabExercises) ? raw.rehabExercises : [];
-    for (const exercise of rehab) {
-      if (!exercise || typeof exercise !== "object") continue;
-      const videoId = (exercise as {videoContentId?: unknown}).videoContentId;
-      if (typeof videoId === "string" && videoId) linkedAssetIds.add(videoId);
+  if (entitlements.physicalTherapy) {
+    for (const docSnap of physicalTherapySnap.docs) {
+      const raw = docSnap.data() as Record<string, unknown>;
+      const rehab = Array.isArray(raw.rehabExercises) ? raw.rehabExercises : [];
+      for (const exercise of rehab) {
+        if (!exercise || typeof exercise !== "object") continue;
+        const videoId = (exercise as {videoContentId?: unknown}).videoContentId;
+        if (typeof videoId === "string" && videoId) linkedAssetIds.add(videoId);
+      }
     }
   }
 

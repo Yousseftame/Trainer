@@ -13,6 +13,7 @@ export type PackageEntitlementKey =
   | "exerciseVideos"
   | "pdfDocuments"
   | "progressTracking"
+  | "physicalTherapy"
 
 export type PackageEntitlements = Record<PackageEntitlementKey, boolean>
 
@@ -23,6 +24,7 @@ export const DEFAULT_PACKAGE_ENTITLEMENTS: PackageEntitlements = {
   exerciseVideos: false,
   pdfDocuments: false,
   progressTracking: false,
+  physicalTherapy: false,
 }
 
 export type SubscriptionPackage = {

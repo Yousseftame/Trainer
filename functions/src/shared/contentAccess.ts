@@ -3,7 +3,8 @@ export type PackageEntitlementKey =
   | "nutritionProgram"
   | "exerciseVideos"
   | "pdfDocuments"
-  | "progressTracking";
+  | "progressTracking"
+  | "physicalTherapy";
 
 export type PackageEntitlements = Record<PackageEntitlementKey, boolean>;
 
@@ -23,11 +24,17 @@ const DEFAULT_ENTITLEMENTS: PackageEntitlements = {
   exerciseVideos: false,
   pdfDocuments: false,
   progressTracking: false,
+  physicalTherapy: false,
 };
 
 export function normalizeEntitlements(
   input?: Partial<PackageEntitlements> | null,
 ): PackageEntitlements {
+  // Legacy packages never stored physicalTherapy (module was ungated).
+  const legacyPhysicalTherapy =
+    input != null &&
+    !Object.prototype.hasOwnProperty.call(input, "physicalTherapy");
+
   return {
     workoutProgram: input?.workoutProgram ?? DEFAULT_ENTITLEMENTS.workoutProgram,
     nutritionProgram:
@@ -36,6 +43,9 @@ export function normalizeEntitlements(
     pdfDocuments: input?.pdfDocuments ?? DEFAULT_ENTITLEMENTS.pdfDocuments,
     progressTracking:
       input?.progressTracking ?? DEFAULT_ENTITLEMENTS.progressTracking,
+    physicalTherapy: legacyPhysicalTherapy
+      ? true
+      : (input?.physicalTherapy ?? DEFAULT_ENTITLEMENTS.physicalTherapy),
   };
 }
 

@@ -10,6 +10,7 @@ import {
 import { APP_ROUTES } from "@/config/constants"
 import { useSubscriberPTQuery } from "@/features/physicalTherapy/hooks"
 import { usePanelSubscriber } from "@/features/subscribers/use-panel-subscriber"
+import { useSubscriberEntitlementAccess } from "@/features/subscriptions/use-subscriber-entitlement-access"
 import { useLocale } from "@/hooks/useLocale"
 import { cn } from "@/lib/utils"
 
@@ -21,6 +22,7 @@ export function SubscriberPTSection() {
   const { locale, isRtl } = useLocale()
   const isAr = locale === "ar"
   const { subscriberId } = usePanelSubscriber()
+  const { canAccess } = useSubscriberEntitlementAccess()
   const { data: ptRecord, isLoading } = useSubscriberPTQuery(subscriberId)
 
   const openCase = useMemo(() => {
@@ -29,7 +31,7 @@ export function SubscriberPTSection() {
     return ptRecord
   }, [ptRecord])
 
-  if (isLoading || !openCase) return null
+  if (!canAccess("physicalTherapy") || isLoading || !openCase) return null
 
   const ArrowIcon = isRtl ? ArrowLeft : ArrowRight
 

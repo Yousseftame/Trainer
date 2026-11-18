@@ -537,6 +537,10 @@ export function SubscriptionsPage() {
                 ar: "تتبع التقدم",
                 en: "Progress tracking",
               },
+              physicalTherapy: {
+                ar: "العلاج الطبيعي",
+                en: "Physical therapy",
+              },
             }
             return (
               <div className="grid gap-4 sm:grid-cols-[1fr_240px]">

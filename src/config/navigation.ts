@@ -329,7 +329,12 @@ export const subscriberNav: NavItem[] = [
     icon: TrendingUp,
     entitlement: "progressTracking",
   },
-  { labelKey: "nav.physicalTherapy", to: APP_ROUTES.subscriber.physicalTherapy, icon: Activity },
+  {
+    labelKey: "nav.physicalTherapy",
+    to: APP_ROUTES.subscriber.physicalTherapy,
+    icon: Activity,
+    entitlement: "physicalTherapy",
+  },
   { labelKey: "nav.history", to: APP_ROUTES.subscriber.history, icon: History },
   { labelKey: "nav.subscription", to: APP_ROUTES.subscriber.subscription, icon: CreditCard },
   { labelKey: "nav.profile", to: APP_ROUTES.subscriber.profile, icon: User },

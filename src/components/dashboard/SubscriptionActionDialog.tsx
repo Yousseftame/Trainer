@@ -70,6 +70,7 @@ const ENTITLEMENT_SHORT_LABELS: Record<
   exerciseVideos: { ar: "الفيديوهات", en: "Videos" },
   pdfDocuments: { ar: "ملفات PDF", en: "PDFs" },
   progressTracking: { ar: "التقدم", en: "Progress" },
+  physicalTherapy: { ar: "العلاج الطبيعي", en: "PT / Rehab" },
 }
 
 function toDateInputValue(iso: string | null | undefined): string {

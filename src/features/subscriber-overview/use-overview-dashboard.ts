@@ -128,6 +128,11 @@ export function useSubscriberOverviewDashboard(locale: AppLocale) {
     pkg ?? undefined,
     "progressTracking",
   )
+  const canPhysicalTherapy = canAccessPackageEntitlement(
+    currentSub,
+    pkg ?? undefined,
+    "physicalTherapy",
+  )
 
   const weeks: AdherenceWeek[] = useMemo(
     () =>
@@ -248,6 +253,7 @@ export function useSubscriberOverviewDashboard(locale: AppLocale) {
     canWorkout,
     canNutrition,
     canProgress,
+    canPhysicalTherapy,
     measurements,
     workoutPrograms,
     nutritionPrograms,

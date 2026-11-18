@@ -89,6 +89,7 @@ export function SubscriberMobileMenuDrawer({
               : "Injury rehab & recovery exercises",
             to: APP_ROUTES.subscriber.physicalTherapy,
             icon: HeartPulse,
+            entitlement: "physicalTherapy",
           },
           {
             label: isAr ? "تتبع التقدم والقياسات" : "Progress & Body Metrics",

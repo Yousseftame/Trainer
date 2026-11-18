@@ -13,17 +13,26 @@ export const ENTITLEMENT_KEYS: PackageEntitlementKey[] = [
   "exerciseVideos",
   "pdfDocuments",
   "progressTracking",
+  "physicalTherapy",
 ]
 
 export function normalizeEntitlements(
   input?: Partial<PackageEntitlements> | null,
 ): PackageEntitlements {
+  // Legacy packages/snapshots never stored physicalTherapy (module was ungated).
+  // Keep access on until a coach explicitly saves the entitlement off.
+  const legacyPhysicalTherapy =
+    input != null && !Object.prototype.hasOwnProperty.call(input, "physicalTherapy")
+
   return {
     workoutProgram: input?.workoutProgram ?? DEFAULT_PACKAGE_ENTITLEMENTS.workoutProgram,
     nutritionProgram: input?.nutritionProgram ?? DEFAULT_PACKAGE_ENTITLEMENTS.nutritionProgram,
     exerciseVideos: input?.exerciseVideos ?? DEFAULT_PACKAGE_ENTITLEMENTS.exerciseVideos,
     pdfDocuments: input?.pdfDocuments ?? DEFAULT_PACKAGE_ENTITLEMENTS.pdfDocuments,
     progressTracking: input?.progressTracking ?? DEFAULT_PACKAGE_ENTITLEMENTS.progressTracking,
+    physicalTherapy: legacyPhysicalTherapy
+      ? true
+      : (input?.physicalTherapy ?? DEFAULT_PACKAGE_ENTITLEMENTS.physicalTherapy),
   }
 }
 

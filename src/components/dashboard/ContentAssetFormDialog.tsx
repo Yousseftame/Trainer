@@ -115,6 +115,11 @@ const ENTITLEMENT_OPTIONS: Array<{
     ar: "ملفات PDF والمستندات",
     en: "PDFs & educational docs",
   },
+  {
+    id: "physicalTherapy",
+    ar: "العلاج الطبيعي والتأهيل",
+    en: "Physical therapy & rehab",
+  },
 ]
 
 export function ContentAssetFormDialog({

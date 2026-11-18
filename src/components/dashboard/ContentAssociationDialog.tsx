@@ -46,6 +46,11 @@ const ENTITLEMENT_OPTIONS: Array<{
   { id: "nutritionProgram", ar: "برامج التغذية", en: "Nutrition programs" },
   { id: "pdfDocuments", ar: "ملفات PDF والمستندات", en: "PDFs & educational docs" },
   { id: "progressTracking", ar: "تتبع التقدم", en: "Progress tracking" },
+  {
+    id: "physicalTherapy",
+    ar: "العلاج الطبيعي والتأهيل",
+    en: "Physical therapy & rehab",
+  },
 ]
 
 type ProgramPickerItem = {

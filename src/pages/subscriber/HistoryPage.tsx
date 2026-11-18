@@ -206,6 +206,11 @@ export function HistoryPage() {
     pkg ?? undefined,
     "progressTracking",
   )
+  const canPhysicalTherapy = canAccessPackageEntitlement(
+    currentSub,
+    pkg ?? undefined,
+    "physicalTherapy",
+  )
 
   const unifiedPrograms = useMemo(() => {
     const list: Array<{
@@ -454,15 +459,19 @@ export function HistoryPage() {
                 icon: HeartPulse,
                 label: isAr ? "التأهيل" : "Rehab History",
                 count: ptRecords.length,
+                show: canPhysicalTherapy,
               },
               {
                 id: "subscriptions" as const,
                 icon: CreditCard,
                 label: isAr ? "الاشتراكات" : "Subscriptions",
                 count: subscriptions.length,
+                show: true,
               },
             ] as const
-          ).map((tab) => (
+          )
+            .filter((tab) => ("show" in tab ? tab.show !== false : true))
+            .map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -975,7 +984,11 @@ export function HistoryPage() {
         </div>
       ) : null}
 
-      {activeSubscriberId && !pageLoading && !pageError && activeTab === "rehab" ? (
+      {activeSubscriberId &&
+      !pageLoading &&
+      !pageError &&
+      activeTab === "rehab" &&
+      canPhysicalTherapy ? (
         <div className="flex flex-col gap-4">
           <div className="space-y-4 rounded-[24px] border border-black/6 bg-white p-5 shadow-xs sm:p-7">
             <div className="flex flex-col gap-2 border-b border-black/5 pb-4 sm:flex-row sm:items-center sm:justify-between">

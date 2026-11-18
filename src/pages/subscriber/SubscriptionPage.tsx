@@ -75,6 +75,12 @@ const ENTITLEMENT_LABELS: Record<
     descAr: "تسجيل الوزن والقياسات وصور التقدم والرسوم البيانية.",
     descEn: "Record body weight, measurements, progress photos, and charts.",
   },
+  physicalTherapy: {
+    ar: "العلاج الطبيعي وإعادة التأهيل",
+    en: "Physical therapy & rehab",
+    descAr: "الوصول إلى خطط العلاج الطبيعي وتمارين إعادة التأهيل المعيّنة.",
+    descEn: "Access assigned physical therapy plans and rehab exercises.",
+  },
 }
 
 export function SubscriptionPage() {

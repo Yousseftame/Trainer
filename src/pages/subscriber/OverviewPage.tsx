@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils"
 export function OverviewPage() {
   const { locale, isRtl } = useLocale()
   const isAr = locale === "ar"
-  const { canWorkout, canNutrition, canProgress } =
+  const { canWorkout, canNutrition, canProgress, canPhysicalTherapy } =
     useSubscriberOverviewDashboard(locale)
 
   useDocumentTitle(isAr ? "الرئيسية • لوحة المشترك" : "Overview • DerpyFit")
@@ -65,16 +65,18 @@ export function OverviewPage() {
               icon: TrendingUp,
             }
           : null,
-        {
-          id: "physicalTherapy",
-          title: isAr ? "العلاج الطبيعي" : "Physical Therapy",
-          to: APP_ROUTES.subscriber.physicalTherapy,
-          icon: HeartPulse,
-        },
+        canPhysicalTherapy
+          ? {
+              id: "physicalTherapy",
+              title: isAr ? "العلاج الطبيعي" : "Physical Therapy",
+              to: APP_ROUTES.subscriber.physicalTherapy,
+              icon: HeartPulse,
+            }
+          : null,
       ].filter(
         (item): item is NonNullable<typeof item> => item != null,
       ),
-    [isAr, canWorkout, canNutrition, canProgress],
+    [isAr, canWorkout, canNutrition, canProgress, canPhysicalTherapy],
   )
 
   return (

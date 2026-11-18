@@ -32,6 +32,7 @@ import { LogMeasurementDialog } from "@/components/dashboard/LogMeasurementDialo
 import { LogPerformanceDialog } from "@/components/dashboard/LogPerformanceDialog"
 import { PhotoComparisonDialog } from "@/components/dashboard/PhotoComparisonDialog"
 import { ProgressPhotoImage } from "@/components/dashboard/ProgressPhotoImage"
+import { ProgressPhotoLightbox } from "@/components/dashboard/ProgressPhotoLightbox"
 import { FilterChip, StatCard } from "@/components/dashboard/StatCard"
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
 import { APP_ROUTES } from "@/config/constants"
@@ -162,6 +163,7 @@ export function ProgressPage() {
   const [photoModalOpen, setPhotoModalOpen] = useState(false)
   const [performanceModalOpen, setPerformanceModalOpen] = useState(false)
   const [compareModalOpen, setCompareModalOpen] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean
@@ -483,10 +485,15 @@ export function ProgressPage() {
                 <button
                   type="button"
                   onClick={() => setCompareModalOpen(true)}
+                  title={
+                    isAr
+                      ? "قارن صورتين جنباً إلى جنب لرؤية التغير"
+                      : "Compare two photos side-by-side to review change"
+                  }
                   className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[#F4F4F4] px-4 text-[13px] font-bold text-[var(--gym-ink,#111111)] transition hover:bg-black/5"
                 >
                   <ArrowLeftRight className="size-4" />
-                  <span>{isAr ? "مقارنة الصور" : "Compare"}</span>
+                  <span>{isAr ? "مقارنة جنباً إلى جنب" : "Side-by-Side"}</span>
                 </button>
               ) : null}
             </div>
@@ -546,6 +553,10 @@ export function ProgressPage() {
                 canWrite ? () => setPerformanceModalOpen(true) : undefined
               }
               onOpenCompareModal={() => setCompareModalOpen(true)}
+              onOpenPhoto={(photo) => {
+                const idx = selectedPhotos.findIndex((p) => p.id === photo.id)
+                setLightboxIndex(idx >= 0 ? idx : 0)
+              }}
               onDeleteMeasurement={
                 canWrite ? handleDeleteMeasurement : undefined
               }
@@ -598,6 +609,14 @@ export function ProgressPage() {
             photos={selectedPhotos}
             subscriberName={selected.subscriber.displayName}
             onClose={() => setCompareModalOpen(false)}
+          />
+
+          <ProgressPhotoLightbox
+            open={lightboxIndex != null}
+            photos={selectedPhotos}
+            index={lightboxIndex ?? 0}
+            onClose={() => setLightboxIndex(null)}
+            onIndexChange={setLightboxIndex}
           />
         </>
       ) : null}
@@ -764,6 +783,7 @@ function ReviewPanel({
   onOpenPhotoModal,
   onOpenPerformanceModal,
   onOpenCompareModal,
+  onOpenPhoto,
   onDeleteMeasurement,
   onDeletePhoto,
   onDeleteLift,
@@ -782,6 +802,7 @@ function ReviewPanel({
   onOpenPhotoModal?: () => void
   onOpenPerformanceModal?: () => void
   onOpenCompareModal?: () => void
+  onOpenPhoto?: (photo: ProgressPhoto) => void
   onDeleteMeasurement?: (row: BodyMeasurement) => void
   onDeletePhoto?: (photo: ProgressPhoto) => void
   onDeleteLift?: (row: PerformanceRecord) => void
@@ -859,6 +880,7 @@ function ReviewPanel({
             latest={latest}
             programs={programs}
             locale={locale}
+            onOpenPhoto={onOpenPhoto}
           />
         ) : null}
         {tab === "body" ? (
@@ -874,6 +896,7 @@ function ReviewPanel({
             photos={photos}
             onAddPhoto={onOpenPhotoModal}
             onCompare={onOpenCompareModal}
+            onOpenPhoto={onOpenPhoto}
             onDeletePhoto={onDeletePhoto}
           />
         ) : null}
@@ -904,6 +927,10 @@ function metricSet(row: BodyMeasurement | undefined, latest: BodyMeasurement) {
   ] as const
 }
 
+function photoDayKey(iso: string) {
+  return iso.slice(0, 10)
+}
+
 function OverviewTab({
   measurements,
   photos,
@@ -913,6 +940,7 @@ function OverviewTab({
   latest,
   programs,
   locale,
+  onOpenPhoto,
 }: {
   measurements: BodyMeasurement[]
   photos: ProgressPhoto[]
@@ -922,24 +950,40 @@ function OverviewTab({
   latest?: BodyMeasurement
   programs: { workouts: WorkoutProgram[]; nutrition: NutritionProgram[] }
   locale: AppLocale
+  onOpenPhoto?: (photo: ProgressPhoto) => void
 }) {
   const { t } = useTranslation()
   const workoutPct = week ? percent(week.workoutDone, week.workoutTotal) : null
   const nutritionPct = week ? percent(week.nutritionDone, week.nutritionTotal) : null
-  const latestPhotos = photos.filter((item) => item.takenAt === photos[photos.length - 1]?.takenAt)
+  const latestDay = photos[photos.length - 1]
+    ? photoDayKey(photos[photos.length - 1].takenAt)
+    : null
+  const latestPhotos = latestDay
+    ? photos.filter((item) => photoDayKey(item.takenAt) === latestDay)
+    : []
+  const activeWorkouts = programs.workouts.filter((item) => item.status === "active")
+  const activeNutrition = programs.nutrition.filter((item) => item.status === "active")
+  const hasAnyContent =
+    Boolean(latest) ||
+    photos.length > 0 ||
+    activeWorkouts.length > 0 ||
+    activeNutrition.length > 0 ||
+    Boolean(week && (week.workoutTotal > 0 || week.nutritionTotal > 0))
 
-  if (!latest) {
+  if (!hasAnyContent) {
     return <EmptyNote>{t("admin.progress.emptyPerson")}</EmptyNote>
   }
 
   return (
     <div className="flex flex-col gap-3">
-      <Panel>
-        <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#8c8c8c]">
-          {t("admin.progress.weightTrend")}
-        </p>
-        <WeightChart measurements={measurements} locale={locale} />
-      </Panel>
+      {latest ? (
+        <Panel>
+          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#8c8c8c]">
+            {t("admin.progress.weightTrend")}
+          </p>
+          <WeightChart measurements={measurements} locale={locale} />
+        </Panel>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <AdherenceCard
@@ -958,24 +1002,26 @@ function OverviewTab({
         />
       </div>
 
-      <Panel>
-        <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#8c8c8c]">
-          {t("admin.progress.sinceStart")}
-        </p>
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-          {metricSet(first, latest).map((item) => (
-            <DeltaStat
-              key={item.key}
-              label={t(`admin.progress.metrics.${item.key}`)}
-              first={item.first}
-              latest={item.latest}
-              unit={item.unit}
-            />
-          ))}
-        </div>
-      </Panel>
+      {latest ? (
+        <Panel>
+          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#8c8c8c]">
+            {t("admin.progress.sinceStart")}
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            {metricSet(first, latest).map((item) => (
+              <DeltaStat
+                key={item.key}
+                label={t(`admin.progress.metrics.${item.key}`)}
+                first={item.first}
+                latest={item.latest}
+                unit={item.unit}
+              />
+            ))}
+          </div>
+        </Panel>
+      ) : null}
 
-      {previous ? (
+      {previous && latest ? (
         <Panel>
           <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#8c8c8c]">
             {t("admin.progress.vsPrevious")}
@@ -1001,7 +1047,7 @@ function OverviewTab({
           </p>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:max-w-xl">
             {latestPhotos.map((item) => (
-              <PhotoCard key={item.id} photo={item} />
+              <PhotoCard key={item.id} photo={item} onOpen={onOpenPhoto} />
             ))}
           </div>
         </Panel>
@@ -1012,9 +1058,7 @@ function OverviewTab({
           {t("admin.progress.currentPrograms")}
         </p>
         <ul className="mt-2 flex flex-col gap-2">
-          {programs.workouts
-            .filter((item) => item.status === "active")
-            .map((item) => (
+          {activeWorkouts.map((item) => (
               <li key={item.id} className="rounded-2xl bg-[#F4F4F4] px-3 py-2.5">
                 <p className="text-[13px] font-bold text-[var(--gym-ink,#111111)]">{item.title[locale]}</p>
                 <p className="mt-0.5 text-[11px] font-medium text-[#8c8c8c]">
@@ -1024,9 +1068,7 @@ function OverviewTab({
                 </p>
               </li>
             ))}
-          {programs.nutrition
-            .filter((item) => item.status === "active")
-            .map((item) => (
+          {activeNutrition.map((item) => (
               <li key={item.id} className="rounded-2xl bg-[#F4F4F4] px-3 py-2.5">
                 <p className="text-[13px] font-bold text-[var(--gym-ink,#111111)]">{item.title[locale]}</p>
                 <p className="mt-0.5 text-[11px] font-medium text-[#8c8c8c]">
@@ -1037,8 +1079,7 @@ function OverviewTab({
                 </p>
               </li>
             ))}
-          {!programs.workouts.some((item) => item.status === "active") &&
-          !programs.nutrition.some((item) => item.status === "active") ? (
+          {activeWorkouts.length === 0 && activeNutrition.length === 0 ? (
             <li className="text-[13px] font-medium text-[#8c8c8c]">{t("admin.progress.noProgram")}</li>
           ) : null}
         </ul>
@@ -1183,11 +1224,13 @@ function PhotosTab({
   photos,
   onAddPhoto,
   onCompare,
+  onOpenPhoto,
   onDeletePhoto,
 }: {
   photos: ProgressPhoto[]
   onAddPhoto?: () => void
   onCompare?: () => void
+  onOpenPhoto?: (photo: ProgressPhoto) => void
   onDeletePhoto?: (photo: ProgressPhoto) => void
 }) {
   const { t } = useTranslation()
@@ -1195,23 +1238,41 @@ function PhotosTab({
   const isAr = locale === "ar"
   if (!photos.length) return <EmptyNote>{t("admin.progress.emptyPhotos")}</EmptyNote>
 
-  const firstDate = photos[0]?.takenAt
-  const lastDate = photos[photos.length - 1]?.takenAt
-  const start = photos.filter((item) => item.takenAt === firstDate)
-  const latest = firstDate !== lastDate ? photos.filter((item) => item.takenAt === lastDate) : []
+  const firstDay = photos[0] ? photoDayKey(photos[0].takenAt) : null
+  const lastDay = photos[photos.length - 1]
+    ? photoDayKey(photos[photos.length - 1].takenAt)
+    : null
+  const start = firstDay
+    ? photos.filter((item) => photoDayKey(item.takenAt) === firstDay)
+    : []
+  const latest =
+    firstDay && lastDay && firstDay !== lastDay
+      ? photos.filter((item) => photoDayKey(item.takenAt) === lastDay)
+      : []
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Header controls inside tab */}
-      <div className="flex items-center justify-between rounded-[18px] bg-white px-4 py-3">
-        <p className="text-[12px] font-bold text-[#8c8c8c]">
-          {photos.length} {isAr ? "صور مسجلة في هذا الملف" : "photos on this profile"}
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-[18px] bg-white px-4 py-3">
+        <div>
+          <p className="text-[12px] font-bold text-[#8c8c8c]">
+            {photos.length} {isAr ? "صور مسجلة في هذا الملف" : "photos on this profile"}
+          </p>
+          <p className="mt-0.5 text-[11px] font-medium text-[#a3a3a3]">
+            {isAr
+              ? "اضغط الصورة للعرض الكامل · قارن صورتين جنباً إلى جنب لرؤية التغير"
+              : "Click a photo for fullscreen · Side-by-Side compares two photos over time"}
+          </p>
+        </div>
         <div className="flex items-center gap-2">
           {photos.length >= 2 && onCompare ? (
             <button
               type="button"
               onClick={onCompare}
+              title={
+                isAr
+                  ? "قارن صورتين جنباً إلى جنب لرؤية التغير"
+                  : "Compare two photos side-by-side to review change"
+              }
               className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[#F4F4F4] px-3.5 text-[11px] font-bold text-[var(--gym-ink,#111111)] hover:bg-[#ececec]"
             >
               <ArrowLeftRight className="size-3.5" />
@@ -1239,7 +1300,12 @@ function PhotosTab({
             </p>
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {start.map((item) => (
-                <PhotoCard key={item.id} photo={item} onDelete={onDeletePhoto} />
+                <PhotoCard
+                  key={item.id}
+                  photo={item}
+                  onOpen={onOpenPhoto}
+                  onDelete={onDeletePhoto}
+                />
               ))}
             </div>
           </Panel>
@@ -1249,7 +1315,12 @@ function PhotosTab({
             </p>
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {latest.map((item) => (
-                <PhotoCard key={item.id} photo={item} onDelete={onDeletePhoto} />
+                <PhotoCard
+                  key={item.id}
+                  photo={item}
+                  onOpen={onOpenPhoto}
+                  onDelete={onDeletePhoto}
+                />
               ))}
             </div>
           </Panel>
@@ -1261,7 +1332,12 @@ function PhotosTab({
         </p>
         <div className="mt-3 grid grid-cols-2 content-start items-start gap-2 sm:grid-cols-3 lg:grid-cols-4">
           {photos.map((item) => (
-            <PhotoCard key={item.id} photo={item} onDelete={onDeletePhoto} />
+            <PhotoCard
+              key={item.id}
+              photo={item}
+              onOpen={onOpenPhoto}
+              onDelete={onDeletePhoto}
+            />
           ))}
         </div>
       </Panel>
@@ -1295,6 +1371,31 @@ function PerformanceTab({
     workout: week.workoutTotal ? percent(week.workoutDone, week.workoutTotal) : null,
     nutrition: week.nutritionTotal ? percent(week.nutritionDone, week.nutritionTotal) : null,
   }))
+  const showAdherence = hasWorkout || hasNutrition
+  const isEmpty = !lifts.length && !log.length && !showAdherence
+
+  if (isEmpty) {
+    return (
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between rounded-[18px] bg-white px-4 py-3">
+          <p className="text-[12px] font-bold text-[#8c8c8c]">
+            {isAr ? "الأرقام القياسية والتطور الرياضي" : "Athletic Performance & PR Records"}
+          </p>
+          {onAddLift ? (
+            <button
+              type="button"
+              onClick={onAddLift}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--gym-ink,#111111)] px-3.5 text-[11px] font-bold text-white hover:opacity-90"
+            >
+              <Plus className="size-3.5" />
+              <span>{isAr ? "تسجيل رقم جديد" : "Log PR"}</span>
+            </button>
+          ) : null}
+        </div>
+        <EmptyNote>{t("admin.progress.emptyPerformance")}</EmptyNote>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -1375,7 +1476,7 @@ function PerformanceTab({
           </div>
         </Panel>
       ) : null}
-      {chartData.length ? (
+      {showAdherence && chartData.length ? (
         <Panel>
           <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#8c8c8c]">
             {t("admin.progress.adherenceHistory")}
@@ -1644,9 +1745,11 @@ function DeltaStat({
 
 function PhotoCard({
   photo,
+  onOpen,
   onDelete,
 }: {
   photo: ProgressPhoto
+  onOpen?: (photo: ProgressPhoto) => void
   onDelete?: (photo: ProgressPhoto) => void
 }) {
   const { t } = useTranslation()
@@ -1655,29 +1758,50 @@ function PhotoCard({
 
   return (
     <figure className="group relative h-fit overflow-hidden rounded-[16px] bg-[var(--gym-ink,#111111)] text-white shadow-2xs">
-      <div className="relative flex aspect-[3/4] items-center justify-center overflow-hidden bg-black/40">
+      <button
+        type="button"
+        onClick={() => onOpen?.(photo)}
+        disabled={!onOpen}
+        className={cn(
+          "relative flex aspect-[3/4] w-full items-center justify-center overflow-hidden bg-black/40 text-start",
+          onOpen && "cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gym-lime,#fb5001)]",
+        )}
+        aria-label={
+          isAr
+            ? `عرض صورة ${photo.pose || ""} بالحجم الكامل`
+            : `Open ${photo.pose || "progress"} photo fullscreen`
+        }
+      >
         <ProgressPhotoImage photo={photo} />
         <span className="absolute bottom-2 start-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-bold uppercase">
           {photo.pose ? t(`admin.progress.pose.${photo.pose}`) : "Photo"}
         </span>
-
-        {onDelete ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onDelete(photo)
-            }}
-            className="absolute top-2 end-2 flex size-7 items-center justify-center rounded-full bg-black/60 text-white/80 opacity-0 group-hover:opacity-100 transition hover:bg-[#C44536] hover:text-white"
-            title={isAr ? "حذف الصورة" : "Delete photo"}
-          >
-            <Trash2 className="size-3.5" />
-          </button>
+        {onOpen ? (
+          <span className="pointer-events-none absolute inset-0 bg-black/0 transition group-hover:bg-black/15" />
         ) : null}
-      </div>
+      </button>
+
+      {onDelete ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onDelete(photo)
+          }}
+          className="absolute top-2 end-2 z-10 flex size-7 items-center justify-center rounded-full bg-black/60 text-white/80 opacity-0 transition group-hover:opacity-100 hover:bg-[#C44536] hover:text-white"
+          title={isAr ? "حذف الصورة" : "Delete photo"}
+        >
+          <Trash2 className="size-3.5" />
+        </button>
+      ) : null}
+
       <figcaption className="px-2.5 py-2 text-[11px] font-bold text-white/80">
         <span className="block">{formatDate(photo.takenAt, locale)}</span>
-        {photo.caption ? <span className="mt-0.5 block truncate font-medium text-white/55">{photo.caption}</span> : null}
+        {photo.caption ? (
+          <span className="mt-0.5 block truncate font-medium text-white/55">
+            {photo.caption}
+          </span>
+        ) : null}
       </figcaption>
     </figure>
   )

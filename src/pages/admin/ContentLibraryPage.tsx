@@ -77,6 +77,7 @@ const ENTITLEMENT_BADGE: Record<
   nutritionProgram: { ar: "صلاحية: التغذية", en: "Requires: Nutrition" },
   pdfDocuments: { ar: "صلاحية: ملفات PDF", en: "Requires: PDFs" },
   progressTracking: { ar: "صلاحية: التقدم", en: "Requires: Progress" },
+  physicalTherapy: { ar: "صلاحية: العلاج الطبيعي", en: "Requires: PT / Rehab" },
 }
 
 const PREVIEW: Record<ContentCategory, { className: string; icon: ReactNode }> = {

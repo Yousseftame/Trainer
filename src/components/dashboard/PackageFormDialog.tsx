@@ -34,6 +34,7 @@ const ENTITLEMENT_LABELS: Record<
   exerciseVideos: { ar: "فيديوهات التمارين", en: "Exercise videos" },
   pdfDocuments: { ar: "ملفات ومستندات PDF", en: "PDF documents" },
   progressTracking: { ar: "تتبع التقدم والقياسات", en: "Progress tracking" },
+  physicalTherapy: { ar: "العلاج الطبيعي", en: "Physical therapy" },
 }
 
 const TONE_OPTIONS: Array<{
@@ -125,6 +126,7 @@ export function PackageFormDialog({
         exerciseVideos: true,
         pdfDocuments: true,
         progressTracking: true,
+        physicalTherapy: true,
       })
       setFeaturesAr(["خطة تمارين وتغذية مخصصة", "متابعة أسبوعية للنتائج"])
       setFeaturesEn([
