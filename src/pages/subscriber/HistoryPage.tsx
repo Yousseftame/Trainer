@@ -171,7 +171,6 @@ export function HistoryPage() {
   })
   const {
     data: measurements = [],
-    isLoading: measurementsLoading,
     isError: measurementsError,
     refetch: refetchMeasurements,
   } = useMeasurementsQuery(activeSubscriberId || undefined)
@@ -179,7 +178,6 @@ export function HistoryPage() {
   const { data: lifts = [] } = usePerformanceQuery(activeSubscriberId || undefined)
   const {
     data: ptRecords = [],
-    isLoading: ptLoading,
     isError: ptError,
     refetch: refetchPt,
   } = useSubscriberPTRecordsQuery(activeSubscriberId)
